@@ -1,0 +1,38 @@
+name: secrets-setup
+description: >
+  Load secrets from GCP Secret Manager into the workflow environment via mise + fnox.
+  Self-contained: calls auth-gcp internally.
+
+inputs:
+  profile:
+    description: fnox profile (maps to secret paths)
+    required: true
+  project-id:
+    description: GCP project ID for Secret Manager access
+    required: true
+  workload-identity-provider:
+    description: Workload Identity Provider resource name
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Authenticate to GCP
+      uses: ./actions/auth-gcp
+      with:
+        project-id: ${{ inputs.project-id }}
+        workload-identity-provider: ${{ inputs.workload-identity-provider }}
+
+    - name: Setup mise
+      uses: jdx/mise-action@v2
+
+    - name: Load secrets via fnox
+      shell: bash
+      env:
+        FNOX_PROFILE: ${{ inputs.profile }}
+        GCP_PROJECT: ${{ inputs.project-id }}
+      run: |
+        echo "::group::Load secrets from GCP Secret Manager"
+        # fnox reads fnox.toml in the repo and loads secrets for the given profile
+        fnox load --profile "${FNOX_PROFILE}" --project "${GCP_PROJECT}" --export >> "$GITHUB_ENV"
+        echo "::endgroup::"

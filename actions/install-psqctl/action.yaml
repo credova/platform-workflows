@@ -1,0 +1,76 @@
+name: install-pctl
+description: >
+  Internal: Install pctl from GitHub releases.
+  Accepts a pre-generated token with access to credova/pctl.
+  Handles version resolution, architecture detection, and checksum verification.
+
+inputs:
+  version:
+    description: pctl version to install
+    required: false
+    default: latest
+  token:
+    description: GitHub token with read access to credova/pctl releases
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Check if pctl is already installed
+      id: check
+      shell: bash
+      run: |
+        if command -v pctl &> /dev/null; then
+          echo "pctl already installed: $(pctl version)"
+          echo "installed=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "installed=false" >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: Install pctl
+      if: steps.check.outputs.installed != 'true'
+      shell: bash
+      env:
+        PCTL_VERSION: ${{ inputs.version }}
+        GH_TOKEN: ${{ inputs.token }}
+      run: |
+        echo "::group::Install pctl"
+
+        # Resolve version
+        if [ "${PCTL_VERSION}" = "latest" ]; then
+          PCTL_VERSION=$(gh release view --repo credova/pctl --json tagName -q '.tagName' | sed 's/^v//')
+        fi
+
+        # Detect OS and architecture
+        OS=$(uname -s)   # Linux or Darwin
+        ARCH=$(uname -m) # x86_64 or aarch64/arm64
+        case "${ARCH}" in
+          aarch64|arm64) ARCH="arm64" ;;
+          x86_64)        ARCH="x86_64" ;;
+          *) echo "::error::Unsupported architecture: ${ARCH}"; exit 1 ;;
+        esac
+
+        ARCHIVE="pctl_${OS}_${ARCH}.tar.gz"
+        URL="https://github.com/credova/pctl/releases/download/v${PCTL_VERSION}/${ARCHIVE}"
+
+        echo "Downloading pctl v${PCTL_VERSION} from ${URL}"
+        curl -fsSL -o "/tmp/${ARCHIVE}" "${URL}"
+
+        # Verify checksum
+        CHECKSUMS_URL="https://github.com/credova/pctl/releases/download/v${PCTL_VERSION}/checksums.txt"
+        curl -fsSL -o /tmp/checksums.txt "${CHECKSUMS_URL}"
+        EXPECTED=$(grep "${ARCHIVE}" /tmp/checksums.txt | awk '{print $1}')
+        ACTUAL=$(sha256sum "/tmp/${ARCHIVE}" | awk '{print $1}')
+        if [ "${EXPECTED}" != "${ACTUAL}" ]; then
+          echo "::error::Checksum mismatch for ${ARCHIVE}: expected ${EXPECTED}, got ${ACTUAL}"
+          exit 1
+        fi
+        echo "Checksum verified."
+
+        # Extract and install
+        tar -xzf "/tmp/${ARCHIVE}" -C /tmp
+        install -m 755 /tmp/pctl /usr/local/bin/pctl
+        rm -f "/tmp/${ARCHIVE}" /tmp/checksums.txt /tmp/pctl
+
+        echo "Installed: $(pctl version)"
+        echo "::endgroup::"

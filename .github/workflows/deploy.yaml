@@ -1,0 +1,397 @@
+name: Deploy
+
+on:
+  workflow_call:
+    inputs:
+      # Language (optional - for repos that need tests before deploy)
+      language:
+        description: "Language runtime to setup: go, node, kotlin, python, ruby, dotnet"
+        type: string
+        required: false
+        default: ""
+      language-version:
+        description: Language/runtime version (required if language is set)
+        type: string
+        required: false
+        default: ""
+      test-command:
+        description: Custom test command (defaults per language if empty)
+        type: string
+        required: false
+        default: ""
+
+      # Container (on by default - disable for non-container repos)
+      container:
+        description: Build, scan, and push a container image
+        type: boolean
+        required: false
+        default: true
+      image:
+        description: "Single image - name:dockerfile or just name (defaults to ./Dockerfile)"
+        type: string
+        required: false
+        default: ""
+      images:
+        description: "Multi-image YAML list with name, dockerfile, optional target, canary, context"
+        type: string
+        required: false
+        default: ""
+      container-reuse:
+        description: Check for existing image before building
+        type: boolean
+        required: false
+        default: true
+
+      # Deployment (on by default - disable for release-only repos)
+      deploy:
+        description: Deploy to Cloud Run via pctl
+        type: boolean
+        required: false
+        default: true
+      config-path:
+        description: Path to CUE config directory
+        type: string
+        required: false
+        default: deployments/
+      canary:
+        description: Top-level canary traffic percentage
+        type: number
+        required: false
+        default: 0
+      require-approval:
+        description: Require manual approval for production
+        type: boolean
+        required: false
+        default: true
+
+      # Hotfix mode — tag push → build → approve → production (skip staging/tests)
+      hotfix:
+        description: "Hotfix mode: skip staging and tests. Deploy straight to production."
+        type: boolean
+        required: false
+        default: false
+
+      # Security
+      security-severity:
+        description: Minimum severity to fail container scan on
+        type: string
+        required: false
+        default: HIGH
+
+      # Notifications
+      notifications:
+        description: Send Slack notifications
+        type: boolean
+        required: false
+        default: true
+
+      # Auth
+      project-id:
+        description: GCP project ID
+        type: string
+        required: false
+        default: ""
+      workload-identity-provider:
+        description: Workload Identity Provider resource name
+        type: string
+        required: false
+        default: ""
+
+    secrets:
+      RELEASE_APP_ID:
+        required: false
+      RELEASE_APP_PRIVATE_KEY:
+        required: false
+
+jobs:
+  # --- Input validation and image parsing ---
+  validate-inputs:
+    runs-on: ubuntu-latest
+    outputs:
+      image-name: ${{ steps.parse.outputs.image-name }}
+      image-dockerfile: ${{ steps.parse.outputs.image-dockerfile }}
+      deploy-tag: ${{ steps.parse.outputs.deploy-tag }}
+    steps:
+      - name: Validate and parse inputs
+        id: parse
+        shell: bash
+        env:
+          IMAGE: ${{ inputs.image }}
+          IMAGES: ${{ inputs.images }}
+          CONTAINER: ${{ inputs.container }}
+          LANGUAGE: ${{ inputs.language }}
+          LANGUAGE_VERSION: ${{ inputs.language-version }}
+          HOTFIX: ${{ inputs.hotfix }}
+          REPO_NAME: ${{ github.event.repository.name }}
+          REF_NAME: ${{ github.ref_name }}
+          SHA: ${{ github.sha }}
+        run: |
+          if [ -n "${IMAGE}" ] && [ -n "${IMAGES}" ]; then
+            echo "::error::Cannot specify both 'image' and 'images'. Use one or the other."
+            exit 1
+          fi
+
+          if [ -n "${LANGUAGE}" ] && [ -z "${LANGUAGE_VERSION}" ]; then
+            echo "::error::language-version is required when language is set."
+            exit 1
+          fi
+
+          if [ "${CONTAINER}" = "true" ]; then
+            if [ -n "${IMAGE}" ]; then
+              if [[ "${IMAGE}" == *":"* ]]; then
+                echo "image-name=${IMAGE%%:*}" >> "$GITHUB_OUTPUT"
+                echo "image-dockerfile=${IMAGE#*:}" >> "$GITHUB_OUTPUT"
+              else
+                echo "image-name=${IMAGE}" >> "$GITHUB_OUTPUT"
+                echo "image-dockerfile=./Dockerfile" >> "$GITHUB_OUTPUT"
+              fi
+            else
+              echo "image-name=${REPO_NAME}" >> "$GITHUB_OUTPUT"
+              echo "image-dockerfile=./Dockerfile" >> "$GITHUB_OUTPUT"
+            fi
+          fi
+
+          # Hotfix uses the tag name, normal deploy uses the commit SHA
+          if [ "${HOTFIX}" = "true" ]; then
+            echo "deploy-tag=${REF_NAME}" >> "$GITHUB_OUTPUT"
+          else
+            echo "deploy-tag=${SHA}" >> "$GITHUB_OUTPUT"
+          fi
+
+  # --- Generate release download token (for pctl) ---
+  auth:
+    if: inputs.deploy
+    runs-on: ubuntu-latest
+    outputs:
+      token: ${{ steps.token.outputs.token }}
+    steps:
+      - name: Generate release download token
+        id: token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          owner: credova
+          repositories: pctl
+
+  # --- Tests (only when language is set, skipped for hotfix) ---
+  test:
+    if: inputs.language != '' && !inputs.hotfix
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup language
+        uses: ./actions/setup-language
+        with:
+          language: ${{ inputs.language }}
+          version: ${{ inputs.language-version }}
+
+      - name: Run tests
+        shell: bash
+        env:
+          LANGUAGE: ${{ inputs.language }}
+          TEST_COMMAND: ${{ inputs.test-command }}
+        run: |
+          if [ -n "${TEST_COMMAND}" ]; then
+            echo "Running: ${TEST_COMMAND}"
+            eval "${TEST_COMMAND}"
+            exit $?
+          fi
+
+          case "${LANGUAGE}" in
+            go)     go test ./... ;;
+            node)   npm ci && npm test ;;
+            kotlin) ./gradlew test ;;
+            python) pip install -e ".[test]" 2>/dev/null || pip install -e . && pytest ;;
+            ruby)   bundle install && bundle exec rake test ;;
+            dotnet) dotnet test ;;
+          esac
+
+  # --- Container build, scan, push (only when container is enabled) ---
+  build-scan-push:
+    if: inputs.container
+    needs: [validate-inputs, test]
+    # Run even if test was skipped (non-language repos or hotfix)
+    # but not if test failed
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build, scan, and push image
+        if: inputs.images == ''
+        uses: ./actions/container
+        with:
+          name: ${{ needs.validate-inputs.outputs.image-name }}
+          dockerfile: ${{ needs.validate-inputs.outputs.image-dockerfile }}
+          build: "true"
+          push: "true"
+          reuse: ${{ !inputs.hotfix && inputs.container-reuse && 'true' || 'false' }}
+          tag: ${{ needs.validate-inputs.outputs.deploy-tag }}
+          project-id: ${{ inputs.project-id }}
+          workload-identity-provider: ${{ inputs.workload-identity-provider }}
+          severity: ${{ inputs.security-severity }}
+
+  # --- Deploy staging (skipped for hotfix) ---
+  deploy-staging:
+    if: inputs.deploy && !inputs.hotfix
+    needs: [auth, build-scan-push, test, validate-inputs]
+    # Run if upstream didn't fail (skipped is ok)
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy to staging
+        uses: ./actions/deployment
+        with:
+          target: ${{ inputs.config-path }}
+          tag: ${{ needs.validate-inputs.outputs.deploy-tag }}
+          config-path: ${{ inputs.config-path }}
+          project-id: ${{ inputs.project-id }}
+          workload-identity-provider: ${{ inputs.workload-identity-provider }}
+          token: ${{ needs.auth.outputs.token }}
+
+  # --- Canary flow ---
+  approve-canary:
+    if: inputs.deploy && inputs.canary > 0
+    needs: [deploy-staging, build-scan-push]
+    # Run even if staging was skipped (hotfix) but not if it failed
+    runs-on: ubuntu-latest
+    environment: production-canary
+    steps:
+      - run: echo "Canary deployment approved"
+
+  deploy-canary:
+    if: inputs.deploy && inputs.canary > 0
+    needs: [auth, approve-canary, validate-inputs]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy canary
+        id: canary
+        uses: ./actions/deployment
+        with:
+          target: ${{ inputs.config-path }}
+          tag: ${{ needs.validate-inputs.outputs.deploy-tag }}
+          canary: ${{ inputs.canary }}
+          config-path: ${{ inputs.config-path }}
+          project-id: ${{ inputs.project-id }}
+          workload-identity-provider: ${{ inputs.workload-identity-provider }}
+          token: ${{ needs.auth.outputs.token }}
+
+  # --- Production approval ---
+  approve-production:
+    if: inputs.deploy && inputs.require-approval
+    needs: [build-scan-push, deploy-staging, deploy-canary]
+    # Run even if staging/canary were skipped (hotfix or non-canary repos)
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - run: echo "Production deployment approved"
+
+  # --- Deploy production ---
+  deploy-production:
+    if: inputs.deploy && always() && !failure() && !cancelled()
+    needs: [auth, approve-production, validate-inputs]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Retag image for production
+        if: inputs.container
+        uses: ./actions/container
+        with:
+          name: ${{ needs.validate-inputs.outputs.image-name || github.event.repository.name }}
+          retag: "true"
+          source-tag: ${{ needs.validate-inputs.outputs.deploy-tag }}
+          tag: ${{ needs.validate-inputs.outputs.deploy-tag }}-prd
+          project-id: ${{ inputs.project-id }}
+          workload-identity-provider: ${{ inputs.workload-identity-provider }}
+
+      - name: Promote canary to production
+        if: inputs.canary > 0
+        uses: ./actions/deployment
+        with:
+          target: ${{ inputs.config-path }}
+          action: promote
+          config-path: ${{ inputs.config-path }}
+          project-id: ${{ inputs.project-id }}
+          workload-identity-provider: ${{ inputs.workload-identity-provider }}
+          token: ${{ needs.auth.outputs.token }}
+
+      - name: Deploy to production (full)
+        if: inputs.canary == 0
+        uses: ./actions/deployment
+        with:
+          target: ${{ inputs.config-path }}
+          tag: ${{ needs.validate-inputs.outputs.deploy-tag }}-prd
+          config-path: ${{ inputs.config-path }}
+          project-id: ${{ inputs.project-id }}
+          workload-identity-provider: ${{ inputs.workload-identity-provider }}
+          token: ${{ needs.auth.outputs.token }}
+
+  # --- Release tag + GitHub Release ---
+  release:
+    needs: [deploy-production, validate-inputs]
+    if: always() && !failure() && !cancelled()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Normal deploy: increment tag and create release
+      - name: Create release tag
+        if: ${{ !inputs.hotfix }}
+        id: tag
+        uses: ./actions/increment-tag
+
+      - name: Create GitHub Release
+        if: ${{ !inputs.hotfix }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          gh release create "${TAG}" \
+            --title "${TAG}" \
+            --generate-notes
+
+      # Hotfix: release from the tag that triggered the workflow
+      - name: Create GitHub Release (hotfix)
+        if: ${{ inputs.hotfix }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.validate-inputs.outputs.deploy-tag }}
+        run: |
+          gh release create "${TAG}" \
+            --title "${TAG} (hotfix)" \
+            --generate-notes \
+            --notes-start-tag "$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo '')" \
+            2>/dev/null || echo "Release ${TAG} already exists, skipping"
+
+  # --- Cancel superseded pending deploys ---
+  cancel-superseded:
+    if: inputs.deploy && !inputs.hotfix
+    needs: [deploy-production]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Cancel superseded pending deploys
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          CURRENT_SHA: ${{ github.sha }}
+        run: |
+          echo "Checking for superseded pending deploys..."
+
+          WAITING_RUNS=$(gh api "repos/${REPO}/actions/runs?status=waiting" \
+            --jq '.workflow_runs[] | select(.head_sha != env.CURRENT_SHA) | .id')
+
+          for run_id in ${WAITING_RUNS}; do
+            echo "Cancelling superseded run #${run_id}"
+            gh api "repos/${REPO}/actions/runs/${run_id}/cancel" -X POST || true
+          done

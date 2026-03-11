@@ -1,0 +1,206 @@
+name: container
+description: >
+  Full container lifecycle - build, scan, push, tag, reuse, retag.
+  Self-contained: calls auth-gcp internally. Calls security (container scan) automatically after build.
+
+inputs:
+  name:
+    description: Image name (used for registry path)
+    required: true
+  dockerfile:
+    description: Path to Dockerfile
+    required: false
+    default: ./Dockerfile
+  context:
+    description: Docker build context
+    required: false
+    default: ./
+  target:
+    description: Docker build stage target (--target)
+    required: false
+    default: ""
+  build:
+    description: Build the image
+    required: false
+    default: "true"
+  push:
+    description: Push to Artifact Registry after scan
+    required: false
+    default: "false"
+  reuse:
+    description: Check if image exists first, skip build if so
+    required: false
+    default: "true"
+  tag:
+    description: Image tag
+    required: false
+    default: ${{ github.sha }}
+  extra-tags:
+    description: Additional tags to apply
+    required: false
+    default: ""
+  retag:
+    description: Retag an existing image (skip build + scan)
+    required: false
+    default: "false"
+  source-tag:
+    description: Source tag for retag operation
+    required: false
+    default: ""
+  build-args:
+    description: Docker build args
+    required: false
+    default: ""
+  # Auth inputs (passed through to auth-gcp)
+  project-id:
+    description: GCP project ID
+    required: false
+    default: ""
+  workload-identity-provider:
+    description: Workload Identity Provider resource name
+    required: false
+    default: ""
+  registry:
+    description: Artifact Registry hostname
+    required: false
+    default: us-docker.pkg.dev
+  severity:
+    description: Minimum severity to fail container scan on
+    required: false
+    default: HIGH
+
+outputs:
+  image:
+    description: Full image reference (registry/project/repo/name:tag)
+    value: ${{ steps.meta.outputs.image }}
+  digest:
+    description: Image digest
+    value: ${{ steps.push-image.outputs.digest }}
+  reused:
+    description: Whether the image was reused from a previous build
+    value: ${{ steps.reuse-check.outputs.exists }}
+
+runs:
+  using: composite
+  steps:
+    - name: Compute image metadata
+      id: meta
+      shell: bash
+      env:
+        REGISTRY: ${{ inputs.registry }}
+        PROJECT_ID: ${{ inputs.project-id }}
+        IMAGE_NAME: ${{ inputs.name }}
+        IMAGE_TAG: ${{ inputs.tag }}
+      run: |
+        IMAGE="${REGISTRY}/${PROJECT_ID}/${IMAGE_NAME}:${IMAGE_TAG}"
+        echo "image=${IMAGE}" >> "$GITHUB_OUTPUT"
+        echo "Image: ${IMAGE}"
+
+    - name: Authenticate to GCP
+      if: inputs.project-id != '' && inputs.workload-identity-provider != ''
+      uses: ./actions/auth-gcp
+      with:
+        project-id: ${{ inputs.project-id }}
+        workload-identity-provider: ${{ inputs.workload-identity-provider }}
+
+    # --- Retag flow ---
+    - name: Retag existing image
+      if: inputs.retag == 'true'
+      shell: bash
+      env:
+        REGISTRY: ${{ inputs.registry }}
+        PROJECT_ID: ${{ inputs.project-id }}
+        IMAGE_NAME: ${{ inputs.name }}
+        SOURCE_TAG: ${{ inputs.source-tag }}
+        TARGET_TAG: ${{ inputs.tag }}
+      run: |
+        SOURCE="${REGISTRY}/${PROJECT_ID}/${IMAGE_NAME}:${SOURCE_TAG}"
+        TARGET="${REGISTRY}/${PROJECT_ID}/${IMAGE_NAME}:${TARGET_TAG}"
+        echo "Retagging ${SOURCE} -> ${TARGET}"
+        gcloud artifacts docker tags add "${SOURCE}" "${TARGET}"
+
+    # --- Build flow ---
+    - name: Check for existing image (reuse)
+      id: reuse-check
+      if: inputs.build == 'true' && inputs.reuse == 'true' && inputs.retag != 'true'
+      shell: bash
+      env:
+        IMAGE: ${{ steps.meta.outputs.image }}
+      run: |
+        if docker manifest inspect "${IMAGE}" > /dev/null 2>&1; then
+          echo "Image already exists, skipping build."
+          echo "exists=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "Image not found, will build."
+          echo "exists=false" >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: Build image
+      if: >
+        inputs.build == 'true' &&
+        inputs.retag != 'true' &&
+        steps.reuse-check.outputs.exists != 'true'
+      shell: bash
+      env:
+        IMAGE: ${{ steps.meta.outputs.image }}
+        DOCKERFILE: ${{ inputs.dockerfile }}
+        CONTEXT: ${{ inputs.context }}
+        TARGET: ${{ inputs.target }}
+        BUILD_ARGS: ${{ inputs.build-args }}
+      run: |
+        BUILD_CMD="docker build -t ${IMAGE} -f ${DOCKERFILE}"
+
+        if [ -n "${TARGET}" ]; then
+          BUILD_CMD="${BUILD_CMD} --target ${TARGET}"
+        fi
+
+        if [ -n "${BUILD_ARGS}" ]; then
+          while IFS= read -r arg; do
+            [ -n "$arg" ] && BUILD_CMD="${BUILD_CMD} --build-arg ${arg}"
+          done <<< "${BUILD_ARGS}"
+        fi
+
+        BUILD_CMD="${BUILD_CMD} ${CONTEXT}"
+        echo "Running: ${BUILD_CMD}"
+        eval "${BUILD_CMD}"
+
+    - name: Container security scan (mandatory)
+      if: >
+        inputs.build == 'true' &&
+        inputs.retag != 'true' &&
+        steps.reuse-check.outputs.exists != 'true'
+      uses: ./actions/security
+      with:
+        packages: "false"
+        code: "false"
+        container: "true"
+        image-ref: ${{ steps.meta.outputs.image }}
+        severity: ${{ inputs.severity }}
+
+    - name: Tag and push image
+      id: push-image
+      if: >
+        inputs.push == 'true' &&
+        inputs.retag != 'true'
+      shell: bash
+      env:
+        IMAGE: ${{ steps.meta.outputs.image }}
+        EXTRA_TAGS: ${{ inputs.extra-tags }}
+        REGISTRY: ${{ inputs.registry }}
+        PROJECT_ID: ${{ inputs.project-id }}
+        IMAGE_NAME: ${{ inputs.name }}
+      run: |
+        echo "Pushing ${IMAGE}"
+        docker push "${IMAGE}"
+        DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' "${IMAGE}" | cut -d'@' -f2)
+        echo "digest=${DIGEST}" >> "$GITHUB_OUTPUT"
+
+        # Apply extra tags
+        if [ -n "${EXTRA_TAGS}" ]; then
+          for extra_tag in ${EXTRA_TAGS}; do
+            EXTRA_IMAGE="${REGISTRY}/${PROJECT_ID}/${IMAGE_NAME}:${extra_tag}"
+            docker tag "${IMAGE}" "${EXTRA_IMAGE}"
+            docker push "${EXTRA_IMAGE}"
+            echo "Pushed extra tag: ${EXTRA_IMAGE}"
+          done
+        fi

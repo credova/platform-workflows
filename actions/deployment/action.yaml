@@ -1,0 +1,115 @@
+name: deployment
+description: >
+  Deploy to Cloud Run via pctl. Handles auth, notifications, canary, promote, and rollback.
+  Self-contained: calls auth-gcp internally. Notifications handled by pctl.
+
+inputs:
+  target:
+    description: Target name from CUE config
+    required: true
+  tag:
+    description: Image tag to deploy
+    required: false
+    default: ${{ github.sha }}
+  action:
+    description: "Action to perform: deploy, promote, rollback, abort"
+    required: false
+    default: deploy
+  canary:
+    description: Canary traffic percentage (0 = full deploy)
+    required: false
+    default: "0"
+  config-path:
+    description: Path to CUE config directory
+    required: false
+    default: deployments
+  revision:
+    description: Revision name (required for promote/rollback)
+    required: false
+    default: ""
+  # Auth inputs
+  project-id:
+    description: GCP project ID
+    required: false
+    default: ""
+  workload-identity-provider:
+    description: Workload Identity Provider resource name
+    required: false
+    default: ""
+  # pctl
+  pctl-version:
+    description: pctl version to install
+    required: false
+    default: latest
+  # Token for private repo access (pctl download)
+  token:
+    description: GitHub token with read access to credova/pctl releases (e.g. from a GitHub App)
+    required: true
+
+outputs:
+  revision:
+    description: Deployed Cloud Run revision name
+    value: ${{ steps.deploy.outputs.revision }}
+  traffic:
+    description: JSON traffic allocation
+    value: ${{ steps.deploy.outputs.traffic }}
+
+runs:
+  using: composite
+  steps:
+    - name: Authenticate to GCP
+      if: inputs.project-id != '' && inputs.workload-identity-provider != ''
+      uses: ./actions/auth-gcp
+      with:
+        project-id: ${{ inputs.project-id }}
+        workload-identity-provider: ${{ inputs.workload-identity-provider }}
+
+    - name: Install pctl
+      uses: ./actions/install-pctl
+      with:
+        version: ${{ inputs.pctl-version }}
+        token: ${{ inputs.token }}
+
+    - name: Execute deployment
+      id: deploy
+      shell: bash
+      env:
+        TARGET: ${{ inputs.target }}
+        TAG: ${{ inputs.tag }}
+        ACTION: ${{ inputs.action }}
+        CANARY: ${{ inputs.canary }}
+        CONFIG_PATH: ${{ inputs.config-path }}
+        REVISION: ${{ inputs.revision }}
+      run: |
+        case "${ACTION}" in
+          deploy)
+            CMD="pctl deploy execute ${TARGET} --tag ${TAG} --config ${CONFIG_PATH}"
+            if [ "${CANARY}" != "0" ]; then
+              CMD="${CMD} --canary ${CANARY}"
+            fi
+            ;;
+          promote)
+            CMD="pctl deploy promote ${TARGET} --revision ${REVISION}"
+            ;;
+          rollback)
+            CMD="pctl deploy rollback ${TARGET}"
+            ;;
+          abort)
+            CMD="pctl deploy abort ${TARGET}"
+            ;;
+          *)
+            echo "::error::Unknown action: ${ACTION}"
+            exit 1
+            ;;
+        esac
+
+        echo "Running: ${CMD}"
+        OUTPUT=$(eval "${CMD}" 2>&1) || { echo "${OUTPUT}"; exit 1; }
+        echo "${OUTPUT}"
+
+        # Parse outputs from pctl
+        REVISION_NAME=$(echo "${OUTPUT}" | grep -oP 'revision:\s*\K\S+' || true)
+        TRAFFIC_JSON=$(echo "${OUTPUT}" | grep -oP 'traffic:\s*\K.*' || true)
+
+        echo "revision=${REVISION_NAME}" >> "$GITHUB_OUTPUT"
+        echo "traffic=${TRAFFIC_JSON}" >> "$GITHUB_OUTPUT"

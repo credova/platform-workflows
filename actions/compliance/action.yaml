@@ -1,0 +1,44 @@
+name: compliance
+description: >
+  Process and policy gates. Ensures teams follow required procedures.
+  Default behavior: opt-out. All checks run unless explicitly disabled.
+
+inputs:
+  ticket:
+    description: PR/commit must reference a ticket from the configured tracker
+    required: false
+    default: "true"
+
+runs:
+  using: composite
+  steps:
+    - name: Check ticket reference
+      if: inputs.ticket == 'true'
+      shell: bash
+      env:
+        PR_TITLE: ${{ github.event.pull_request.title || '' }}
+        PR_BODY: ${{ github.event.pull_request.body || '' }}
+        HEAD_COMMIT_MSG: ${{ github.event.head_commit.message || '' }}
+      run: |
+        echo "::group::Ticket reference check"
+
+        # Check PR title, body, and commit messages for ticket references
+        # Matches patterns like: JIRA-123, PROJECT-456, #123
+        TICKET_PATTERN='[A-Z]+-[0-9]+|#[0-9]+'
+
+        FOUND=false
+        for text in "$PR_TITLE" "$PR_BODY" "$HEAD_COMMIT_MSG"; do
+          if echo "$text" | grep -qE "$TICKET_PATTERN"; then
+            FOUND=true
+            break
+          fi
+        done
+
+        if [ "$FOUND" = "false" ]; then
+          echo "::error::No ticket reference found in PR title, body, or commit message."
+          echo "Expected pattern: JIRA-123, PROJECT-456, or #123"
+          exit 1
+        fi
+
+        echo "Ticket reference found."
+        echo "::endgroup::"

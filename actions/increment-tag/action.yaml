@@ -1,0 +1,46 @@
+name: increment-tag
+description: >
+  Auto-increment semantic version tags.
+  Supports suffix-based sequences for environment-specific tag tracking.
+
+inputs:
+  suffix:
+    description: "Optional suffix for environment-specific tags (e.g., stg, prd)"
+    required: false
+    default: ""
+  prefix:
+    description: Tag prefix
+    required: false
+    default: v
+  bump:
+    description: "Version component to bump: major, minor, patch"
+    required: false
+    default: patch
+
+outputs:
+  tag:
+    description: The new version tag
+    value: ${{ steps.increment.outputs.tag }}
+  previous-tag:
+    description: The previous version tag
+    value: ${{ steps.increment.outputs.previous-tag }}
+
+runs:
+  using: composite
+  steps:
+    - name: Fetch tags
+      shell: bash
+      run: git fetch --tags --quiet
+
+    - name: Compute next tag
+      id: increment
+      shell: bash
+      env:
+        SUFFIX: ${{ inputs.suffix }}
+        PREFIX: ${{ inputs.prefix }}
+        BUMP: ${{ inputs.bump }}
+      run: |
+        "${GITHUB_ACTION_PATH}/../../scripts/semver.sh" \
+          --prefix "${PREFIX}" \
+          --suffix "${SUFFIX}" \
+          --bump "${BUMP}"

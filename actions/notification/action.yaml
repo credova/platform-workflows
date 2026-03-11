@@ -1,0 +1,114 @@
+name: notification
+description: >
+  Standalone Slack notifications for any use case.
+  Wraps pctl slack notify with Block Kit formatted messages and threading support.
+
+inputs:
+  channel:
+    description: Slack channel ID or name
+    required: true
+  status:
+    description: "Notification status: started, success, failed, cancelled"
+    required: true
+  service:
+    description: Service name
+    required: true
+  environment:
+    description: Environment name
+    required: true
+  revision:
+    description: Deployed revision name
+    required: false
+    default: ""
+  deployer:
+    description: Who initiated
+    required: false
+    default: ${{ github.actor }}
+  pr-number:
+    description: Related PR number
+    required: false
+    default: ""
+  pr-url:
+    description: Related PR URL
+    required: false
+    default: ""
+  run-url:
+    description: GitHub Actions run URL
+    required: false
+    default: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+  thread-ts:
+    description: Thread timestamp for updates
+    required: false
+    default: ""
+  message:
+    description: Custom message override
+    required: false
+    default: ""
+  # pctl
+  pctl-version:
+    description: pctl version to install
+    required: false
+    default: latest
+  # Token for private repo access (pctl download)
+  token:
+    description: GitHub token with read access to credova/pctl releases (e.g. from a GitHub App)
+    required: true
+
+outputs:
+  message-ts:
+    description: Slack message timestamp (for threading)
+    value: ${{ steps.notify.outputs.message-ts }}
+  channel-id:
+    description: Slack channel ID
+    value: ${{ steps.notify.outputs.channel-id }}
+
+runs:
+  using: composite
+  steps:
+    - name: Install pctl
+      uses: ./actions/install-pctl
+      with:
+        version: ${{ inputs.pctl-version }}
+        token: ${{ inputs.token }}
+
+    - name: Send Slack notification
+      id: notify
+      shell: bash
+      env:
+        CHANNEL: ${{ inputs.channel }}
+        STATUS: ${{ inputs.status }}
+        SERVICE: ${{ inputs.service }}
+        ENVIRONMENT: ${{ inputs.environment }}
+        REVISION: ${{ inputs.revision }}
+        DEPLOYER: ${{ inputs.deployer }}
+        PR_NUMBER: ${{ inputs.pr-number }}
+        PR_URL: ${{ inputs.pr-url }}
+        RUN_URL: ${{ inputs.run-url }}
+        THREAD_TS: ${{ inputs.thread-ts }}
+        MESSAGE: ${{ inputs.message }}
+      run: |
+        CMD="pctl slack notify"
+        CMD="${CMD} --channel ${CHANNEL}"
+        CMD="${CMD} --status ${STATUS}"
+        CMD="${CMD} --service ${SERVICE}"
+        CMD="${CMD} --environment ${ENVIRONMENT}"
+
+        [ -n "${REVISION}" ] && CMD="${CMD} --revision ${REVISION}"
+        [ -n "${DEPLOYER}" ] && CMD="${CMD} --deployer ${DEPLOYER}"
+        [ -n "${PR_NUMBER}" ] && CMD="${CMD} --pr-number ${PR_NUMBER}"
+        [ -n "${PR_URL}" ] && CMD="${CMD} --pr-url ${PR_URL}"
+        [ -n "${RUN_URL}" ] && CMD="${CMD} --run-url ${RUN_URL}"
+        [ -n "${THREAD_TS}" ] && CMD="${CMD} --thread-ts ${THREAD_TS}"
+        [ -n "${MESSAGE}" ] && CMD="${CMD} --message '${MESSAGE}'"
+
+        CMD="${CMD} --output-json"
+
+        echo "Running: ${CMD}"
+        OUTPUT=$(eval "${CMD}" 2>&1) || { echo "${OUTPUT}"; exit 1; }
+
+        # Parse JSON output for message-ts and channel-id
+        MESSAGE_TS=$(echo "${OUTPUT}" | jq -r '.message_ts // empty')
+        CHANNEL_ID=$(echo "${OUTPUT}" | jq -r '.channel_id // empty')
+
+        echo "message-ts=${MESSAGE_TS}" >> "$GITHUB_OUTPUT"
+        echo "channel-id=${CHANNEL_ID}" >> "$GITHUB_OUTPUT"

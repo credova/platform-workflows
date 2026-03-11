@@ -1,0 +1,40 @@
+# Architecture
+
+## Two Layers
+
+**Reusable workflows** (public interface) — the standardized pipelines teams import. These define the pipeline shape, ordering, and gating.
+
+**Composite actions** (internal building blocks) — atomic modules that handle one concern. Reusable workflows call these internally.
+
+```text
+reusable workflow (deploy.yaml)
+  └── calls composite: setup-language (runtime setup)
+  └── calls composite: container (build + scan + push)
+  └── calls composite: deployment (Cloud Run via pctl)
+  └── calls composite: increment-tag (semver release)
+```
+
+## Design Principles
+
+- **Fail early, fail fast** — security and compliance checks run first
+- **Opt-out, not opt-in** — security scanning and compliance gates are on by default
+- **Feature flags, not separate workflows** — one `pull-request.yaml`, one `deploy.yaml` with boolean toggles (`container`, `deploy`, `hotfix`, `language`)
+- **Self-contained modules** — each composite handles its own auth, dependencies, and setup
+- **One interface, hidden internals** — swap trivy for something else, update one composite
+- **Zero PATs** — all auth uses GitHub Apps, GITHUB_TOKEN, or OIDC (Workload Identity Federation)
+
+## Workflows
+
+| Workflow                | Trigger                      | Purpose                                            |
+| ----------------------- | ---------------------------- | -------------------------------------------------- |
+| `pull-request.yaml`     | PR to main                   | Security → test → build → compliance               |
+| `deploy.yaml`           | Push to main                 | Test → build → staging → production → release      |
+| `deploy.yaml` (hotfix)  | Tag push with `hotfix: true` | Build → [canary] → approve → production → release  |
+
+## Pipeline Ordering
+
+PR workflows: `security → test (optional) → build (optional) → compliance`
+
+Deploy workflows: `test → build → scan → push → staging → [canary] → production → release`
+
+Hotfix workflows: `build → scan → push → [canary] → approve → production → release`

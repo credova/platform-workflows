@@ -1,0 +1,205 @@
+name: Pull Request
+
+on:
+  workflow_call:
+    inputs:
+      # Language (optional - for repos that need tests outside a Dockerfile)
+      language:
+        description: "Language runtime to setup: go, node, kotlin, python, ruby, dotnet"
+        type: string
+        required: false
+        default: ""
+      language-version:
+        description: Language/runtime version (required if language is set)
+        type: string
+        required: false
+        default: ""
+      test-command:
+        description: Custom test command (defaults per language if empty)
+        type: string
+        required: false
+        default: ""
+
+      # Container (on by default - disable for non-container repos)
+      container:
+        description: Build and scan a container image
+        type: boolean
+        required: false
+        default: true
+      image:
+        description: "Single image - name:dockerfile or just name (defaults to ./Dockerfile)"
+        type: string
+        required: false
+        default: ""
+      images:
+        description: "Multi-image YAML list with name, dockerfile, optional target, context"
+        type: string
+        required: false
+        default: ""
+
+      # Security
+      security-packages:
+        description: Run package vulnerability scan
+        type: boolean
+        required: false
+        default: true
+      security-code:
+        description: Run code static analysis
+        type: boolean
+        required: false
+        default: true
+      security-severity:
+        description: Minimum severity to fail on
+        type: string
+        required: false
+        default: HIGH
+
+      # Compliance
+      compliance-ticket:
+        description: Require ticket reference
+        type: boolean
+        required: false
+        default: true
+
+jobs:
+  # --- Input validation and image parsing ---
+  validate-inputs:
+    runs-on: ubuntu-latest
+    outputs:
+      image-name: ${{ steps.parse.outputs.image-name }}
+      image-dockerfile: ${{ steps.parse.outputs.image-dockerfile }}
+    steps:
+      - name: Validate and parse inputs
+        id: parse
+        shell: bash
+        env:
+          IMAGE: ${{ inputs.image }}
+          IMAGES: ${{ inputs.images }}
+          CONTAINER: ${{ inputs.container }}
+          LANGUAGE: ${{ inputs.language }}
+          LANGUAGE_VERSION: ${{ inputs.language-version }}
+          REPO_NAME: ${{ github.event.repository.name }}
+        run: |
+          # Validate image inputs
+          if [ -n "${IMAGE}" ] && [ -n "${IMAGES}" ]; then
+            echo "::error::Cannot specify both 'image' and 'images'. Use one or the other."
+            exit 1
+          fi
+
+          # Validate language inputs
+          if [ -n "${LANGUAGE}" ] && [ -z "${LANGUAGE_VERSION}" ]; then
+            echo "::error::language-version is required when language is set."
+            exit 1
+          fi
+
+          # Parse image name and dockerfile
+          if [ "${CONTAINER}" = "true" ]; then
+            if [ -n "${IMAGE}" ]; then
+              if [[ "${IMAGE}" == *":"* ]]; then
+                echo "image-name=${IMAGE%%:*}" >> "$GITHUB_OUTPUT"
+                echo "image-dockerfile=${IMAGE#*:}" >> "$GITHUB_OUTPUT"
+              else
+                echo "image-name=${IMAGE}" >> "$GITHUB_OUTPUT"
+                echo "image-dockerfile=./Dockerfile" >> "$GITHUB_OUTPUT"
+              fi
+            else
+              echo "image-name=${REPO_NAME}" >> "$GITHUB_OUTPUT"
+              echo "image-dockerfile=./Dockerfile" >> "$GITHUB_OUTPUT"
+            fi
+          fi
+
+  # --- Security scanning (always runs) ---
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup language
+        if: inputs.language != ''
+        uses: ./actions/setup-language
+        with:
+          language: ${{ inputs.language }}
+          version: ${{ inputs.language-version }}
+
+      - name: Security scan
+        uses: ./actions/security
+        with:
+          packages: ${{ inputs.security-packages && 'true' || 'false' }}
+          code: ${{ inputs.security-code && 'true' || 'false' }}
+          severity: ${{ inputs.security-severity }}
+
+  # --- Tests (only when language is set) ---
+  test:
+    if: inputs.language != ''
+    needs: [security]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup language
+        uses: ./actions/setup-language
+        with:
+          language: ${{ inputs.language }}
+          version: ${{ inputs.language-version }}
+
+      - name: Run tests
+        shell: bash
+        env:
+          LANGUAGE: ${{ inputs.language }}
+          TEST_COMMAND: ${{ inputs.test-command }}
+        run: |
+          # Use custom test command if provided
+          if [ -n "${TEST_COMMAND}" ]; then
+            echo "Running: ${TEST_COMMAND}"
+            eval "${TEST_COMMAND}"
+            exit $?
+          fi
+
+          # Default test commands per language
+          case "${LANGUAGE}" in
+            go)     go test ./... ;;
+            node)   npm ci && npm test ;;
+            kotlin) ./gradlew test ;;
+            python) pip install -e ".[test]" 2>/dev/null || pip install -e . && pytest ;;
+            ruby)   bundle install && bundle exec rake test ;;
+            dotnet) dotnet test ;;
+          esac
+
+  # --- Container build + scan (only when container is enabled) ---
+  build:
+    if: inputs.container
+    needs: [validate-inputs, security]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build container image
+        if: inputs.images == ''
+        uses: ./actions/container
+        with:
+          name: ${{ needs.validate-inputs.outputs.image-name }}
+          dockerfile: ${{ needs.validate-inputs.outputs.image-dockerfile }}
+          build: "true"
+          push: "false"
+
+      - name: Build container images (multi)
+        if: inputs.images != ''
+        shell: bash
+        env:
+          IMAGES: ${{ inputs.images }}
+        run: |
+          echo "Multi-image build - parsing images config"
+          echo "${IMAGES}"
+
+  # --- Compliance (runs after tests and/or build) ---
+  compliance:
+    needs: [test, build]
+    if: always() && !failure() && !cancelled()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compliance checks
+        uses: ./actions/compliance
+        with:
+          ticket: ${{ inputs.compliance-ticket && 'true' || 'false' }}

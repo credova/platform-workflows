@@ -1,0 +1,87 @@
+name: CI - Validate Actions
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate action.yaml files
+        shell: bash
+        run: |
+          echo "Validating composite action definitions..."
+          ERRORS=0
+
+          for action_file in actions/*/action.yaml; do
+            echo "Checking ${action_file}..."
+
+            # Verify YAML is valid
+            if ! yq '.' "${action_file}" > /dev/null 2>&1; then
+              echo "::error file=${action_file}::Invalid YAML"
+              ERRORS=$((ERRORS + 1))
+              continue
+            fi
+
+            # Verify required fields
+            NAME=$(yq '.name' "${action_file}")
+            if [ "${NAME}" = "null" ] || [ -z "${NAME}" ]; then
+              echo "::error file=${action_file}::Missing 'name' field"
+              ERRORS=$((ERRORS + 1))
+            fi
+
+            RUNS_USING=$(yq '.runs.using' "${action_file}")
+            if [ "${RUNS_USING}" != "composite" ]; then
+              echo "::error file=${action_file}::Expected runs.using=composite, got ${RUNS_USING}"
+              ERRORS=$((ERRORS + 1))
+            fi
+
+            echo "  ✓ ${NAME}"
+          done
+
+          if [ "${ERRORS}" -gt 0 ]; then
+            echo "::error::${ERRORS} validation error(s) found"
+            exit 1
+          fi
+
+          echo "All actions validated successfully."
+
+      - name: Validate workflow files
+        shell: bash
+        run: |
+          echo "Validating reusable workflow definitions..."
+          ERRORS=0
+
+          for workflow_file in .github/workflows/*.yaml; do
+            # Skip self
+            [ "$(basename "${workflow_file}")" = "ci.yaml" ] && continue
+            [ "$(basename "${workflow_file}")" = "release.yaml" ] && continue
+
+            echo "Checking ${workflow_file}..."
+
+            if ! yq '.' "${workflow_file}" > /dev/null 2>&1; then
+              echo "::error file=${workflow_file}::Invalid YAML"
+              ERRORS=$((ERRORS + 1))
+              continue
+            fi
+
+            # Verify it's a reusable workflow (has workflow_call trigger)
+            HAS_WORKFLOW_CALL=$(yq '.on.workflow_call' "${workflow_file}")
+            if [ "${HAS_WORKFLOW_CALL}" = "null" ]; then
+              echo "::warning file=${workflow_file}::No workflow_call trigger (not a reusable workflow)"
+            fi
+
+            echo "  ✓ $(basename "${workflow_file}")"
+          done
+
+          if [ "${ERRORS}" -gt 0 ]; then
+            echo "::error::${ERRORS} validation error(s) found"
+            exit 1
+          fi
+
+          echo "All workflows validated successfully."

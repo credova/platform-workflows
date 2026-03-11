@@ -1,0 +1,85 @@
+name: security
+description: >
+  Vulnerability and code scanning. Selectable scan types.
+  Default behavior: opt-out. All applicable scans run unless explicitly disabled.
+
+inputs:
+  packages:
+    description: Scan dependency manifests (package.json, go.mod, etc.) via trivy
+    required: false
+    default: "true"
+  code:
+    description: Static analysis via opengrep
+    required: false
+    default: "true"
+  container:
+    description: Container image scanning via trivy (usually called internally by container action)
+    required: false
+    default: "false"
+  image-ref:
+    description: Container image reference for container scanning
+    required: false
+    default: ""
+  severity:
+    description: Minimum severity to fail on
+    required: false
+    default: HIGH
+
+runs:
+  using: composite
+  steps:
+    - name: Package vulnerability scan
+      if: inputs.packages == 'true'
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: fs
+        scan-ref: .
+        severity: ${{ inputs.severity }}
+        exit-code: "1"
+        ignore-unfixed: true
+
+    - name: Install opengrep
+      if: inputs.code == 'true'
+      shell: bash
+      run: curl -fsSL https://raw.githubusercontent.com/opengrep/opengrep/main/install.sh | bash
+
+    - name: Code static analysis
+      if: inputs.code == 'true'
+      shell: bash
+      env:
+        SEVERITY: ${{ inputs.severity }}
+      run: |
+        echo "::group::OpenGrep static analysis"
+
+        ARGS="scan --sarif-output=opengrep-results.sarif"
+
+        # Map severity to opengrep --severity flag
+        case "${SEVERITY}" in
+          CRITICAL) ARGS="${ARGS} --severity ERROR" ;;
+          HIGH)     ARGS="${ARGS} --severity WARNING" ;;
+          *)        ARGS="${ARGS} --severity INFO" ;;
+        esac
+
+        # Use auto-detected rules (opengrep default rulesets)
+        ARGS="${ARGS} --config auto"
+
+        opengrep ${ARGS} . || EXIT_CODE=$?
+
+        echo "::endgroup::"
+
+        # Upload SARIF for GitHub code scanning integration
+        if [ -f opengrep-results.sarif ]; then
+          echo "SARIF results written to opengrep-results.sarif"
+        fi
+
+        exit "${EXIT_CODE:-0}"
+
+    - name: Container image scan
+      if: inputs.container == 'true' && inputs.image-ref != ''
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: image
+        image-ref: ${{ inputs.image-ref }}
+        severity: ${{ inputs.severity }}
+        exit-code: "1"
+        ignore-unfixed: true

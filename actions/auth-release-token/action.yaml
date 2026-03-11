@@ -1,0 +1,33 @@
+name: auth-release-token
+description: >
+  Internal: Generate a short-lived GitHub token for downloading releases from private repos.
+  Uses the org-level GitHub App credentials. Single source of truth for release download auth.
+
+inputs:
+  app-id:
+    description: GitHub App ID (from org secret)
+    required: true
+  private-key:
+    description: GitHub App private key PEM (from org secret)
+    required: true
+  repositories:
+    description: Comma-separated list of repositories to scope the token to
+    required: false
+    default: pctl
+
+outputs:
+  token:
+    description: Short-lived GitHub token with read access to the specified repos
+    value: ${{ steps.generate.outputs.token }}
+
+runs:
+  using: composite
+  steps:
+    - name: Generate release download token
+      id: generate
+      uses: actions/create-github-app-token@v1
+      with:
+        app-id: ${{ inputs.app-id }}
+        private-key: ${{ inputs.private-key }}
+        owner: credova
+        repositories: ${{ inputs.repositories }}

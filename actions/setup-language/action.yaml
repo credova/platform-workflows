@@ -1,0 +1,69 @@
+name: setup-language
+description: >
+  Setup language runtime for the current job.
+  Supports Go, Node.js, Kotlin/JDK, Python, Ruby, and .NET.
+
+inputs:
+  language:
+    description: "Language to setup: go, node, kotlin, python, ruby, dotnet"
+    required: true
+  version:
+    description: Language/runtime version
+    required: true
+
+runs:
+  using: composite
+  steps:
+    # Go
+    - name: Setup Go
+      if: inputs.language == 'go'
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ inputs.version }}
+
+    # Node.js
+    - name: Setup Node.js
+      if: inputs.language == 'node'
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ inputs.version }}
+
+    # Kotlin / JDK
+    - name: Setup JDK (Kotlin)
+      if: inputs.language == 'kotlin'
+      uses: actions/setup-java@v4
+      with:
+        distribution: temurin
+        java-version: ${{ inputs.version }}
+
+    # Python
+    - name: Setup Python
+      if: inputs.language == 'python'
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.version }}
+
+    # Ruby
+    - name: Setup Ruby
+      if: inputs.language == 'ruby'
+      uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: ${{ inputs.version }}
+
+    # .NET
+    - name: Setup .NET
+      if: inputs.language == 'dotnet'
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ inputs.version }}
+
+    # Unknown
+    - name: Validate language
+      shell: bash
+      env:
+        LANGUAGE: ${{ inputs.language }}
+      run: |
+        case "${LANGUAGE}" in
+          go|node|kotlin|python|ruby|dotnet) ;;
+          *) echo "::error::Unsupported language: ${LANGUAGE}. Supported: go, node, kotlin, python, ruby, dotnet"; exit 1 ;;
+        esac
