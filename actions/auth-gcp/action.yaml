@@ -10,6 +10,10 @@ inputs:
   workload-identity-provider:
     description: Workload Identity Provider resource name
     required: true
+  registry:
+    description: Artifact Registry hostname
+    required: false
+    default: us-docker.pkg.dev
 
 runs:
   using: composite
@@ -25,4 +29,4 @@ runs:
 
     - name: Configure Docker for Artifact Registry
       shell: bash
-      run: gcloud auth configure-docker us-docker.pkg.dev --quiet
+      run: gcloud auth configure-docker ${{ inputs.registry }} --quiet

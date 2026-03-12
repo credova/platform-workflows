@@ -6,15 +6,15 @@ Process and policy gates. Ensures teams follow required procedures. All checks r
 
 ## Check Types
 
-| Type | Default | Description |
-|------|---------|-------------|
-| `ticket` | `true` | PR/commit must reference a ticket (e.g., `JIRA-123`, `PROJECT-456`, `#123`) |
+| Type     | Default | Description                                                       |
+|----------|---------|-------------------------------------------------------------------|
+| `ticket` | `true`  | PR must reference a Shortcut ticket (`sc-12345` or Shortcut link) |
 
 ## Inputs
 
-| Input | Required | Default | Description |
-|-------|----------|---------|-------------|
-| `ticket` | No | `true` | Require a ticket reference in PR title, body, or commit message |
+| Input    | Required | Default | Description                          |
+|----------|----------|---------|--------------------------------------|
+| `ticket` | No       | `true`  | Require a Shortcut ticket reference  |
 
 ## Examples
 
@@ -32,8 +32,13 @@ Process and policy gates. Ensures teams follow required procedures. All checks r
     ticket: false
 ```
 
-## Ticket Pattern
+## Ticket Patterns
 
-Matches these patterns in PR title, body, or commit messages:
-- `JIRA-123` / `PROJECT-456` — Jira-style references
-- `#123` — GitHub issue references
+The check searches the PR title, body, branch name, commit message, and PR comments for:
+
+- **Tag:** `sc-12345` or `SC-12345`
+- **Link:** `https://app.shortcut.com/<org>/story/12345`
+
+### Automated PRs
+
+Dependabot and Renovate PRs (branch prefix `dependabot/` or `renovate/`) are automatically skipped.

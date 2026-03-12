@@ -10,6 +10,10 @@ inputs:
   version:
     description: Language/runtime version
     required: true
+  cache:
+    description: "Enable dependency caching via WarpBuild cache (requires WarpBuild runners)"
+    required: false
+    default: "false"
 
 runs:
   using: composite
@@ -20,6 +24,15 @@ runs:
       uses: actions/setup-go@v5
       with:
         go-version: ${{ inputs.version }}
+        cache: ${{ inputs.cache != 'true' }}
+
+    - name: Cache Go modules
+      if: inputs.language == 'go' && inputs.cache == 'true'
+      uses: WarpBuilds/cache@v1
+      with:
+        path: ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        restore-keys: ${{ runner.os }}-go-
 
     # Node.js
     - name: Setup Node.js
@@ -27,6 +40,15 @@ runs:
       uses: actions/setup-node@v4
       with:
         node-version: ${{ inputs.version }}
+        package-manager-cache: ${{ inputs.cache != 'true' }}
+
+    - name: Cache npm
+      if: inputs.language == 'node' && inputs.cache == 'true'
+      uses: WarpBuilds/cache@v1
+      with:
+        path: ~/.npm
+        key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json', '**/yarn.lock') }}
+        restore-keys: ${{ runner.os }}-node-
 
     # Kotlin / JDK
     - name: Setup JDK (Kotlin)
@@ -36,12 +58,30 @@ runs:
         distribution: temurin
         java-version: ${{ inputs.version }}
 
+    - name: Cache Gradle
+      if: inputs.language == 'kotlin' && inputs.cache == 'true'
+      uses: WarpBuilds/cache@v1
+      with:
+        path: |
+          ~/.gradle/caches
+          ~/.gradle/wrapper
+        key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+        restore-keys: ${{ runner.os }}-gradle-
+
     # Python
     - name: Setup Python
       if: inputs.language == 'python'
       uses: actions/setup-python@v5
       with:
         python-version: ${{ inputs.version }}
+
+    - name: Cache pip
+      if: inputs.language == 'python' && inputs.cache == 'true'
+      uses: WarpBuilds/cache@v1
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements*.txt', '**/pyproject.toml', '**/setup.py') }}
+        restore-keys: ${{ runner.os }}-pip-
 
     # Ruby
     - name: Setup Ruby
@@ -50,12 +90,28 @@ runs:
       with:
         ruby-version: ${{ inputs.version }}
 
+    - name: Cache Bundler
+      if: inputs.language == 'ruby' && inputs.cache == 'true'
+      uses: WarpBuilds/cache@v1
+      with:
+        path: vendor/bundle
+        key: ${{ runner.os }}-bundler-${{ hashFiles('**/Gemfile.lock') }}
+        restore-keys: ${{ runner.os }}-bundler-
+
     # .NET
     - name: Setup .NET
       if: inputs.language == 'dotnet'
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: ${{ inputs.version }}
+
+    - name: Cache NuGet
+      if: inputs.language == 'dotnet' && inputs.cache == 'true'
+      uses: WarpBuilds/cache@v1
+      with:
+        path: ~/.nuget/packages
+        key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', '**/packages.lock.json') }}
+        restore-keys: ${{ runner.os }}-nuget-
 
     # Unknown
     - name: Validate language

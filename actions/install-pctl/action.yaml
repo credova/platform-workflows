@@ -1,0 +1,36 @@
+name: install-pctl
+description: >
+  Internal: Install pctl from GitHub releases.
+  Accepts a pre-generated token with access to credova/pctl.
+  Handles version resolution, architecture detection, and checksum verification.
+
+inputs:
+  version:
+    description: pctl version to install
+    required: false
+    default: latest
+  token:
+    description: GitHub token with read access to credova/pctl releases
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Check if pctl is already installed
+      id: check
+      shell: bash
+      run: |
+        if command -v pctl &> /dev/null; then
+          echo "pctl already installed: $(pctl version)"
+          echo "installed=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "installed=false" >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: Install pctl
+      if: steps.check.outputs.installed != 'true'
+      shell: bash
+      env:
+        PCTL_VERSION: ${{ inputs.version }}
+        GH_TOKEN: ${{ inputs.token }}
+      run: ${{ github.action_path }}/../../scripts/install-pctl.sh

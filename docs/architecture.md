@@ -18,17 +18,19 @@ reusable workflow (deploy.yaml)
 
 - **Fail early, fail fast** — security and compliance checks run first
 - **Opt-out, not opt-in** — security scanning and compliance gates are on by default
-- **Feature flags, not separate workflows** — one `pull-request.yaml`, one `deploy.yaml` with boolean toggles (`container`, `deploy`, `hotfix`, `language`)
+- **On rails** — smart defaults handle conflicts automatically (e.g. enabling WarpBuild cache auto-disables built-in Go/Node caches)
+- **Feature flags, not separate workflows** — one `pull-request.yaml`, one `deploy.yaml` with boolean toggles (`container`, `deploy`, `hotfix`, `cache`)
 - **Self-contained modules** — each composite handles its own auth, dependencies, and setup
 - **One interface, hidden internals** — swap trivy for something else, update one composite
 - **Zero PATs** — all auth uses GitHub Apps, GITHUB_TOKEN, or OIDC (Workload Identity Federation)
+- **WarpBuild-first** — all workflows default to WarpBuild runners, with opt-in Docker Builders and dependency caching
 
 ## Workflows
 
 | Workflow                | Trigger                      | Purpose                                            |
 | ----------------------- | ---------------------------- | -------------------------------------------------- |
-| `pull-request.yaml`     | PR to main                   | Security → test → build → compliance               |
-| `deploy.yaml`           | Push to main                 | Test → build → staging → production → release      |
+| `pull-request.yaml`     | PR to master                 | Security → test → build → compliance               |
+| `deploy.yaml`           | Push to master               | Test → build → staging → production → release      |
 | `deploy.yaml` (hotfix)  | Tag push with `hotfix: true` | Build → [canary] → approve → production → release  |
 
 ## Pipeline Ordering

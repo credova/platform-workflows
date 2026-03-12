@@ -2,15 +2,36 @@ name: CI - Validate Actions
 
 on:
   pull_request:
-    branches: [main]
+    branches: [master]
   push:
-    branches: [main]
+    branches: [master]
 
 jobs:
   validate:
-    runs-on: ubuntu-latest
+    runs-on: warp-ubuntu-2204-x64-2x
     steps:
       - uses: actions/checkout@v4
+
+      - name: Validate YAML syntax
+        shell: bash
+        run: |
+          echo "Validating YAML syntax with yamllint..."
+          ERRORS=0
+
+          for yaml_file in actions/*/action.yaml .github/workflows/*.yaml; do
+            if ! yamllint -d relaxed "${yaml_file}" > /dev/null 2>&1; then
+              echo "::error file=${yaml_file}::yamllint failed"
+              yamllint -d relaxed "${yaml_file}" || true
+              ERRORS=$((ERRORS + 1))
+            fi
+          done
+
+          if [ "${ERRORS}" -gt 0 ]; then
+            echo "::error::${ERRORS} YAML file(s) failed lint"
+            exit 1
+          fi
+
+          echo "All YAML files pass lint."
 
       - name: Validate action.yaml files
         shell: bash
@@ -21,27 +42,18 @@ jobs:
           for action_file in actions/*/action.yaml; do
             echo "Checking ${action_file}..."
 
-            # Verify YAML is valid
-            if ! yq '.' "${action_file}" > /dev/null 2>&1; then
-              echo "::error file=${action_file}::Invalid YAML"
-              ERRORS=$((ERRORS + 1))
-              continue
-            fi
-
-            # Verify required fields
-            NAME=$(yq '.name' "${action_file}")
-            if [ "${NAME}" = "null" ] || [ -z "${NAME}" ]; then
+            # Verify required fields exist using grep (no yq dependency)
+            if ! grep -q '^name:' "${action_file}"; then
               echo "::error file=${action_file}::Missing 'name' field"
               ERRORS=$((ERRORS + 1))
             fi
 
-            RUNS_USING=$(yq '.runs.using' "${action_file}")
-            if [ "${RUNS_USING}" != "composite" ]; then
-              echo "::error file=${action_file}::Expected runs.using=composite, got ${RUNS_USING}"
+            if ! grep -q 'using: composite' "${action_file}"; then
+              echo "::error file=${action_file}::Expected runs.using=composite"
               ERRORS=$((ERRORS + 1))
             fi
 
-            echo "  ✓ ${NAME}"
+            echo "  OK ${action_file}"
           done
 
           if [ "${ERRORS}" -gt 0 ]; then
@@ -58,25 +70,18 @@ jobs:
           ERRORS=0
 
           for workflow_file in .github/workflows/*.yaml; do
-            # Skip self
+            # Skip self and release
             [ "$(basename "${workflow_file}")" = "ci.yaml" ] && continue
             [ "$(basename "${workflow_file}")" = "release.yaml" ] && continue
 
             echo "Checking ${workflow_file}..."
 
-            if ! yq '.' "${workflow_file}" > /dev/null 2>&1; then
-              echo "::error file=${workflow_file}::Invalid YAML"
-              ERRORS=$((ERRORS + 1))
-              continue
-            fi
-
             # Verify it's a reusable workflow (has workflow_call trigger)
-            HAS_WORKFLOW_CALL=$(yq '.on.workflow_call' "${workflow_file}")
-            if [ "${HAS_WORKFLOW_CALL}" = "null" ]; then
+            if ! grep -q 'workflow_call' "${workflow_file}"; then
               echo "::warning file=${workflow_file}::No workflow_call trigger (not a reusable workflow)"
             fi
 
-            echo "  ✓ $(basename "${workflow_file}")"
+            echo "  OK $(basename "${workflow_file}")"
           done
 
           if [ "${ERRORS}" -gt 0 ]; then

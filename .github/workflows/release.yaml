@@ -2,7 +2,7 @@ name: Release
 
 on:
   push:
-    branches: [main]
+    branches: [master]
   workflow_dispatch:
     inputs:
       bump:
@@ -20,7 +20,7 @@ permissions:
 
 jobs:
   release:
-    runs-on: ubuntu-latest
+    runs-on: warp-ubuntu-2204-x64-2x
     steps:
       - uses: actions/checkout@v4
         with:

@@ -5,7 +5,7 @@ description: >
 
 inputs:
   ticket:
-    description: PR/commit must reference a ticket from the configured tracker
+    description: PR/commit must reference a Shortcut ticket (sc-NNNNN or Shortcut link)
     required: false
     default: "true"
 
@@ -18,27 +18,9 @@ runs:
       env:
         PR_TITLE: ${{ github.event.pull_request.title || '' }}
         PR_BODY: ${{ github.event.pull_request.body || '' }}
+        PR_BRANCH: ${{ github.head_ref || github.ref_name }}
         HEAD_COMMIT_MSG: ${{ github.event.head_commit.message || '' }}
-      run: |
-        echo "::group::Ticket reference check"
-
-        # Check PR title, body, and commit messages for ticket references
-        # Matches patterns like: JIRA-123, PROJECT-456, #123
-        TICKET_PATTERN='[A-Z]+-[0-9]+|#[0-9]+'
-
-        FOUND=false
-        for text in "$PR_TITLE" "$PR_BODY" "$HEAD_COMMIT_MSG"; do
-          if echo "$text" | grep -qE "$TICKET_PATTERN"; then
-            FOUND=true
-            break
-          fi
-        done
-
-        if [ "$FOUND" = "false" ]; then
-          echo "::error::No ticket reference found in PR title, body, or commit message."
-          echo "Expected pattern: JIRA-123, PROJECT-456, or #123"
-          exit 1
-        fi
-
-        echo "Ticket reference found."
-        echo "::endgroup::"
+        PR_NUMBER: ${{ github.event.pull_request.number || '' }}
+        REPO: ${{ github.repository }}
+        GH_TOKEN: ${{ github.token }}
+      run: ${{ github.action_path }}/../../scripts/check-shortcut-ticket.sh

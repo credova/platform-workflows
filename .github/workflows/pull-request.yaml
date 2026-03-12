@@ -32,10 +32,36 @@ on:
         required: false
         default: ""
       images:
-        description: "Multi-image YAML list with name, dockerfile, optional target, context"
+        description: "Multi-image YAML list with name, dockerfile, optional target, context, platform"
         type: string
         required: false
         default: ""
+      platform:
+        description: "Target platform for single-image builds (e.g. linux/amd64, linux/arm64)"
+        type: string
+        required: false
+        default: linux/amd64
+
+      # WarpBuild (opt-in)
+      warpbuild-profile:
+        description: "WarpBuild Docker Builder profile name (enables WarpBuild remote builds)"
+        type: string
+        required: false
+        default: ""
+
+      # Caching
+      cache:
+        description: "Enable dependency caching via WarpBuild cache (requires WarpBuild runners)"
+        type: boolean
+        required: false
+        default: false
+
+      # Runner
+      runner:
+        description: "GitHub Actions runner label"
+        type: string
+        required: false
+        default: warp-ubuntu-2204-x64-2x
 
       # Security
       security-packages:
@@ -61,56 +87,50 @@ on:
         required: false
         default: true
 
+    secrets:
+      WARPBUILD_API_KEY:
+        required: false
+
 jobs:
   # --- Input validation and image parsing ---
   validate-inputs:
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner }}
     outputs:
-      image-name: ${{ steps.parse.outputs.image-name }}
-      image-dockerfile: ${{ steps.parse.outputs.image-dockerfile }}
+      image-matrix: ${{ steps.parse.outputs.image-matrix }}
     steps:
-      - name: Validate and parse inputs
-        id: parse
+      - uses: actions/checkout@v4
+
+      - name: Validate inputs
         shell: bash
         env:
           IMAGE: ${{ inputs.image }}
           IMAGES: ${{ inputs.images }}
-          CONTAINER: ${{ inputs.container }}
           LANGUAGE: ${{ inputs.language }}
           LANGUAGE_VERSION: ${{ inputs.language-version }}
-          REPO_NAME: ${{ github.event.repository.name }}
         run: |
-          # Validate image inputs
           if [ -n "${IMAGE}" ] && [ -n "${IMAGES}" ]; then
             echo "::error::Cannot specify both 'image' and 'images'. Use one or the other."
             exit 1
           fi
-
-          # Validate language inputs
           if [ -n "${LANGUAGE}" ] && [ -z "${LANGUAGE_VERSION}" ]; then
             echo "::error::language-version is required when language is set."
             exit 1
           fi
 
-          # Parse image name and dockerfile
-          if [ "${CONTAINER}" = "true" ]; then
-            if [ -n "${IMAGE}" ]; then
-              if [[ "${IMAGE}" == *":"* ]]; then
-                echo "image-name=${IMAGE%%:*}" >> "$GITHUB_OUTPUT"
-                echo "image-dockerfile=${IMAGE#*:}" >> "$GITHUB_OUTPUT"
-              else
-                echo "image-name=${IMAGE}" >> "$GITHUB_OUTPUT"
-                echo "image-dockerfile=./Dockerfile" >> "$GITHUB_OUTPUT"
-              fi
-            else
-              echo "image-name=${REPO_NAME}" >> "$GITHUB_OUTPUT"
-              echo "image-dockerfile=./Dockerfile" >> "$GITHUB_OUTPUT"
-            fi
-          fi
+      - name: Parse image inputs
+        id: parse
+        env:
+          IMAGE: ${{ inputs.image }}
+          IMAGES: ${{ inputs.images }}
+          CONTAINER: ${{ inputs.container && 'true' || 'false' }}
+          PLATFORM: ${{ inputs.platform }}
+          REPO_NAME: ${{ github.event.repository.name }}
+        shell: bash
+        run: ./scripts/parse-images.sh
 
   # --- Security scanning (always runs) ---
   security:
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner }}
     steps:
       - uses: actions/checkout@v4
 
@@ -120,6 +140,7 @@ jobs:
         with:
           language: ${{ inputs.language }}
           version: ${{ inputs.language-version }}
+          cache: ${{ inputs.cache && 'true' || 'false' }}
 
       - name: Security scan
         uses: ./actions/security
@@ -132,7 +153,7 @@ jobs:
   test:
     if: inputs.language != ''
     needs: [security]
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner }}
     steps:
       - uses: actions/checkout@v4
 
@@ -141,6 +162,7 @@ jobs:
         with:
           language: ${{ inputs.language }}
           version: ${{ inputs.language-version }}
+          cache: ${{ inputs.cache && 'true' || 'false' }}
 
       - name: Run tests
         shell: bash
@@ -169,33 +191,32 @@ jobs:
   build:
     if: inputs.container
     needs: [validate-inputs, security]
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner }}
+    strategy:
+      fail-fast: true
+      matrix:
+        include: ${{ fromJson(needs.validate-inputs.outputs.image-matrix) }}
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build container image
-        if: inputs.images == ''
+      - name: Build container image (${{ matrix.name }})
         uses: ./actions/container
         with:
-          name: ${{ needs.validate-inputs.outputs.image-name }}
-          dockerfile: ${{ needs.validate-inputs.outputs.image-dockerfile }}
+          name: ${{ matrix.name }}
+          dockerfile: ${{ matrix.dockerfile }}
+          context: ${{ matrix.context }}
+          target: ${{ matrix.target }}
+          platform: ${{ matrix.platform }}
           build: "true"
           push: "false"
-
-      - name: Build container images (multi)
-        if: inputs.images != ''
-        shell: bash
-        env:
-          IMAGES: ${{ inputs.images }}
-        run: |
-          echo "Multi-image build - parsing images config"
-          echo "${IMAGES}"
+          warpbuild-profile: ${{ inputs.warpbuild-profile }}
+          warpbuild-api-key: ${{ secrets.WARPBUILD_API_KEY }}
 
   # --- Compliance (runs after tests and/or build) ---
   compliance:
     needs: [test, build]
     if: always() && !failure() && !cancelled()
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner }}
     steps:
       - uses: actions/checkout@v4
 

@@ -51,6 +51,10 @@ inputs:
     description: Docker build args
     required: false
     default: ""
+  platform:
+    description: "Target platform (e.g. linux/amd64, linux/arm64)"
+    required: false
+    default: linux/amd64
   # Auth inputs (passed through to auth-gcp)
   project-id:
     description: GCP project ID
@@ -68,6 +72,15 @@ inputs:
     description: Minimum severity to fail container scan on
     required: false
     default: HIGH
+  # WarpBuild (opt-in)
+  warpbuild-profile:
+    description: "WarpBuild Docker Builder profile name (enables WarpBuild remote builds)"
+    required: false
+    default: ""
+  warpbuild-api-key:
+    description: "WarpBuild API key (only needed when NOT running on WarpBuild runners)"
+    required: false
+    default: ""
 
 outputs:
   image:
@@ -96,12 +109,30 @@ runs:
         echo "image=${IMAGE}" >> "$GITHUB_OUTPUT"
         echo "Image: ${IMAGE}"
 
+    - name: Validate inputs
+      if: inputs.build == 'true' || inputs.retag == 'true'
+      shell: bash
+      env:
+        PROJECT_ID: ${{ inputs.project-id }}
+        RETAG: ${{ inputs.retag }}
+        SOURCE_TAG: ${{ inputs.source-tag }}
+      run: |
+        if [ -z "${PROJECT_ID}" ]; then
+          echo "::error::project-id is required for container operations"
+          exit 1
+        fi
+        if [ "${RETAG}" = "true" ] && [ -z "${SOURCE_TAG}" ]; then
+          echo "::error::source-tag is required when retag is true"
+          exit 1
+        fi
+
     - name: Authenticate to GCP
       if: inputs.project-id != '' && inputs.workload-identity-provider != ''
       uses: ./actions/auth-gcp
       with:
         project-id: ${{ inputs.project-id }}
         workload-identity-provider: ${{ inputs.workload-identity-provider }}
+        registry: ${{ inputs.registry }}
 
     # --- Retag flow ---
     - name: Retag existing image
@@ -135,8 +166,56 @@ runs:
           echo "exists=false" >> "$GITHUB_OUTPUT"
         fi
 
+    # --- WarpBuild build path (opt-in via warpbuild-profile) ---
+    - name: Configure WarpBuild Docker Builder
+      if: >
+        inputs.warpbuild-profile != '' &&
+        inputs.build == 'true' &&
+        inputs.retag != 'true' &&
+        steps.reuse-check.outputs.exists != 'true'
+      uses: Warpbuilds/docker-configure@v1
+      with:
+        profile-name: ${{ inputs.warpbuild-profile }}
+        api-key: ${{ inputs.warpbuild-api-key }}
+
+    - name: Build image (WarpBuild)
+      if: >
+        inputs.warpbuild-profile != '' &&
+        inputs.build == 'true' &&
+        inputs.retag != 'true' &&
+        steps.reuse-check.outputs.exists != 'true'
+      uses: Warpbuilds/build-push-action@v6
+      with:
+        context: ${{ inputs.context }}
+        file: ${{ inputs.dockerfile }}
+        target: ${{ inputs.target }}
+        platforms: ${{ inputs.platform }}
+        tags: ${{ steps.meta.outputs.image }}
+        push: ${{ inputs.push }}
+        load: ${{ inputs.push != 'true' }}
+        build-args: ${{ inputs.build-args }}
+
+    # --- Standard build path (default — no WarpBuild) ---
+    - name: Setup Docker Buildx
+      if: >
+        inputs.warpbuild-profile == '' &&
+        inputs.build == 'true' &&
+        inputs.retag != 'true' &&
+        steps.reuse-check.outputs.exists != 'true'
+      uses: docker/setup-buildx-action@v3
+
+    - name: Setup QEMU (cross-platform)
+      if: >
+        inputs.warpbuild-profile == '' &&
+        inputs.build == 'true' &&
+        inputs.retag != 'true' &&
+        steps.reuse-check.outputs.exists != 'true' &&
+        inputs.platform != 'linux/amd64'
+      uses: docker/setup-qemu-action@v3
+
     - name: Build image
       if: >
+        inputs.warpbuild-profile == '' &&
         inputs.build == 'true' &&
         inputs.retag != 'true' &&
         steps.reuse-check.outputs.exists != 'true'
@@ -146,23 +225,10 @@ runs:
         DOCKERFILE: ${{ inputs.dockerfile }}
         CONTEXT: ${{ inputs.context }}
         TARGET: ${{ inputs.target }}
+        PLATFORM: ${{ inputs.platform }}
         BUILD_ARGS: ${{ inputs.build-args }}
-      run: |
-        BUILD_CMD="docker build -t ${IMAGE} -f ${DOCKERFILE}"
-
-        if [ -n "${TARGET}" ]; then
-          BUILD_CMD="${BUILD_CMD} --target ${TARGET}"
-        fi
-
-        if [ -n "${BUILD_ARGS}" ]; then
-          while IFS= read -r arg; do
-            [ -n "$arg" ] && BUILD_CMD="${BUILD_CMD} --build-arg ${arg}"
-          done <<< "${BUILD_ARGS}"
-        fi
-
-        BUILD_CMD="${BUILD_CMD} ${CONTEXT}"
-        echo "Running: ${BUILD_CMD}"
-        eval "${BUILD_CMD}"
+        PUSH: ${{ inputs.push }}
+      run: ${{ github.action_path }}/../../scripts/docker-build.sh
 
     - name: Container security scan (mandatory)
       if: >
@@ -189,18 +255,5 @@ runs:
         REGISTRY: ${{ inputs.registry }}
         PROJECT_ID: ${{ inputs.project-id }}
         IMAGE_NAME: ${{ inputs.name }}
-      run: |
-        echo "Pushing ${IMAGE}"
-        docker push "${IMAGE}"
-        DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' "${IMAGE}" | cut -d'@' -f2)
-        echo "digest=${DIGEST}" >> "$GITHUB_OUTPUT"
-
-        # Apply extra tags
-        if [ -n "${EXTRA_TAGS}" ]; then
-          for extra_tag in ${EXTRA_TAGS}; do
-            EXTRA_IMAGE="${REGISTRY}/${PROJECT_ID}/${IMAGE_NAME}:${extra_tag}"
-            docker tag "${IMAGE}" "${EXTRA_IMAGE}"
-            docker push "${EXTRA_IMAGE}"
-            echo "Pushed extra tag: ${EXTRA_IMAGE}"
-          done
-        fi
+        BUILDX_PUSH: ${{ (inputs.warpbuild-profile != '' || inputs.platform != 'linux/amd64') && 'true' || 'false' }}
+      run: ${{ github.action_path }}/../../scripts/docker-push.sh

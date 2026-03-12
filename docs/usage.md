@@ -6,8 +6,8 @@ Every consuming repo uses the same file names:
 any-repo/
 └── .github/workflows/
     ├── pull-request.yaml    # PR validation
-    ├── deploy.yaml          # merge to main → staging → production
-    └── deploy-tag.yaml      # tag push → straight to production (hotfix)
+    ├── deploy.yaml          # merge to master → staging → production
+    └── deploy-hotfix.yaml   # tag push → straight to production (hotfix)
 ```
 
 ---
@@ -25,7 +25,7 @@ The simplest case. Builds a Dockerfile, scans it, runs compliance checks. No lan
 name: Pull Request
 on:
   pull_request:
-    branches: [main]
+    branches: [master]
 
 jobs:
   ci:
@@ -117,14 +117,14 @@ One workflow handles everything. Same flags as pull-request plus deployment opti
 
 ### Standard service deploy
 
-Merge to main → build → scan → push → staging → approval → production.
+Merge to master → build → scan → push → staging → approval → production.
 
 ```yaml
 # .github/workflows/deploy.yaml
 name: Deploy
 on:
   push:
-    branches: [main]
+    branches: [master]
 
 jobs:
   deploy:
@@ -208,7 +208,7 @@ jobs:
 Same `deploy.yaml` with `hotfix: true`. Skips tests and staging — goes straight to build → [canary] → approve → production. Canary still works if `canary > 0`.
 
 ```yaml
-# .github/workflows/deploy-tag.yaml
+# .github/workflows/deploy-hotfix.yaml
 name: Deploy Hotfix
 on:
   push:
@@ -247,22 +247,114 @@ jobs:
 
 ---
 
+## WarpBuild
+
+All workflows run on [WarpBuild](https://warpbuild.com) runners by default (`warp-ubuntu-2204-x64-2x`). WarpBuild also provides remote Docker Builders for faster container builds with built-in layer caching.
+
+### Prerequisites
+
+1. **WarpBuild runners** must be configured in your GitHub organization. All workflows default to `warp-ubuntu-2204-x64-2x`. Override with the `runner` input if needed.
+2. **WarpBuild Docker Builder** (optional) — to use remote Docker builds, you must first create a Docker Builder profile in the [WarpBuild dashboard](https://app.warpbuild.com). The profile name is passed via the `warpbuild-profile` input.
+3. **`WARPBUILD_API_KEY` secret** (optional) — only required if running on non-WarpBuild runners. Not needed when using WarpBuild runners.
+
+### Using WarpBuild Docker Builders
+
+Pass your Docker Builder profile name to enable remote builds:
+
+```yaml
+jobs:
+  ci:
+    uses: credova/platform-workflows/.github/workflows/pull-request.yaml@v1
+    with:
+      warpbuild-profile: my-docker-builder
+```
+
+Benefits over standard buildx:
+
+- **Built-in layer caching** — no `cache-to`/`cache-from` configuration needed
+- **Native arm64 support** — no QEMU emulation, builds run on real hardware
+- **Faster builds** — dedicated remote build infrastructure
+
+### Overriding the runner
+
+To use a different runner (e.g. for repos not yet on WarpBuild):
+
+```yaml
+jobs:
+  ci:
+    uses: credova/platform-workflows/.github/workflows/pull-request.yaml@v1
+    with:
+      runner: ubuntu-latest
+```
+
+### Available WarpBuild runners
+
+| Runner | vCPU | RAM | Arch |
+| ------ | ---- | --- | ---- |
+| `warp-ubuntu-2204-x64-2x` | 2 | 8 GB | x64 |
+| `warp-ubuntu-2204-x64-4x` | 4 | 16 GB | x64 |
+| `warp-ubuntu-2204-x64-8x` | 8 | 32 GB | x64 |
+| `warp-ubuntu-2204-arm64-2x` | 2 | 8 GB | arm64 |
+| `warp-ubuntu-2204-arm64-4x` | 4 | 16 GB | arm64 |
+| `warp-ubuntu-2204-arm64-8x` | 8 | 32 GB | arm64 |
+| `warp-ubuntu-2404-x64-2x` | 2 | 8 GB | x64 |
+| `warp-ubuntu-2404-x64-4x` | 4 | 16 GB | x64 |
+| `warp-ubuntu-2404-x64-8x` | 8 | 32 GB | x64 |
+| `warp-ubuntu-2404-arm64-2x` | 2 | 8 GB | arm64 |
+| `warp-ubuntu-2404-arm64-4x` | 4 | 16 GB | arm64 |
+| `warp-ubuntu-2404-arm64-8x` | 8 | 32 GB | arm64 |
+
+Default: `warp-ubuntu-2204-x64-2x`. Use 4x/8x for resource-intensive builds only.
+
+### Dependency caching (WarpCache)
+
+Enable `WarpBuilds/cache@v1` for dependency caching. This is a drop-in replacement for `actions/cache` with unlimited storage and better performance on WarpBuild runners.
+
+```yaml
+jobs:
+  ci:
+    uses: credova/platform-workflows/.github/workflows/pull-request.yaml@v1
+    with:
+      language: go
+      language-version: "1.24"
+      cache: true
+```
+
+Cached paths per language:
+
+| Language | Cache path          | Key based on                              |
+| -------- | ------------------- | ----------------------------------------- |
+| Go       | `~/go/pkg/mod`      | `go.sum`                                  |
+| Node.js  | `~/.npm`            | `package-lock.json`, `yarn.lock`          |
+| Kotlin   | `~/.gradle/caches`  | `*.gradle*`, `gradle-wrapper.properties`  |
+| Python   | `~/.cache/pip`      | `requirements*.txt`, `pyproject.toml`     |
+| Ruby     | `vendor/bundle`     | `Gemfile.lock`                            |
+| .NET     | `~/.nuget/packages` | `*.csproj`, `packages.lock.json`          |
+
+When `cache: true`, built-in caches from `actions/setup-go` and `actions/setup-node` are automatically disabled to avoid double-caching.
+
+---
+
 ## Input Reference
 
 ### pull-request.yaml
 
-| Input               | Type    | Default | Description                                                          |
-| ------------------- | ------- | ------- | -------------------------------------------------------------------- |
-| `language`          | string  | `""`    | Language runtime: `go`, `node`, `kotlin`, `python`, `ruby`, `dotnet` |
-| `language-version`  | string  | `""`    | Runtime version (required if language is set)                        |
-| `test-command`      | string  | `""`    | Custom test command (defaults per language)                          |
-| `container`         | boolean | `true`  | Build and scan a container image                                     |
-| `image`             | string  | `""`    | Single image `name:dockerfile`                                       |
-| `images`            | string  | `""`    | Multi-image YAML list                                                |
-| `security-packages` | boolean | `true`  | Package vulnerability scan                                           |
-| `security-code`     | boolean | `true`  | Code static analysis                                                 |
-| `security-severity` | string  | `HIGH`  | Minimum severity to fail on                                          |
-| `compliance-ticket` | boolean | `true`  | Require ticket reference                                             |
+| Input               | Type    | Default                    | Description                          |
+| ------------------- | ------- | -------------------------- | ------------------------------------ |
+| `language`          | string  | `""`                       | Language runtime (see table above)   |
+| `language-version`  | string  | `""`                       | Runtime version (required w/ lang)   |
+| `test-command`      | string  | `""`                       | Custom test command                  |
+| `container`         | boolean | `true`                     | Build and scan a container image     |
+| `image`             | string  | `""`                       | Single image `name:dockerfile`       |
+| `images`            | string  | `""`                       | Multi-image YAML list                |
+| `platform`          | string  | `linux/amd64`              | Target platform for builds           |
+| `warpbuild-profile` | string  | `""`                       | WarpBuild Docker Builder profile     |
+| `cache`             | boolean | `false`                    | WarpBuild dependency caching         |
+| `runner`            | string  | see WarpBuild section      | GitHub Actions runner label          |
+| `security-packages` | boolean | `true`                     | Package vulnerability scan           |
+| `security-code`     | boolean | `true`                     | Code static analysis                 |
+| `security-severity` | string  | `HIGH`                     | Minimum severity to fail on          |
+| `compliance-ticket` | boolean | `true`                     | Require ticket reference             |
 
 ### deploy.yaml
 
@@ -279,6 +371,9 @@ All inputs from pull-request.yaml plus:
 | `notifications`              | boolean | `true`         | Send Slack notifications                                          |
 | `project-id`                 | string  | `""`           | GCP project ID                                                    |
 | `workload-identity-provider` | string  | `""`           | WIF provider resource name                                        |
+
+**Secrets** (both workflows): `WARPBUILD_API_KEY` (optional — only needed on non-WarpBuild runners).
+Deploy also requires: `RELEASE_APP_ID`, `RELEASE_APP_PRIVATE_KEY`.
 
 ---
 

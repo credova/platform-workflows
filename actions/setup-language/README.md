@@ -4,10 +4,11 @@ Setup a language runtime for the current job. Single action that handles Go, Nod
 
 ## Inputs
 
-| Input      | Required | Description                                              |
-|------------|----------|----------------------------------------------------------|
-| `language` | Yes      | `go`, `node`, `kotlin`, `python`, `ruby`, or `dotnet`    |
-| `version`  | Yes      | Language/runtime version (e.g. `1.24`, `20`, `21`, `3.12`) |
+| Input      | Required | Description                                                                                        |
+|------------|----------|----------------------------------------------------------------------------------------------------|
+| `language` | Yes      | `go`, `node`, `kotlin`, `python`, `ruby`, or `dotnet`                                              |
+| `version`  | Yes      | Language/runtime version (e.g. `1.24`, `20`, `21`, `3.12`)                                         |
+| `cache`    | No       | `false` — enable WarpBuild dependency caching. Auto-disables built-in Go/Node caches when `true`.  |
 
 ## Examples
 
@@ -64,6 +65,18 @@ Setup a language runtime for the current job. Single action that handles Go, Nod
     language: dotnet
     version: "8.0"
 ```
+
+### With WarpBuild caching
+
+```yaml
+- uses: credova/platform-workflows/actions/setup-language@v1
+  with:
+    language: go
+    version: "1.24"
+    cache: true
+```
+
+When `cache: true`, Go's built-in `actions/setup-go` cache and Node's `actions/setup-node` cache are automatically disabled to avoid double-caching.
 
 ## Internal Mapping
 

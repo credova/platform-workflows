@@ -18,7 +18,7 @@ Vulnerability and code scanning with selectable scan types. All applicable scans
 | `code` | No | `true` | Run code static analysis |
 | `container` | No | `false` | Run container image scan |
 | `image-ref` | No | `""` | Container image reference (required when `container: true`) |
-| `severity` | No | `HIGH` | Minimum severity to fail on (`HIGH`, `CRITICAL`) |
+| `severity` | No | `HIGH` | Minimum severity to fail on (`LOW`, `MEDIUM`, `HIGH`, `CRITICAL`) |
 
 ## Examples
 
@@ -71,5 +71,5 @@ Vulnerability and code scanning with selectable scan types. All applicable scans
 
 These are implementation details — swappable without consumer impact:
 
-- **Trivy** — package and container vulnerability scanning
+- **Trivy** (`aquasecurity/trivy-action@0.31.0`) — package and container vulnerability scanning
 - **OpenGrep** — code/static analysis (Semgrep-compatible, LGPL 2.1)

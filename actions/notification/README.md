@@ -6,21 +6,21 @@ Standalone Slack notifications for any use case. Wraps `pctl slack notify` with 
 
 ## Inputs
 
-| Input            | Required | Default              | Description                                    |
-| ---------------- | -------- | -------------------- | ---------------------------------------------- |
-| `channel`        | Yes      | —                    | Slack channel ID or name                       |
-| `status`         | Yes      | —                    | `started`, `success`, `failed`, `cancelled`    |
-| `service`        | Yes      | —                    | Service name                                   |
-| `environment`    | Yes      | —                    | Environment name                               |
-| `revision`       | No       | —                    | Deployed revision name                         |
-| `deployer`       | No       | `github.actor`       | Who initiated                                  |
-| `pr-number`      | No       | —                    | Related PR number                              |
-| `pr-url`         | No       | —                    | Related PR URL                                 |
-| `run-url`        | No       | Current workflow run | GitHub Actions run URL                         |
-| `thread-ts`      | No       | —                    | Thread timestamp for updates                   |
-| `message`        | No       | —                    | Custom message override                        |
-| `token`          | Yes      | —                    | GitHub token for pctl download               |
-| `pctl-version` | No       | `latest`             | pctl version to install                      |
+| Input          | Required | Default              | Description                                 |
+| -------------- | -------- | -------------------- | ------------------------------------------- |
+| `channel`      | Yes      | —                    | Slack channel ID or name                    |
+| `status`       | Yes      | —                    | `started`, `success`, `failed`, `cancelled` |
+| `service`      | Yes      | —                    | Service name                                |
+| `environment`  | Yes      | —                    | Environment name                            |
+| `revision`     | No       | —                    | Deployed revision name                      |
+| `deployer`     | No       | `github.actor`       | Who initiated                               |
+| `pr-number`    | No       | —                    | Related PR number                           |
+| `pr-url`       | No       | —                    | Related PR URL                              |
+| `run-url`      | No       | Current workflow run | GitHub Actions run URL                      |
+| `thread-ts`    | No       | —                    | Thread timestamp for updates                |
+| `message`      | No       | —                    | Custom message override                     |
+| `token`        | Yes      | —                    | GitHub token for pctl download              |
+| `pctl-version` | No       | `latest`             | pctl version to install                     |
 
 ## Outputs
 

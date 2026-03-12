@@ -21,7 +21,10 @@ Full container lifecycle — build, scan, push, tag, reuse, retag. Self-containe
 | `project-id` | No | — | GCP project ID |
 | `workload-identity-provider` | No | — | WIF provider resource name |
 | `registry` | No | `us-docker.pkg.dev` | Artifact Registry hostname |
+| `platform` | No | `linux/amd64` | Target platform (e.g. `linux/amd64`, `linux/arm64`) |
 | `severity` | No | `HIGH` | Minimum severity to fail container scan on |
+| `warpbuild-profile` | No | `""` | WarpBuild Docker Builder profile name (enables remote builds) |
+| `warpbuild-api-key` | No | `""` | WarpBuild API key (only needed on non-WarpBuild runners) |
 
 ## Outputs
 
@@ -83,6 +86,33 @@ Full container lifecycle — build, scan, push, tag, reuse, retag. Self-containe
     retag: true
     source-tag: v1.2.3-stg
     tag: v1.2.3-prd
+    project-id: psq-shd-operations
+    workload-identity-provider: projects/123/locations/global/...
+```
+
+### WarpBuild remote build
+
+```yaml
+- uses: credova/platform-workflows/actions/container@v1
+  with:
+    name: merchant-portal
+    dockerfile: apps/merchant-portal/Dockerfile
+    build: true
+    push: true
+    warpbuild-profile: my-docker-builder
+    project-id: psq-shd-operations
+    workload-identity-provider: projects/123/locations/global/...
+```
+
+### Cross-platform build (arm64)
+
+```yaml
+- uses: credova/platform-workflows/actions/container@v1
+  with:
+    name: merchant-portal
+    platform: linux/arm64
+    build: true
+    push: true
     project-id: psq-shd-operations
     workload-identity-provider: projects/123/locations/global/...
 ```

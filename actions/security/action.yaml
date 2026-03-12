@@ -28,6 +28,15 @@ inputs:
 runs:
   using: composite
   steps:
+    - name: Log scan configuration
+      shell: bash
+      run: |
+        echo "Security scan configuration:"
+        echo "  packages: ${{ inputs.packages }}"
+        echo "  code: ${{ inputs.code }}"
+        echo "  container: ${{ inputs.container }}"
+        echo "  severity: ${{ inputs.severity }}"
+
     - name: Package vulnerability scan
       if: inputs.packages == 'true'
       uses: aquasecurity/trivy-action@master
@@ -48,31 +57,7 @@ runs:
       shell: bash
       env:
         SEVERITY: ${{ inputs.severity }}
-      run: |
-        echo "::group::OpenGrep static analysis"
-
-        ARGS="scan --sarif-output=opengrep-results.sarif"
-
-        # Map severity to opengrep --severity flag
-        case "${SEVERITY}" in
-          CRITICAL) ARGS="${ARGS} --severity ERROR" ;;
-          HIGH)     ARGS="${ARGS} --severity WARNING" ;;
-          *)        ARGS="${ARGS} --severity INFO" ;;
-        esac
-
-        # Use auto-detected rules (opengrep default rulesets)
-        ARGS="${ARGS} --config auto"
-
-        opengrep ${ARGS} . || EXIT_CODE=$?
-
-        echo "::endgroup::"
-
-        # Upload SARIF for GitHub code scanning integration
-        if [ -f opengrep-results.sarif ]; then
-          echo "SARIF results written to opengrep-results.sarif"
-        fi
-
-        exit "${EXIT_CODE:-0}"
+      run: ${{ github.action_path }}/../../scripts/opengrep-scan.sh
 
     - name: Container image scan
       if: inputs.container == 'true' && inputs.image-ref != ''
