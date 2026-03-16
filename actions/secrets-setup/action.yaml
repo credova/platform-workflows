@@ -24,7 +24,7 @@ runs:
         workload-identity-provider: ${{ inputs.workload-identity-provider }}
 
     - name: Setup mise
-      uses: jdx/mise-action@v2
+      uses: jdx/mise-action@v4
 
     - name: Load secrets via fnox
       shell: bash

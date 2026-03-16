@@ -9,6 +9,7 @@ set -e
 #   CANARY      - Canary traffic percentage (0 = full deploy)
 #   CONFIG_PATH - Path to CUE config directory
 #   REVISION    - Revision name (required for promote/rollback)
+# Token: PCTL_SLACK_BOT_TOKEN (passed through to pctl for notifications)
 
 : "${TARGET:?TARGET is required}"
 : "${ACTION:?ACTION is required}"
@@ -17,21 +18,23 @@ if [ "${ACTION}" = "deploy" ]; then
   : "${TAG:?TAG is required for deploy action}"
 fi
 
+CMD_ARGS=("pctl" "deploy")
+
 case "${ACTION}" in
   deploy)
-    CMD="pctl deploy execute ${TARGET} --tag ${TAG} --config ${CONFIG_PATH}"
-    if [ "${CANARY}" != "0" ]; then
-      CMD="${CMD} --canary ${CANARY}"
+    CMD_ARGS+=("execute" "${TARGET}" "--tag" "${TAG}" "--config" "${CONFIG_PATH}")
+    if [ "${CANARY}" != "0" ] && [ -n "${CANARY}" ]; then
+      CMD_ARGS+=("--canary" "${CANARY}")
     fi
     ;;
   promote)
-    CMD="pctl deploy promote ${TARGET} --revision ${REVISION}"
+    CMD_ARGS+=("promote" "${TARGET}" "--revision" "${REVISION}")
     ;;
   rollback)
-    CMD="pctl deploy rollback ${TARGET}"
+    CMD_ARGS+=("rollback" "${TARGET}")
     ;;
   abort)
-    CMD="pctl deploy abort ${TARGET}"
+    CMD_ARGS+=("abort" "${TARGET}")
     ;;
   *)
     echo "::error::Unknown action: ${ACTION}"
@@ -39,8 +42,8 @@ case "${ACTION}" in
     ;;
 esac
 
-echo "Running: ${CMD}"
-OUTPUT=$(eval "${CMD}" 2>&1) || { echo "${OUTPUT}"; exit 1; }
+echo "Running: ${CMD_ARGS[*]}"
+OUTPUT=$("${CMD_ARGS[@]}" 2>&1) || { echo "${OUTPUT}"; exit 1; }
 echo "${OUTPUT}"
 
 # Parse outputs from pctl

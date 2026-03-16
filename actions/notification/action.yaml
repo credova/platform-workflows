@@ -6,7 +6,8 @@ description: >
 inputs:
   channel:
     description: Slack channel ID or name
-    required: true
+    required: false
+    default: C09J27QLTS7
   status:
     description: "Notification status: started, success, failed, cancelled"
     required: true
@@ -38,7 +39,15 @@ inputs:
     required: false
     default: ""
   thread-ts:
-    description: Thread timestamp for updates
+    description: "Thread timestamp — without reply: updates in-place; with reply: posts thread reply"
+    required: false
+    default: ""
+  reply:
+    description: Post as thread reply instead of updating in-place (requires thread-ts)
+    required: false
+    default: "false"
+  template:
+    description: "Template name (deploy, general, security) or path to .json.tmpl file"
     required: false
     default: ""
   # Link inputs
@@ -100,7 +109,7 @@ runs:
       id: notify
       shell: bash
       env:
-        SLACK_BOT_TOKEN: ${{ inputs.slack-token }}
+        PCTL_SLACK_BOT_TOKEN: ${{ inputs.slack-token }}
         CHANNEL: ${{ inputs.channel }}
         STATUS: ${{ inputs.status }}
         SERVICE: ${{ inputs.service }}
@@ -111,6 +120,8 @@ runs:
         REVISION: ${{ inputs.revision }}
         MESSAGE: ${{ inputs.message }}
         THREAD_TS: ${{ inputs.thread-ts }}
+        REPLY: ${{ inputs.reply }}
+        TEMPLATE: ${{ inputs.template }}
         RUN_URL: ${{ inputs.run-url }}
         STORY_URL: ${{ inputs.story-url }}
         GCP_LOGS_URL: ${{ inputs.gcp-logs-url }}

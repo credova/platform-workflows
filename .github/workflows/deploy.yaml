@@ -107,7 +107,7 @@ on:
 
       # Notifications
       notifications:
-        description: "Send Slack notifications (not yet wired — reserved for future use)"
+        description: "Send Slack notifications during deployment"
         type: boolean
         required: false
         default: true
@@ -131,6 +131,8 @@ on:
         required: false
       WARPBUILD_API_KEY:
         required: false
+      PCTL_SLACK_BOT_TOKEN:
+        required: false
 
 jobs:
   # --- Input validation and image parsing ---
@@ -140,7 +142,7 @@ jobs:
       image-matrix: ${{ steps.parse.outputs.image-matrix }}
       deploy-tag: ${{ steps.tag.outputs.deploy-tag }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Validate inputs
         shell: bash
@@ -191,7 +193,7 @@ jobs:
     outputs:
       token: ${{ steps.token.outputs.token }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Generate release download token
         id: token
@@ -206,7 +208,7 @@ jobs:
     needs: [validate-inputs]
     runs-on: ${{ inputs.runner }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup language
         uses: ./actions/setup-language
@@ -246,7 +248,7 @@ jobs:
       matrix:
         include: ${{ fromJson(needs.validate-inputs.outputs.image-matrix) }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Build, scan, and push image (${{ matrix.name }})
         uses: ./actions/container
@@ -273,7 +275,7 @@ jobs:
     runs-on: ${{ inputs.runner }}
     environment: staging
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Deploy to staging
         uses: ./actions/deployment
@@ -283,6 +285,7 @@ jobs:
           config-path: ${{ inputs.config-path }}
           project-id: ${{ inputs.project-id }}
           workload-identity-provider: ${{ inputs.workload-identity-provider }}
+          slack-token: ${{ secrets.PCTL_SLACK_BOT_TOKEN }}
           token: ${{ needs.auth.outputs.token }}
 
   # --- Canary flow ---
@@ -299,7 +302,7 @@ jobs:
     needs: [auth, approve-canary, validate-inputs]
     runs-on: ${{ inputs.runner }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Deploy canary
         id: canary
@@ -311,6 +314,7 @@ jobs:
           config-path: ${{ inputs.config-path }}
           project-id: ${{ inputs.project-id }}
           workload-identity-provider: ${{ inputs.workload-identity-provider }}
+          slack-token: ${{ secrets.PCTL_SLACK_BOT_TOKEN }}
           token: ${{ needs.auth.outputs.token }}
 
   # --- Production approval ---
@@ -332,7 +336,7 @@ jobs:
       matrix:
         include: ${{ fromJson(needs.validate-inputs.outputs.image-matrix) }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Retag image for production (${{ matrix.name }})
         uses: ./actions/container
@@ -350,7 +354,18 @@ jobs:
     needs: [auth, approve-production, retag-production, validate-inputs]
     runs-on: ${{ inputs.runner }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
+
+      - name: Require Slack token for production
+        if: inputs.notifications
+        shell: bash
+        env:
+          PCTL_SLACK_BOT_TOKEN: ${{ secrets.PCTL_SLACK_BOT_TOKEN }}
+        run: |
+          if [ -z "${PCTL_SLACK_BOT_TOKEN}" ]; then
+            echo "::error::PCTL_SLACK_BOT_TOKEN secret is required for production deploys when notifications are enabled"
+            exit 1
+          fi
 
       - name: Promote canary to production
         if: inputs.canary > 0
@@ -361,6 +376,7 @@ jobs:
           config-path: ${{ inputs.config-path }}
           project-id: ${{ inputs.project-id }}
           workload-identity-provider: ${{ inputs.workload-identity-provider }}
+          slack-token: ${{ secrets.PCTL_SLACK_BOT_TOKEN }}
           token: ${{ needs.auth.outputs.token }}
 
       - name: Deploy to production (full)
@@ -372,6 +388,7 @@ jobs:
           config-path: ${{ inputs.config-path }}
           project-id: ${{ inputs.project-id }}
           workload-identity-provider: ${{ inputs.workload-identity-provider }}
+          slack-token: ${{ secrets.PCTL_SLACK_BOT_TOKEN }}
           token: ${{ needs.auth.outputs.token }}
 
   # --- Release tag + GitHub Release ---
@@ -380,7 +397,7 @@ jobs:
     if: always() && !failure() && !cancelled()
     runs-on: ${{ inputs.runner }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 

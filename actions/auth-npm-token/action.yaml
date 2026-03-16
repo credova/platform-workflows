@@ -25,7 +25,7 @@ runs:
   steps:
     - name: Generate npm publish token
       id: generate
-      uses: actions/create-github-app-token@v1
+      uses: actions/create-github-app-token@v3
       with:
         app-id: ${{ inputs.app-id }}
         private-key: ${{ inputs.private-key }}
