@@ -36,6 +36,11 @@ inputs:
     description: Workload Identity Provider resource name
     required: false
     default: ""
+  # Slack notifications (pctl reads token from env automatically)
+  slack-token:
+    description: Slack bot token for deploy notifications (or set PCTL_SLACK_BOT_TOKEN in workflow env)
+    required: false
+    default: ""
   # pctl
   pctl-version:
     description: pctl version to install
@@ -80,4 +85,5 @@ runs:
         CANARY: ${{ inputs.canary }}
         CONFIG_PATH: ${{ inputs.config-path }}
         REVISION: ${{ inputs.revision }}
+        PCTL_SLACK_BOT_TOKEN: ${{ inputs.slack-token }}
       run: ${{ github.action_path }}/../../scripts/deploy.sh

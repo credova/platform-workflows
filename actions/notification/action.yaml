@@ -38,7 +38,19 @@ inputs:
     required: false
     default: ""
   thread-ts:
-    description: Thread timestamp for updates
+    description: "Thread timestamp — without reply: updates in-place; with reply: posts thread reply"
+    required: false
+    default: ""
+  reply:
+    description: Post as thread reply instead of updating in-place (requires thread-ts)
+    required: false
+    default: "false"
+  template:
+    description: "Template name (deploy, general, security) or path to .json.tmpl file"
+    required: false
+    default: ""
+  email-domains:
+    description: Comma-separated email domains for resolving user mentions
     required: false
     default: ""
   # Link inputs
@@ -100,7 +112,7 @@ runs:
       id: notify
       shell: bash
       env:
-        SLACK_BOT_TOKEN: ${{ inputs.slack-token }}
+        PCTL_SLACK_BOT_TOKEN: ${{ inputs.slack-token }}
         CHANNEL: ${{ inputs.channel }}
         STATUS: ${{ inputs.status }}
         SERVICE: ${{ inputs.service }}
@@ -111,6 +123,9 @@ runs:
         REVISION: ${{ inputs.revision }}
         MESSAGE: ${{ inputs.message }}
         THREAD_TS: ${{ inputs.thread-ts }}
+        REPLY: ${{ inputs.reply }}
+        TEMPLATE: ${{ inputs.template }}
+        EMAIL_DOMAINS: ${{ inputs.email-domains }}
         RUN_URL: ${{ inputs.run-url }}
         STORY_URL: ${{ inputs.story-url }}
         GCP_LOGS_URL: ${{ inputs.gcp-logs-url }}
