@@ -18,19 +18,18 @@ Standalone Slack notifications for any use case. Wraps `pctl slack notify` with 
 
 ### Optional Notification Inputs
 
-| Input           | Required | Default        | Description                                                             |
-| --------------- | -------- | -------------- | ----------------------------------------------------------------------- |
-| `host`          | No       | —              | Service host/URL                                                        |
-| `project`       | No       | —              | GCP project ID                                                          |
-| `author`        | No       | `github.actor` | Commit author / who triggered                                           |
-| `approver`      | No       | —              | Who approved the release                                                |
-| `revision`      | No       | —              | Deployed revision name                                                  |
-| `message`       | No       | —              | Commit message or custom text                                           |
-| `thread-ts`     | No       | —              | Without `reply`: updates in-place; with `reply`: posts thread reply     |
-| `reply`         | No       | `false`        | Post as thread reply instead of updating in-place (needs `thread-ts`)   |
-| `template`      | No       | —              | Template name (`deploy`, `general`, `security`) or `.json.tmpl` path   |
-| `email-domains` | No       | —              | Comma-separated email domains for resolving user mentions               |
-| `pctl-version`  | No       | `latest`       | pctl version to install                                                 |
+| Input           | Required | Default                    | Description                                                   |
+| --------------- | -------- | -------------------------- | ------------------------------------------------------------- |
+| `host`          | No       | —                          | Service host/URL                                              |
+| `project`       | No       | —                          | GCP project ID                                                |
+| `author`        | No       | `github.actor`             | Commit author / who triggered                                 |
+| `approver`      | No       | —                          | Who approved the release                                      |
+| `revision`      | No       | —                          | Deployed revision name                                        |
+| `message`       | No       | —                          | Commit message or custom text                                 |
+| `thread-ts`     | No       | —                          | Without `reply`: updates in-place; with `reply`: thread reply |
+| `reply`         | No       | `false`                    | Post as thread reply instead of updating in-place             |
+| `template`      | No       | —                          | Template name (`deploy`, `general`, `security`) or file path  |
+| `pctl-version`  | No       | `latest`                   | pctl version to install                                       |
 
 ### Link Inputs
 

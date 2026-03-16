@@ -49,10 +49,6 @@ inputs:
     description: "Template name (deploy, general, security) or path to .json.tmpl file"
     required: false
     default: ""
-  email-domains:
-    description: Comma-separated email domains for resolving user mentions
-    required: false
-    default: ""
   # Link inputs
   run-url:
     description: GitHub Actions run URL
@@ -125,7 +121,6 @@ runs:
         THREAD_TS: ${{ inputs.thread-ts }}
         REPLY: ${{ inputs.reply }}
         TEMPLATE: ${{ inputs.template }}
-        EMAIL_DOMAINS: ${{ inputs.email-domains }}
         RUN_URL: ${{ inputs.run-url }}
         STORY_URL: ${{ inputs.story-url }}
         GCP_LOGS_URL: ${{ inputs.gcp-logs-url }}

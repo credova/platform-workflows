@@ -4,7 +4,7 @@ set -e
 # Send a Slack notification via pctl.
 # Required env vars: CHANNEL, STATUS, SERVICE
 # Optional env vars: HOST, PROJECT, AUTHOR, APPROVER, REVISION, MESSAGE,
-#   THREAD_TS, REPLY, TEMPLATE, EMAIL_DOMAINS, RUN_URL, STORY_URL,
+#   THREAD_TS, REPLY, TEMPLATE, RUN_URL, STORY_URL,
 #   GCP_LOGS_URL, DASHBOARD_URL, ROLLBACK_URL, ROLLBACK_REVISION
 # Token: PCTL_SLACK_BOT_TOKEN or SLACK_BOT_TOKEN (passed through to pctl)
 
@@ -26,7 +26,6 @@ CMD_ARGS+=("--service" "${SERVICE}")
 [ -n "${THREAD_TS}" ] && CMD_ARGS+=("--thread-ts" "${THREAD_TS}")
 [ "${REPLY}" = "true" ] && CMD_ARGS+=("--reply")
 [ -n "${TEMPLATE}" ] && CMD_ARGS+=("--template" "${TEMPLATE}")
-[ -n "${EMAIL_DOMAINS}" ] && CMD_ARGS+=("--email-domains" "${EMAIL_DOMAINS}")
 [ -n "${RUN_URL}" ] && CMD_ARGS+=("--run-url" "${RUN_URL}")
 [ -n "${STORY_URL}" ] && CMD_ARGS+=("--story-url" "${STORY_URL}")
 [ -n "${GCP_LOGS_URL}" ] && CMD_ARGS+=("--gcp-logs-url" "${GCP_LOGS_URL}")
