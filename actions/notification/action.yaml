@@ -6,7 +6,8 @@ description: >
 inputs:
   channel:
     description: Slack channel ID or name
-    required: true
+    required: false
+    default: C09J27QLTS7
   status:
     description: "Notification status: started, success, failed, cancelled"
     required: true
