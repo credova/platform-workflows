@@ -10,7 +10,7 @@ jobs:
   validate:
     runs-on: warp-ubuntu-2204-x64-2x
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Validate YAML syntax
         shell: bash

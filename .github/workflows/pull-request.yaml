@@ -98,7 +98,7 @@ jobs:
     outputs:
       image-matrix: ${{ steps.parse.outputs.image-matrix }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Validate inputs
         shell: bash
@@ -132,7 +132,7 @@ jobs:
   security:
     runs-on: ${{ inputs.runner }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup language
         if: inputs.language != ''
@@ -155,7 +155,7 @@ jobs:
     needs: [security]
     runs-on: ${{ inputs.runner }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup language
         uses: ./actions/setup-language
@@ -197,7 +197,7 @@ jobs:
       matrix:
         include: ${{ fromJson(needs.validate-inputs.outputs.image-matrix) }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Build container image (${{ matrix.name }})
         uses: ./actions/container
@@ -218,7 +218,7 @@ jobs:
     if: always() && !failure() && !cancelled()
     runs-on: ${{ inputs.runner }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Compliance checks
         uses: ./actions/compliance
