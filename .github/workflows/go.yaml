@@ -44,6 +44,11 @@ on:
         required: false
         default: warp-ubuntu-latest-arm64-4x
 
+permissions:
+  contents: write
+  packages: write
+  id-token: write
+
 jobs:
   lint:
     if: inputs.lint
@@ -107,10 +112,6 @@ jobs:
     needs: [lint, security, test]
     if: inputs.goreleaser && !failure() && !cancelled()
     runs-on: ${{ inputs.runner }}
-    permissions:
-      contents: write
-      packages: write
-      id-token: write
     steps:
       - uses: actions/checkout@v6
         with:
