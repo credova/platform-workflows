@@ -44,7 +44,6 @@ on:
         required: false
         default: warp-ubuntu-latest-arm64-4x
 
-
 jobs:
   lint:
     if: inputs.lint
@@ -139,8 +138,8 @@ jobs:
         id: homebrew-token
         uses: actions/create-github-app-token@v3
         with:
-          app-id: ${{ vars.HOMEBREW_PUBLISHER_APP_ID || vars.PSQ_HOMEBREW_PUBLISHER_APP_ID }}
-          private-key: ${{ secrets.HOMEBREW_PUBLISHER_APP_PRIVATE_KEY || secrets.PSQ_HOMEBREW_PUBLISHER_APP_PRIVATE_KEY }}
+          app-id: ${{ vars.HOMEBREW_PUBLISHER_APP_ID }}
+          private-key: ${{ secrets.HOMEBREW_PUBLISHER_APP_PRIVATE_KEY }}
           owner: credova
           repositories: homebrew-tap
 
