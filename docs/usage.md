@@ -167,6 +167,57 @@ jobs:
 | `goreleaser-args` | string  | `""`                          | Additional GoReleaser args  |
 | `runner`          | string  | `warp-ubuntu-latest-arm64-4x` | GitHub Actions runner label |
 
+### GoReleaser Docker (dockers_v2)
+
+GoReleaser v2 replaces `dockers` + `docker_manifests` with a single `dockers_v2` section. This uses `docker buildx build` under the hood, building multi-platform manifests in one step.
+
+**.goreleaser.yaml:**
+
+```yaml
+dockers_v2:
+  - images:
+      - us-docker.pkg.dev/your-project/your-repo/your-image
+    tags:
+      - "v{{ .Version }}"
+      - "{{ if not .IsNightly }}latest{{ end }}"
+```
+
+**Dockerfile** — use `$TARGETPLATFORM` to copy the correct binary:
+
+```dockerfile
+FROM scratch
+ARG TARGETPLATFORM
+COPY $TARGETPLATFORM/my-binary /
+ENTRYPOINT ["/my-binary"]
+```
+
+GoReleaser sets up the build context so each platform's artifacts are in `$TARGETPLATFORM/`. On `--snapshot` builds, platform is appended to tags and images are built instead of manifests (manifests require pushing).
+
+### Local Docker testing
+
+Add file tasks to `mise-tasks/` for local testing:
+
+```bash
+# mise-tasks/docker-build
+#!/usr/bin/env bash
+#MISE description="Build Docker image locally via goreleaser snapshot"
+set -euo pipefail
+goreleaser release --snapshot --clean
+
+# mise-tasks/docker-test
+#!/usr/bin/env bash
+#MISE description="Build and run the Docker image locally to verify it works"
+#MISE depends=["docker-build"]
+set -euo pipefail
+IMAGE=$(docker images --format '{{.Repository}}:{{.Tag}}' | grep your-image | head -1)
+docker run --rm "$IMAGE" version
+```
+
+```bash
+chmod +x mise-tasks/docker-build mise-tasks/docker-test
+mise run docker-test
+```
+
 ---
 
 ## Deploy Workflow
