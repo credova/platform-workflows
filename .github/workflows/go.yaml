@@ -44,11 +44,6 @@ on:
         required: false
         default: warp-ubuntu-latest-arm64-4x
 
-permissions:
-  contents: write
-  packages: write
-  id-token: write
-
 jobs:
   lint:
     if: inputs.lint

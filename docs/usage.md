@@ -111,6 +111,64 @@ jobs:
 
 ---
 
+## Go Workflow
+
+For Go repos using [mise](https://mise.jdx.dev/) and [GoReleaser](https://goreleaser.com/).
+
+### PR (lint + security + test only)
+
+```yaml
+name: Pull Request
+on:
+  pull_request:
+    branches: [master]
+
+permissions:
+  contents: read
+
+jobs:
+  go:
+    uses: credova/platform-workflows/.github/workflows/go.yaml@v1
+    with:
+      goreleaser: false
+```
+
+### Push / tag (with GoReleaser)
+
+GoReleaser needs write permissions for releases, packages, and OIDC signing. Callers **must** declare these — GitHub does not allow reusable workflows to escalate beyond what the caller grants.
+
+```yaml
+name: Build and Release
+on:
+  push:
+    branches: [master]
+    tags: ["v*"]
+
+permissions:
+  contents: write
+  packages: write
+  id-token: write
+
+jobs:
+  go:
+    uses: credova/platform-workflows/.github/workflows/go.yaml@v1
+    secrets: inherit
+```
+
+### go.yaml inputs
+
+| Input             | Type    | Default                       | Description                 |
+| ----------------- | ------- | ----------------------------- | --------------------------- |
+| `lint`            | boolean | `true`                        | Run `mise run lint`         |
+| `security`        | boolean | `true`                        | Run `mise run security`     |
+| `test`            | boolean | `true`                        | Run tests                   |
+| `test-command`    | string  | `""`                          | Custom test command         |
+| `goreleaser`      | boolean | `true`                        | Run GoReleaser              |
+| `goreleaser-args` | string  | `""`                          | Additional GoReleaser args  |
+| `runner`          | string  | `warp-ubuntu-latest-arm64-4x` | GitHub Actions runner label |
+
+---
+
 ## Deploy Workflow
 
 One workflow handles everything. Same flags as pull-request plus deployment options.
