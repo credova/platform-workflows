@@ -134,7 +134,7 @@ jobs:
         id: homebrew-token
         uses: actions/create-github-app-token@v3
         with:
-          app-id: ${{ vars.HOMEBREW_PUBLISHER_APP_ID }}
+          app-id: ${{ secrets.HOMEBREW_PUBLISHER_APP_ID }}
           private-key: ${{ secrets.HOMEBREW_PUBLISHER_APP_PRIVATE_KEY }}
           owner: credova
           repositories: homebrew-tap
