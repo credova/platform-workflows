@@ -94,7 +94,9 @@ runs:
     - name: Install opengrep
       if: inputs.code == 'true' && inputs.target == 'dir:.'
       shell: bash
-      run: curl -fsSL https://raw.githubusercontent.com/opengrep/opengrep/main/install.sh | bash
+      run: |
+        curl -fsSL https://raw.githubusercontent.com/opengrep/opengrep/main/install.sh | bash
+        echo "$HOME/.opengrep/cli/latest" >> "$GITHUB_PATH"
 
     - name: Code static analysis
       if: inputs.code == 'true' && inputs.target == 'dir:.'
