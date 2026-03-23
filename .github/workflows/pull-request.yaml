@@ -65,7 +65,12 @@ on:
 
       # Security
       security-packages:
-        description: Run package vulnerability scan
+        description: Run package vulnerability scan (source + image)
+        type: boolean
+        required: false
+        default: true
+      security-licenses:
+        description: Run license compliance scan (informational only)
         type: boolean
         required: false
         default: true
@@ -146,6 +151,7 @@ jobs:
         uses: ./actions/security
         with:
           packages: ${{ inputs.security-packages && 'true' || 'false' }}
+          licenses: ${{ inputs.security-licenses && 'true' || 'false' }}
           code: ${{ inputs.security-code && 'true' || 'false' }}
           severity: ${{ inputs.security-severity }}
 

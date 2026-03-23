@@ -1,27 +1,35 @@
 name: security
 description: >
-  Vulnerability and code scanning. Selectable scan types.
-  Default behavior: opt-out. All applicable scans run unless explicitly disabled.
+  Two-phase security scanning. Phase 1 (source): package vulns + license
+  compliance + static analysis. Phase 2 (image): container image vuln scan.
+  Target determines the phase — dir:. for source, docker:<ref> for image.
+  Posts and maintains a single PR comment with results from both phases.
 
 inputs:
+  target:
+    description: >
+      Syft scan target. "dir:." scans source packages (default).
+      "docker:<image>" scans a built container image.
+    required: false
+    default: "dir:."
   packages:
-    description: Scan dependency manifests (package.json, go.mod, etc.) via trivy
+    description: Run vulnerability scan via grype
+    required: false
+    default: "true"
+  licenses:
+    description: >
+      Run license compliance scan via grant — informational only, never blocks.
+      Only applies when target is dir:.
     required: false
     default: "true"
   code:
-    description: Static analysis via opengrep
+    description: >
+      Run static code analysis via opengrep.
+      Only applies when target is dir:.
     required: false
     default: "true"
-  container:
-    description: Container image scanning via trivy (usually called internally by container action)
-    required: false
-    default: "false"
-  image-ref:
-    description: Container image reference for container scanning
-    required: false
-    default: ""
   severity:
-    description: Minimum severity to fail on
+    description: Minimum severity to fail on (CRITICAL, HIGH, MEDIUM, LOW)
     required: false
     default: HIGH
 
@@ -31,40 +39,66 @@ runs:
     - name: Log scan configuration
       shell: bash
       run: |
-        echo "Security scan configuration:"
+        echo "Security scan:"
+        echo "  target:   ${{ inputs.target }}"
         echo "  packages: ${{ inputs.packages }}"
-        echo "  code: ${{ inputs.code }}"
-        echo "  container: ${{ inputs.container }}"
+        echo "  licenses: ${{ inputs.licenses }}"
+        echo "  code:     ${{ inputs.code }}"
         echo "  severity: ${{ inputs.severity }}"
+
+    - name: Install Anchore tools
+      if: inputs.packages == 'true' || inputs.licenses == 'true'
+      shell: bash
+      run: ${{ github.action_path }}/../../scripts/install-anchore.sh
+
+    - name: Generate SBOM
+      if: inputs.packages == 'true' || inputs.licenses == 'true'
+      shell: bash
+      env:
+        TARGET: ${{ inputs.target }}
+      run: syft "$TARGET" -o spdx-json=sbom.spdx.json
 
     - name: Package vulnerability scan
       if: inputs.packages == 'true'
-      uses: aquasecurity/trivy-action@master
-      with:
-        scan-type: fs
-        scan-ref: .
-        severity: ${{ inputs.severity }}
-        exit-code: "1"
-        ignore-unfixed: true
+      id: grype
+      continue-on-error: true
+      shell: bash
+      env:
+        SEVERITY: ${{ inputs.severity }}
+        RESULTS_FILE: ${{ inputs.target == 'dir:.' && 'grype-source-results.json' || 'grype-image-results.json' }}
+      run: ${{ github.action_path }}/../../scripts/grype-scan.sh
+
+    - name: License compliance scan
+      if: inputs.licenses == 'true' && inputs.target == 'dir:.'
+      shell: bash
+      run: ${{ github.action_path }}/../../scripts/grant-scan.sh
+
+    - name: Post security comment
+      if: always() && github.event_name == 'pull_request'
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        SCAN_PHASE: ${{ inputs.target == 'dir:.' && 'source' || 'image' }}
+        SEVERITY: ${{ inputs.severity }}
+        PACKAGES: ${{ inputs.packages }}
+        LICENSES: ${{ inputs.licenses }}
+      run: ${{ github.action_path }}/../../scripts/post-security-comment.sh
+
+    - name: Fail on vulnerabilities
+      if: steps.grype.outcome == 'failure'
+      shell: bash
+      run: |
+        echo "::error::Vulnerability scan found ${{ inputs.severity }}-or-higher issues — see PR comment for details"
+        exit 1
 
     - name: Install opengrep
-      if: inputs.code == 'true'
+      if: inputs.code == 'true' && inputs.target == 'dir:.'
       shell: bash
       run: curl -fsSL https://raw.githubusercontent.com/opengrep/opengrep/main/install.sh | bash
 
     - name: Code static analysis
-      if: inputs.code == 'true'
+      if: inputs.code == 'true' && inputs.target == 'dir:.'
       shell: bash
       env:
         SEVERITY: ${{ inputs.severity }}
       run: ${{ github.action_path }}/../../scripts/opengrep-scan.sh
-
-    - name: Container image scan
-      if: inputs.container == 'true' && inputs.image-ref != ''
-      uses: aquasecurity/trivy-action@master
-      with:
-        scan-type: image
-        image-ref: ${{ inputs.image-ref }}
-        severity: ${{ inputs.severity }}
-        exit-code: "1"
-        ignore-unfixed: true

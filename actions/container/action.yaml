@@ -68,6 +68,10 @@ inputs:
     description: Artifact Registry hostname
     required: false
     default: us-docker.pkg.dev
+  scan:
+    description: Run security scan on the built image (syft + grype)
+    required: false
+    default: "true"
   severity:
     description: Minimum severity to fail container scan on
     required: false
@@ -230,17 +234,18 @@ runs:
         PUSH: ${{ inputs.push }}
       run: ${{ github.action_path }}/../../scripts/docker-build.sh
 
-    - name: Container security scan (mandatory)
+    - name: Scan container image
       if: >
+        inputs.scan == 'true' &&
         inputs.build == 'true' &&
         inputs.retag != 'true' &&
         steps.reuse-check.outputs.exists != 'true'
       uses: ./actions/security
       with:
-        packages: "false"
+        target: docker:${{ steps.meta.outputs.image }}
+        packages: "true"
+        licenses: "false"
         code: "false"
-        container: "true"
-        image-ref: ${{ steps.meta.outputs.image }}
         severity: ${{ inputs.severity }}
 
     - name: Tag and push image
