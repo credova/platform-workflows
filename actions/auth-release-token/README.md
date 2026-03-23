@@ -6,17 +6,17 @@ Generates a short-lived GitHub token scoped to specific repositories for release
 
 ## Inputs
 
-| Input          | Required | Default  | Description                                          |
-|----------------|----------|----------|------------------------------------------------------|
-| `app-id`       | Yes      | —        | GitHub App ID (from org secret `RELEASE_APP_ID`)     |
-| `private-key`  | Yes      | —        | GitHub App private key (from org secret `RELEASE_APP_PRIVATE_KEY`) |
-| `repositories` | No       | `pctl` | Comma-separated repos to scope the token to          |
+| Input          | Required | Default | Description                                                        |
+| -------------- | -------- | ------- | ------------------------------------------------------------------ |
+| `app-id`       | Yes      | —       | GitHub App ID (from org secret `RELEASE_APP_ID`)                   |
+| `private-key`  | Yes      | —       | GitHub App private key (from org secret `RELEASE_APP_PRIVATE_KEY`) |
+| `repositories` | No       | `pctl`  | Comma-separated repos to scope the token to                        |
 
 ## Outputs
 
-| Output  | Description                              |
-|---------|------------------------------------------|
-| `token` | Short-lived token with read access       |
+| Output  | Description                        |
+| ------- | ---------------------------------- |
+| `token` | Short-lived token with read access |
 
 ## Usage in reusable workflows
 

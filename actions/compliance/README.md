@@ -7,14 +7,14 @@ Process and policy gates. Ensures teams follow required procedures. All checks r
 ## Check Types
 
 | Type     | Default | Description                                                       |
-|----------|---------|-------------------------------------------------------------------|
+| -------- | ------- | ----------------------------------------------------------------- |
 | `ticket` | `true`  | PR must reference a Shortcut ticket (`sc-12345` or Shortcut link) |
 
 ## Inputs
 
-| Input    | Required | Default | Description                          |
-|----------|----------|---------|--------------------------------------|
-| `ticket` | No       | `true`  | Require a Shortcut ticket reference  |
+| Input    | Required | Default | Description                         |
+| -------- | -------- | ------- | ----------------------------------- |
+| `ticket` | No       | `true`  | Require a Shortcut ticket reference |
 
 ## Examples
 

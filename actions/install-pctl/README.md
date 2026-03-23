@@ -6,10 +6,10 @@ Installs pctl from the private `credova/pctl` GitHub releases. Handles version r
 
 ## Inputs
 
-| Input | Required | Default | Description |
-|-------|----------|---------|-------------|
-| `version` | No | `latest` | pctl version to install |
-| `token` | Yes | — | GitHub token with read access to `credova/pctl` releases |
+| Input     | Required | Default  | Description                                              |
+| --------- | -------- | -------- | -------------------------------------------------------- |
+| `version` | No       | `latest` | pctl version to install                                  |
+| `token`   | Yes      | —        | GitHub token with read access to `credova/pctl` releases |
 
 The token should be generated at the reusable workflow level (e.g. via `actions/create-github-app-token`) and passed down to composites. This keeps GitHub App credentials in one place.
 

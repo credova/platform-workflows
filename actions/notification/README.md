@@ -8,41 +8,41 @@ Standalone Slack notifications for any use case. Wraps `pctl slack notify` with 
 
 ### Required Notification Inputs
 
-| Input          | Required | Default        | Description                                 |
-| -------------- | -------- | -------------- | ------------------------------------------- |
-| `channel`      | Yes      | —              | Slack channel ID or name                    |
-| `status`       | Yes      | —              | `started`, `success`, `failed`, `cancelled` |
-| `service`      | Yes      | —              | Service name                                |
-| `slack-token`  | Yes      | —              | Slack bot token                             |
-| `token`        | Yes      | —              | GitHub token for pctl download              |
+| Input         | Required | Default | Description                                 |
+| ------------- | -------- | ------- | ------------------------------------------- |
+| `channel`     | Yes      | —       | Slack channel ID or name                    |
+| `status`      | Yes      | —       | `started`, `success`, `failed`, `cancelled` |
+| `service`     | Yes      | —       | Service name                                |
+| `slack-token` | Yes      | —       | Slack bot token                             |
+| `token`       | Yes      | —       | GitHub token for pctl download              |
 
 ### Optional Notification Inputs
 
-| Input           | Required | Default                    | Description                                                   |
-| --------------- | -------- | -------------------------- | ------------------------------------------------------------- |
-| `host`          | No       | —                          | Service host/URL                                              |
-| `project`       | No       | —                          | GCP project ID                                                |
-| `author`        | No       | `github.actor`             | Commit author / who triggered                                 |
-| `approver`      | No       | —                          | Who approved the release                                      |
-| `revision`      | No       | —                          | Deployed revision name                                        |
-| `message`       | No       | —                          | Commit message or custom text                                 |
-| `thread-ts`     | No       | —                          | Without `reply`: updates in-place; with `reply`: thread reply |
-| `reply`         | No       | `false`                    | Post as thread reply instead of updating in-place             |
-| `template`      | No       | —                          | Template name (`deploy`, `general`, `security`) or file path  |
-| `pctl-version`  | No       | `latest`                   | pctl version to install                                       |
+| Input          | Required | Default        | Description                                                   |
+| -------------- | -------- | -------------- | ------------------------------------------------------------- |
+| `host`         | No       | —              | Service host/URL                                              |
+| `project`      | No       | —              | GCP project ID                                                |
+| `author`       | No       | `github.actor` | Commit author / who triggered                                 |
+| `approver`     | No       | —              | Who approved the release                                      |
+| `revision`     | No       | —              | Deployed revision name                                        |
+| `message`      | No       | —              | Commit message or custom text                                 |
+| `thread-ts`    | No       | —              | Without `reply`: updates in-place; with `reply`: thread reply |
+| `reply`        | No       | `false`        | Post as thread reply instead of updating in-place             |
+| `template`     | No       | —              | Template name (`deploy`, `general`, `security`) or file path  |
+| `pctl-version` | No       | `latest`       | pctl version to install                                       |
 
 ### Link Inputs
 
 These only appear in the notification if a value is provided:
 
-| Input              | Required | Default              | Description                        |
-| ------------------ | -------- | -------------------- | ---------------------------------- |
-| `run-url`          | No       | Current workflow run | GitHub Actions run URL             |
-| `story-url`        | No       | —                    | Shortcut story URL                 |
-| `gcp-logs-url`     | No       | —                    | GCP Cloud Run logs URL             |
-| `dashboard-url`    | No       | —                    | Observability dashboard URL        |
-| `rollback-url`     | No       | —                    | GCP console rollback URL           |
-| `rollback-revision`| No       | —                    | Revision number for rollback label |
+| Input               | Required | Default              | Description                        |
+| ------------------- | -------- | -------------------- | ---------------------------------- |
+| `run-url`           | No       | Current workflow run | GitHub Actions run URL             |
+| `story-url`         | No       | —                    | Shortcut story URL                 |
+| `gcp-logs-url`      | No       | —                    | GCP Cloud Run logs URL             |
+| `dashboard-url`     | No       | —                    | Observability dashboard URL        |
+| `rollback-url`      | No       | —                    | GCP console rollback URL           |
+| `rollback-revision` | No       | —                    | Revision number for rollback label |
 
 ## Outputs
 

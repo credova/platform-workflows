@@ -12,10 +12,10 @@ Authenticates to Google Cloud via Workload Identity Federation and configures Do
 
 ## Inputs
 
-| Input | Required | Description |
-|-------|----------|-------------|
-| `project-id` | Yes | GCP project ID |
-| `workload-identity-provider` | Yes | Workload Identity Provider resource name |
+| Input                        | Required | Description                              |
+| ---------------------------- | -------- | ---------------------------------------- |
+| `project-id`                 | Yes      | GCP project ID                           |
+| `workload-identity-provider` | Yes      | Workload Identity Provider resource name |
 
 ## Usage
 

@@ -69,8 +69,7 @@ build_vuln_section() {
 
   if [ "$high_plus" -gt 0 ]; then
     echo ""
-    echo "<details>"
-    echo "<summary>Critical &amp; High details (${high_plus})</summary>"
+    echo "**Critical & High (${high_plus})**"
     echo ""
     echo "| Package | Version | CVE | Severity | Fixed In |"
     echo "|---------|---------|-----|----------|----------|"
@@ -84,8 +83,6 @@ build_vuln_section() {
           end
         ) |"
     ' "$results_file"
-    echo ""
-    echo "</details>"
   fi
 }
 
@@ -109,11 +106,14 @@ build_code_section() {
   echo "<details>"
   echo "<summary>Findings (${count})</summary>"
   echo ""
-  echo "| File | Line | Rule |"
-  echo "|------|------|------|"
-  jq -r '
+  echo "| File | Rule |"
+  echo "|------|------|"
+  jq -r --arg repo "$GITHUB_REPOSITORY" --arg sha "$GITHUB_SHA" '
     .runs[].results[]
-    | "| \(.locations[0].physicalLocation.artifactLocation.uri) | \(.locations[0].physicalLocation.region.startLine) | \(.ruleId) |"
+    | . as $r
+    | ($r.locations[0].physicalLocation.artifactLocation.uri) as $file
+    | ($r.locations[0].physicalLocation.region.startLine | tostring) as $line
+    | "| [\($file)#L\($line)](https://github.com/\($repo)/blob/\($sha)/\($file)#L\($line)) | \($r.ruleId) |"
   ' opengrep-results.sarif
   echo ""
   echo "</details>"
@@ -188,17 +188,17 @@ fi
 COMMENT_BODY="${MAIN_MARKER}
 ## Security Scan
 
-### Source Packages
+### Source — Package & OS Vulnerabilities
 ${SOURCE_START}
 ${SOURCE_CONTENT}
 ${SOURCE_END}
 
-### Container Image
+### Container Image — Package & OS Vulnerabilities
 ${IMAGE_START}
 ${IMAGE_CONTENT}
 ${IMAGE_END}
 
-### Code
+### Code — Static Analysis
 ${CODE_START}
 ${CODE_CONTENT}
 ${CODE_END}

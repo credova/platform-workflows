@@ -83,11 +83,26 @@ jobs:
           GIT_CONFIG_VALUE_0: "ssh://git@github.com/"
 
       - name: Run lint
-        run: mise run lint
+        id: lint
+        continue-on-error: true
+        run: mise run lint 2>&1 | tee lint-output.txt
         env:
           GIT_CONFIG_COUNT: 1
           GIT_CONFIG_KEY_0: "url.https://x-access-token:${{ steps.cross-repo-token.outputs.token || github.token }}@github.com/.insteadOf"
           GIT_CONFIG_VALUE_0: "ssh://git@github.com/"
+
+      - name: Post Go comment
+        if: always() && github.event_name == 'pull_request'
+        uses: credova/platform-workflows/actions/go-report@master
+        with:
+          job: lint
+          outcome: ${{ steps.lint.outcome }}
+          output-file: lint-output.txt
+
+      - name: Fail on lint errors
+        if: steps.lint.outcome == 'failure'
+        shell: bash
+        run: exit 1
 
   security:
     if: inputs.security
@@ -117,11 +132,26 @@ jobs:
           GIT_CONFIG_VALUE_0: "ssh://git@github.com/"
 
       - name: Run security
-        run: mise run security
+        id: security
+        continue-on-error: true
+        run: mise run security 2>&1 | tee security-output.txt
         env:
           GIT_CONFIG_COUNT: 1
           GIT_CONFIG_KEY_0: "url.https://x-access-token:${{ steps.cross-repo-token.outputs.token || github.token }}@github.com/.insteadOf"
           GIT_CONFIG_VALUE_0: "ssh://git@github.com/"
+
+      - name: Post Go comment
+        if: always() && github.event_name == 'pull_request'
+        uses: credova/platform-workflows/actions/go-report@master
+        with:
+          job: security
+          outcome: ${{ steps.security.outcome }}
+          output-file: security-output.txt
+
+      - name: Fail on security errors
+        if: steps.security.outcome == 'failure'
+        shell: bash
+        run: exit 1
 
   test:
     if: inputs.test
@@ -151,6 +181,8 @@ jobs:
           GIT_CONFIG_VALUE_0: "ssh://git@github.com/"
 
       - name: Run tests
+        id: test
+        continue-on-error: true
         shell: bash
         env:
           TEST_COMMAND: ${{ inputs.test-command }}
@@ -160,10 +192,23 @@ jobs:
         run: |
           if [ -n "${TEST_COMMAND}" ]; then
             echo "Running: ${TEST_COMMAND}"
-            eval "${TEST_COMMAND}"
+            eval "${TEST_COMMAND}" 2>&1 | tee test-output.txt
           else
-            go test -v -race -coverprofile=coverage.out ./...
+            go test -v -race -coverprofile=coverage.out ./... 2>&1 | tee test-output.txt
           fi
+
+      - name: Post Go comment
+        if: always() && github.event_name == 'pull_request'
+        uses: credova/platform-workflows/actions/go-report@master
+        with:
+          job: test
+          outcome: ${{ steps.test.outcome }}
+          output-file: test-output.txt
+
+      - name: Fail on test errors
+        if: steps.test.outcome == 'failure'
+        shell: bash
+        run: exit 1
 
   goreleaser:
     name: GoReleaser

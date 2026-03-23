@@ -4,17 +4,17 @@ Auto-increment semantic version tags. Supports suffix-based sequences for enviro
 
 ## Inputs
 
-| Input | Required | Default | Description |
-|-------|----------|---------|-------------|
-| `suffix` | No | — | Environment suffix (e.g., `stg`, `prd`) creates tags like `v1.0.0-stg` |
-| `prefix` | No | `v` | Tag prefix |
-| `bump` | No | `patch` | Version component to bump: `major`, `minor`, `patch` |
+| Input    | Required | Default | Description                                                            |
+| -------- | -------- | ------- | ---------------------------------------------------------------------- |
+| `suffix` | No       | —       | Environment suffix (e.g., `stg`, `prd`) creates tags like `v1.0.0-stg` |
+| `prefix` | No       | `v`     | Tag prefix                                                             |
+| `bump`   | No       | `patch` | Version component to bump: `major`, `minor`, `patch`                   |
 
 ## Outputs
 
-| Output | Description |
-|--------|-------------|
-| `tag` | The new version tag |
+| Output         | Description                                   |
+| -------------- | --------------------------------------------- |
+| `tag`          | The new version tag                           |
 | `previous-tag` | The previous version tag (empty if first tag) |
 
 ## Examples

@@ -129,6 +129,7 @@ permissions:
 jobs:
   go:
     uses: credova/platform-workflows/.github/workflows/go.yaml@v1
+    secrets: inherit
     with:
       goreleaser: false
 ```
@@ -166,6 +167,17 @@ jobs:
 | `goreleaser`      | boolean | `true`                        | Run GoReleaser              |
 | `goreleaser-args` | string  | `""`                          | Additional GoReleaser args  |
 | `runner`          | string  | `warp-ubuntu-latest-arm64-4x` | GitHub Actions runner label |
+
+### go.yaml secrets
+
+`secrets: inherit` is required. The workflow uses a GitHub App token to fetch mise task includes from `credova/shared-configs`. Without it, `mise run lint` and `mise run security` will fail with 404 errors.
+
+| Secret                              | Required       | Description                                          |
+| ----------------------------------- | -------------- | ---------------------------------------------------- |
+| `RELEASE_DOWNLOADER_APP_ID`         | Yes            | GitHub App ID — grants read access to shared-configs |
+| `RELEASE_DOWNLOADER_APP_PRIVATE_KEY`| Yes            | GitHub App private key                               |
+| `HOMEBREW_PUBLISHER_APP_ID`         | Tag builds only| GitHub App ID — publishes to homebrew-tap            |
+| `HOMEBREW_PUBLISHER_APP_PRIVATE_KEY`| Tag builds only| GitHub App private key                               |
 
 ### GoReleaser Docker (dockers_v2)
 

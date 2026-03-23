@@ -6,17 +6,17 @@ Generates a short-lived GitHub token for npm publish operations. Wraps `actions/
 
 ## Inputs
 
-| Input          | Required | Default | Description                                       |
-|----------------|----------|---------|---------------------------------------------------|
-| `app-id`       | Yes      | —       | GitHub App ID (from org secret `NPM_APP_ID`)      |
+| Input          | Required | Default | Description                                                    |
+| -------------- | -------- | ------- | -------------------------------------------------------------- |
+| `app-id`       | Yes      | —       | GitHub App ID (from org secret `NPM_APP_ID`)                   |
 | `private-key`  | Yes      | —       | GitHub App private key (from org secret `NPM_APP_PRIVATE_KEY`) |
-| `repositories` | No       | —       | Comma-separated repos to scope the token to       |
+| `repositories` | No       | —       | Comma-separated repos to scope the token to                    |
 
 ## Outputs
 
-| Output  | Description                                  |
-|---------|----------------------------------------------|
-| `token` | Short-lived token with package write access  |
+| Output  | Description                                 |
+| ------- | ------------------------------------------- |
+| `token` | Short-lived token with package write access |
 
 ## Usage in reusable workflows
 

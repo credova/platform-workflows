@@ -4,11 +4,11 @@ Load secrets from GCP Secret Manager into the workflow environment via mise + fn
 
 ## Inputs
 
-| Input | Required | Description |
-|-------|----------|-------------|
-| `profile` | Yes | fnox profile (maps to secret paths in `fnox.toml`) |
-| `project-id` | Yes | GCP project ID for Secret Manager access |
-| `workload-identity-provider` | Yes | Workload Identity Provider resource name |
+| Input                        | Required | Description                                        |
+| ---------------------------- | -------- | -------------------------------------------------- |
+| `profile`                    | Yes      | fnox profile (maps to secret paths in `fnox.toml`) |
+| `project-id`                 | Yes      | GCP project ID for Secret Manager access           |
+| `workload-identity-provider` | Yes      | Workload Identity Provider resource name           |
 
 ## Examples
 

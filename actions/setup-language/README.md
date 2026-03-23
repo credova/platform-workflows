@@ -4,11 +4,11 @@ Setup a language runtime for the current job. Single action that handles Go, Nod
 
 ## Inputs
 
-| Input      | Required | Description                                                                                        |
-|------------|----------|----------------------------------------------------------------------------------------------------|
-| `language` | Yes      | `go`, `node`, `kotlin`, `python`, `ruby`, or `dotnet`                                              |
-| `version`  | Yes      | Language/runtime version (e.g. `1.24`, `20`, `21`, `3.12`)                                         |
-| `cache`    | No       | `false` — enable WarpBuild dependency caching. Auto-disables built-in Go/Node caches when `true`.  |
+| Input      | Required | Description                                                                                       |
+| ---------- | -------- | ------------------------------------------------------------------------------------------------- |
+| `language` | Yes      | `go`, `node`, `kotlin`, `python`, `ruby`, or `dotnet`                                             |
+| `version`  | Yes      | Language/runtime version (e.g. `1.24`, `20`, `21`, `3.12`)                                        |
+| `cache`    | No       | `false` — enable WarpBuild dependency caching. Auto-disables built-in Go/Node caches when `true`. |
 
 ## Examples
 
@@ -80,11 +80,11 @@ When `cache: true`, Go's built-in `actions/setup-go` cache and Node's `actions/s
 
 ## Internal Mapping
 
-| Language | Action Used              | Version Input    |
-|----------|--------------------------|------------------|
-| `go`     | `actions/setup-go@v5`    | `go-version`     |
-| `node`   | `actions/setup-node@v4`  | `node-version`   |
-| `kotlin` | `actions/setup-java@v4`  | `java-version` (Temurin) |
-| `python` | `actions/setup-python@v5`| `python-version` |
-| `ruby`   | `ruby/setup-ruby@v1`    | `ruby-version`   |
-| `dotnet` | `actions/setup-dotnet@v4`| `dotnet-version` |
+| Language | Action Used               | Version Input            |
+| -------- | ------------------------- | ------------------------ |
+| `go`     | `actions/setup-go@v5`     | `go-version`             |
+| `node`   | `actions/setup-node@v4`   | `node-version`           |
+| `kotlin` | `actions/setup-java@v4`   | `java-version` (Temurin) |
+| `python` | `actions/setup-python@v5` | `python-version`         |
+| `ruby`   | `ruby/setup-ruby@v1`      | `ruby-version`           |
+| `dotnet` | `actions/setup-dotnet@v4` | `dotnet-version`         |

@@ -1,75 +1,88 @@
 # security
 
-Vulnerability and code scanning with selectable scan types. All applicable scans run by default — opt out explicitly.
+Two-phase security scanning via [Anchore OSS](https://oss.anchore.com) (syft/grype/grant) and [OpenGrep](https://github.com/opengrep/opengrep). All scans run by default — opt out explicitly.
 
-## Scan Types
+## Phases
 
-| Type | Tool | Default | Description |
-|------|------|---------|-------------|
-| `packages` | [Trivy](https://github.com/aquasecurity/trivy) | `true` | Scans dependency manifests (package.json, go.mod, build.gradle, etc.) |
-| `code` | [OpenGrep](https://github.com/opengrep/opengrep) | `true` | Static analysis / SAST across 30+ languages |
-| `container` | [Trivy](https://github.com/aquasecurity/trivy) | `false` | Container image scanning (called internally by the `container` action) |
+| Phase      | Trigger                   | Tools                        | Blocks                                  |
+| ---------- | ------------------------- | ---------------------------- | --------------------------------------- |
+| **Source** | `target: dir:.` (default) | syft, grype, grant, opengrep | Yes - vuln + code at severity threshold |
+| **Image**  | `target: docker:<ref>`    | syft, grype                  | Yes - vuln at severity threshold        |
+
+Phase 1 runs in the security job before build. Phase 2 runs inside the `container` action automatically after every build — no extra wiring needed.
+
+Both phases update the same PR comment. Phase 1 posts first with a "pending" placeholder for the image section; Phase 2 fills it in.
 
 ## Inputs
 
-| Input | Required | Default | Description |
-|-------|----------|---------|-------------|
-| `packages` | No | `true` | Run package vulnerability scan |
-| `code` | No | `true` | Run code static analysis |
-| `container` | No | `false` | Run container image scan |
-| `image-ref` | No | `""` | Container image reference (required when `container: true`) |
-| `severity` | No | `HIGH` | Minimum severity to fail on (`LOW`, `MEDIUM`, `HIGH`, `CRITICAL`) |
+| Input      | Default | Description                                                                     |
+| ---------- | ------- | ------------------------------------------------------------------------------- |
+| `target`   | `dir:.` | Syft scan target. `dir:.` for source packages, `docker:<image>` for container   |
+| `packages` | `true`  | SBOM generation + vulnerability scan (syft + grype)                             |
+| `licenses` | `true`  | License compliance scan (grant) — informational only, never blocks. Source only |
+| `code`     | `true`  | Static analysis (opengrep). Source phase only                                   |
+| `severity` | `HIGH`  | Minimum severity to fail on (`LOW`, `MEDIUM`, `HIGH`, `CRITICAL`)               |
+
+## PR Comment
+
+Every scan posts or updates a single `## Security Scan` comment on the PR with sections for:
+
+- **Source Packages** — grype vuln counts + Critical/High details table
+- **Container Image** — grype vuln counts + Critical/High details table (filled in after build)
+- **Code** — opengrep finding count + collapsible findings table
+- **Licenses** — grant license breakdown by risk (informational, never blocks)
 
 ## Examples
 
-### Default — all scans enabled
+### Default — all scans (no config needed)
 
 ```yaml
-- uses: credova/platform-workflows/actions/security@v1
+- uses: credova/platform-workflows/actions/security@master
 ```
 
-### Opt out of code scanning
+### Opt out of license scanning
 
 ```yaml
-- uses: credova/platform-workflows/actions/security@v1
+- uses: credova/platform-workflows/actions/security@master
   with:
-    code: false
+    licenses: false
 ```
 
-### Only fail on critical vulnerabilities
+### Only fail on critical
 
 ```yaml
-- uses: credova/platform-workflows/actions/security@v1
+- uses: credova/platform-workflows/actions/security@master
   with:
     severity: CRITICAL
-```
-
-### Package scan only
-
-```yaml
-- uses: credova/platform-workflows/actions/security@v1
-  with:
-    code: false
 ```
 
 ### Container image scan (called internally by `container` action)
 
 ```yaml
-- uses: credova/platform-workflows/actions/security@v1
+- uses: credova/platform-workflows/actions/security@master
   with:
-    packages: false
+    target: docker:us-docker.pkg.dev/my-project/my-repo/my-image:abc1234
+    licenses: false
     code: false
-    container: true
-    image-ref: us-docker.pkg.dev/my-project/my-repo/my-image:latest
 ```
 
-## Outputs
+## Tool Versions
 
-- SARIF results from OpenGrep are written to `opengrep-results.sarif` in the workspace for GitHub Code Scanning integration.
+Pinned in [`scripts/install-anchore.sh`](../../scripts/install-anchore.sh). Bump deliberately — do not use `latest`.
 
-## Internal Tools
+| Tool     | Purpose                                         |
+| -------- | ----------------------------------------------- |
+| syft     | SBOM generation                                 |
+| grype    | Vulnerability scanning (offline after first DB) |
+| grant    | License compliance                              |
+| opengrep | Static analysis / SAST                          |
 
-These are implementation details — swappable without consumer impact:
+## Output Files
 
-- **Trivy** (`aquasecurity/trivy-action@0.31.0`) — package and container vulnerability scanning
-- **OpenGrep** — code/static analysis (Semgrep-compatible, LGPL 2.1)
+| File                        | Contents                          |
+| --------------------------- | --------------------------------- |
+| `sbom.spdx.json`            | SPDX SBOM for the scanned target  |
+| `grype-source-results.json` | Grype vuln results — source scan  |
+| `grype-image-results.json`  | Grype vuln results — image scan   |
+| `grant-results.json`        | Grant license results             |
+| `opengrep-results.sarif`    | OpenGrep findings in SARIF format |
