@@ -44,10 +44,15 @@ on:
         required: false
         default: warp-ubuntu-latest-arm64-4x
 
-env:
-  GIT_CONFIG_COUNT: 1
-  GIT_CONFIG_KEY_0: "url.https://x-access-token:${{ github.token }}@github.com/.insteadOf"
-  GIT_CONFIG_VALUE_0: "ssh://git@github.com/"
+    secrets:
+      RELEASE_DOWNLOADER_APP_ID:
+        required: false
+      RELEASE_DOWNLOADER_APP_PRIVATE_KEY:
+        required: false
+      HOMEBREW_PUBLISHER_APP_ID:
+        required: false
+      HOMEBREW_PUBLISHER_APP_PRIVATE_KEY:
+        required: false
 
 jobs:
   lint:
@@ -57,14 +62,32 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Generate cross-repo token
+        id: cross-repo-token
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ secrets.RELEASE_DOWNLOADER_APP_ID }}
+          private-key: ${{ secrets.RELEASE_DOWNLOADER_APP_PRIVATE_KEY }}
+          owner: credova
+          repositories: shared-configs
+
       - name: Setup mise
         uses: jdx/mise-action@v4
         with:
           install: true
           cache: true
+        env:
+          MISE_GITHUB_TOKEN: ${{ steps.cross-repo-token.outputs.token || github.token }}
+          GIT_CONFIG_COUNT: 1
+          GIT_CONFIG_KEY_0: "url.https://x-access-token:${{ steps.cross-repo-token.outputs.token || github.token }}@github.com/.insteadOf"
+          GIT_CONFIG_VALUE_0: "ssh://git@github.com/"
 
       - name: Run lint
         run: mise run lint
+        env:
+          GIT_CONFIG_COUNT: 1
+          GIT_CONFIG_KEY_0: "url.https://x-access-token:${{ steps.cross-repo-token.outputs.token || github.token }}@github.com/.insteadOf"
+          GIT_CONFIG_VALUE_0: "ssh://git@github.com/"
 
   security:
     if: inputs.security
@@ -73,14 +96,32 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Generate cross-repo token
+        id: cross-repo-token
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ secrets.RELEASE_DOWNLOADER_APP_ID }}
+          private-key: ${{ secrets.RELEASE_DOWNLOADER_APP_PRIVATE_KEY }}
+          owner: credova
+          repositories: shared-configs
+
       - name: Setup mise
         uses: jdx/mise-action@v4
         with:
           install: true
           cache: true
+        env:
+          MISE_GITHUB_TOKEN: ${{ steps.cross-repo-token.outputs.token || github.token }}
+          GIT_CONFIG_COUNT: 1
+          GIT_CONFIG_KEY_0: "url.https://x-access-token:${{ steps.cross-repo-token.outputs.token || github.token }}@github.com/.insteadOf"
+          GIT_CONFIG_VALUE_0: "ssh://git@github.com/"
 
       - name: Run security
         run: mise run security
+        env:
+          GIT_CONFIG_COUNT: 1
+          GIT_CONFIG_KEY_0: "url.https://x-access-token:${{ steps.cross-repo-token.outputs.token || github.token }}@github.com/.insteadOf"
+          GIT_CONFIG_VALUE_0: "ssh://git@github.com/"
 
   test:
     if: inputs.test
@@ -89,16 +130,33 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Generate cross-repo token
+        id: cross-repo-token
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ secrets.RELEASE_DOWNLOADER_APP_ID }}
+          private-key: ${{ secrets.RELEASE_DOWNLOADER_APP_PRIVATE_KEY }}
+          owner: credova
+          repositories: shared-configs
+
       - name: Setup mise
         uses: jdx/mise-action@v4
         with:
           install: true
           cache: true
+        env:
+          MISE_GITHUB_TOKEN: ${{ steps.cross-repo-token.outputs.token || github.token }}
+          GIT_CONFIG_COUNT: 1
+          GIT_CONFIG_KEY_0: "url.https://x-access-token:${{ steps.cross-repo-token.outputs.token || github.token }}@github.com/.insteadOf"
+          GIT_CONFIG_VALUE_0: "ssh://git@github.com/"
 
       - name: Run tests
         shell: bash
         env:
           TEST_COMMAND: ${{ inputs.test-command }}
+          GIT_CONFIG_COUNT: 1
+          GIT_CONFIG_KEY_0: "url.https://x-access-token:${{ steps.cross-repo-token.outputs.token || github.token }}@github.com/.insteadOf"
+          GIT_CONFIG_VALUE_0: "ssh://git@github.com/"
         run: |
           if [ -n "${TEST_COMMAND}" ]; then
             echo "Running: ${TEST_COMMAND}"
@@ -117,17 +175,31 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Generate cross-repo token
+        id: cross-repo-token
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ secrets.RELEASE_DOWNLOADER_APP_ID }}
+          private-key: ${{ secrets.RELEASE_DOWNLOADER_APP_PRIVATE_KEY }}
+          owner: credova
+          repositories: shared-configs
+
       - name: Setup mise
         uses: jdx/mise-action@v4
         with:
           install: true
           cache: true
+        env:
+          MISE_GITHUB_TOKEN: ${{ steps.cross-repo-token.outputs.token || github.token }}
+          GIT_CONFIG_COUNT: 1
+          GIT_CONFIG_KEY_0: "url.https://x-access-token:${{ steps.cross-repo-token.outputs.token || github.token }}@github.com/.insteadOf"
+          GIT_CONFIG_VALUE_0: "ssh://git@github.com/"
 
       - name: Configure git for private modules
         env:
-          GITHUB_TOKEN: ${{ github.token }}
+          TOKEN: ${{ steps.cross-repo-token.outputs.token || github.token }}
         run: |
-          git config --global url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"
+          git config --global url."https://x-access-token:${TOKEN}@github.com/".insteadOf "https://github.com/"
           echo "GOPRIVATE=github.com/credova/*" >> $GITHUB_ENV
 
       - name: Set snapshot flag for non-tag builds

@@ -73,6 +73,22 @@ runs:
       shell: bash
       run: ${{ github.action_path }}/../../scripts/grant-scan.sh
 
+    - name: Install opengrep
+      if: inputs.code == 'true' && inputs.target == 'dir:.'
+      shell: bash
+      run: |
+        curl -fsSL https://raw.githubusercontent.com/opengrep/opengrep/main/install.sh | bash
+        echo "$HOME/.opengrep/cli/latest" >> "$GITHUB_PATH"
+
+    - name: Code static analysis
+      if: inputs.code == 'true' && inputs.target == 'dir:.'
+      id: opengrep
+      continue-on-error: true
+      shell: bash
+      env:
+        SEVERITY: ${{ inputs.severity }}
+      run: ${{ github.action_path }}/../../scripts/opengrep-scan.sh
+
     - name: Post security comment
       if: always() && github.event_name == 'pull_request'
       shell: bash
@@ -91,16 +107,9 @@ runs:
         echo "::error::Vulnerability scan found ${{ inputs.severity }}-or-higher issues — see PR comment for details"
         exit 1
 
-    - name: Install opengrep
-      if: inputs.code == 'true' && inputs.target == 'dir:.'
+    - name: Fail on code issues
+      if: steps.opengrep.outcome == 'failure'
       shell: bash
       run: |
-        curl -fsSL https://raw.githubusercontent.com/opengrep/opengrep/main/install.sh | bash
-        echo "$HOME/.opengrep/cli/latest" >> "$GITHUB_PATH"
-
-    - name: Code static analysis
-      if: inputs.code == 'true' && inputs.target == 'dir:.'
-      shell: bash
-      env:
-        SEVERITY: ${{ inputs.severity }}
-      run: ${{ github.action_path }}/../../scripts/opengrep-scan.sh
+        echo "::error::Code scan found issues — see PR comment for details"
+        exit 1

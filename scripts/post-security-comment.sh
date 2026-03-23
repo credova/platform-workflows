@@ -19,6 +19,8 @@ IMAGE_START="<!-- security-image-start -->"
 IMAGE_END="<!-- security-image-end -->"
 LICENSE_START="<!-- security-license-start -->"
 LICENSE_END="<!-- security-license-end -->"
+CODE_START="<!-- security-code-start -->"
+CODE_END="<!-- security-code-end -->"
 
 PR_NUMBER=$(jq -r '.pull_request.number // empty' "$GITHUB_EVENT_PATH")
 if [ -z "$PR_NUMBER" ]; then
@@ -87,6 +89,36 @@ build_vuln_section() {
   fi
 }
 
+# Build the code scan section from SARIF output
+build_code_section() {
+  if [ ! -f "opengrep-results.sarif" ]; then
+    echo "_Code scan not run._"
+    return
+  fi
+
+  local count
+  count=$(jq '[.runs[].results[]] | length' opengrep-results.sarif)
+
+  if [ "$count" -eq 0 ]; then
+    echo "✅ Clean"
+    return
+  fi
+
+  echo "⚠️ ${count} finding(s)"
+  echo ""
+  echo "<details>"
+  echo "<summary>Findings (${count})</summary>"
+  echo ""
+  echo "| File | Line | Rule |"
+  echo "|------|------|------|"
+  jq -r '
+    .runs[].results[]
+    | "| \(.locations[0].physicalLocation.artifactLocation.uri) | \(.locations[0].physicalLocation.region.startLine) | \(.ruleId) |"
+  ' opengrep-results.sarif
+  echo ""
+  echo "</details>"
+}
+
 # Build the license table
 build_license_section() {
   if [ ! -f "grant-results.json" ]; then
@@ -138,14 +170,17 @@ fi
 # Build each section — use local results for current phase, preserve existing for the other
 if [ "${SCAN_PHASE}" = "source" ]; then
   SOURCE_CONTENT=$(build_vuln_section "grype-source-results.json")
+  CODE_CONTENT=$(build_code_section)
   LICENSE_CONTENT=$(build_license_section)
   IMAGE_CONTENT=$(extract_section "$IMAGE_START" "$IMAGE_END" "$EXISTING_BODY")
   [ -z "$IMAGE_CONTENT" ] && IMAGE_CONTENT="_Container image scan runs after build._"
 else
   IMAGE_CONTENT=$(build_vuln_section "grype-image-results.json")
   SOURCE_CONTENT=$(extract_section "$SOURCE_START" "$SOURCE_END" "$EXISTING_BODY")
+  CODE_CONTENT=$(extract_section "$CODE_START" "$CODE_END" "$EXISTING_BODY")
   LICENSE_CONTENT=$(extract_section "$LICENSE_START" "$LICENSE_END" "$EXISTING_BODY")
   [ -z "$SOURCE_CONTENT" ] && SOURCE_CONTENT="_Source scan results unavailable._"
+  [ -z "$CODE_CONTENT" ]   && CODE_CONTENT="_Code scan results unavailable._"
   [ -z "$LICENSE_CONTENT" ] && LICENSE_CONTENT="_License scan results unavailable._"
 fi
 
@@ -162,6 +197,11 @@ ${SOURCE_END}
 ${IMAGE_START}
 ${IMAGE_CONTENT}
 ${IMAGE_END}
+
+### Code
+${CODE_START}
+${CODE_CONTENT}
+${CODE_END}
 
 ### Licenses
 ${LICENSE_START}
