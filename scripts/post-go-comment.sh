@@ -75,9 +75,12 @@ build_test_section() {
   local status_icon
   [ "$outcome" = "success" ] && status_icon="✅" || status_icon="❌"
 
-  # Extract coverage from test output
+  # Extract total coverage from profile (most accurate) or fall back to output
   local coverage=""
-  if [ -n "$output_file" ] && [ -f "$output_file" ]; then
+  if [ -f "coverage.out" ]; then
+    coverage=$(go tool cover -func=coverage.out 2>/dev/null | awk '/^total:/{print $NF}' || true)
+  fi
+  if [ -z "$coverage" ] && [ -n "$output_file" ] && [ -f "$output_file" ]; then
     coverage=$(grep -oE '[0-9]+\.[0-9]+% of statements' "$output_file" | tail -1 || true)
   fi
 

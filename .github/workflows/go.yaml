@@ -194,7 +194,7 @@ jobs:
             echo "Running: ${TEST_COMMAND}"
             eval "${TEST_COMMAND}" 2>&1 | tee test-output.txt
           else
-            go test -v -race -coverprofile=coverage.out ./... 2>&1 | tee test-output.txt
+            mise run test 2>&1 | tee test-output.txt
           fi
 
       - name: Post Go comment

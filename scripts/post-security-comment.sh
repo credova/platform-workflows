@@ -106,14 +106,17 @@ build_code_section() {
   echo "<details>"
   echo "<summary>Findings (${count})</summary>"
   echo ""
-  echo "| File | Rule |"
-  echo "|------|------|"
+  echo "| File | Rule | Description |"
+  echo "|------|------|-------------|"
   jq -r --arg repo "$GITHUB_REPOSITORY" --arg sha "$GITHUB_SHA" '
-    .runs[].results[]
-    | . as $r
-    | ($r.locations[0].physicalLocation.artifactLocation.uri) as $file
-    | ($r.locations[0].physicalLocation.region.startLine | tostring) as $line
-    | "| [\($file)#L\($line)](https://github.com/\($repo)/blob/\($sha)/\($file)#L\($line)) | \($r.ruleId) |"
+    .runs[0] |
+    (.tool.driver.rules // [] | map({(.id): {uri: .helpUri, desc: (.shortDescription.text // .fullDescription.text // "")}}) | add // {}) as $rules |
+    .results[] |
+    . as $r |
+    ($r.locations[0].physicalLocation.artifactLocation.uri) as $file |
+    ($r.locations[0].physicalLocation.region.startLine | tostring) as $line |
+    ($rules[$r.ruleId]) as $rule |
+    "| [\($file)#L\($line)](https://github.com/\($repo)/blob/\($sha)/\($file)#L\($line)) | \(if $rule.uri then "[\($r.ruleId)](\($rule.uri))" else $r.ruleId end) | \($rule.desc // "") |"
   ' opengrep-results.sarif
   echo ""
   echo "</details>"
