@@ -64,6 +64,10 @@ inputs:
     description: Workload Identity Provider resource name
     required: false
     default: ""
+  service-account:
+    description: Service account email to impersonate via WIF
+    required: false
+    default: ""
   registry:
     description: Artifact Registry hostname
     required: false
@@ -136,6 +140,7 @@ runs:
       with:
         project-id: ${{ inputs.project-id }}
         workload-identity-provider: ${{ inputs.workload-identity-provider }}
+        service-account: ${{ inputs.service-account }}
         registry: ${{ inputs.registry }}
 
     # --- Retag flow ---

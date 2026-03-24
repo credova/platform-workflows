@@ -123,6 +123,11 @@ on:
         type: string
         required: false
         default: ""
+      service-account:
+        description: Service account email to impersonate via WIF
+        type: string
+        required: false
+        default: ""
 
     secrets:
       RELEASE_APP_ID:
@@ -264,6 +269,7 @@ jobs:
           tag: ${{ needs.validate-inputs.outputs.deploy-tag }}
           project-id: ${{ inputs.project-id }}
           workload-identity-provider: ${{ inputs.workload-identity-provider }}
+          service-account: ${{ inputs.service-account }}
           severity: ${{ inputs.security-severity }}
           warpbuild-profile: ${{ inputs.warpbuild-profile }}
           warpbuild-api-key: ${{ secrets.WARPBUILD_API_KEY }}
@@ -346,6 +352,7 @@ jobs:
           tag: ${{ needs.validate-inputs.outputs.deploy-tag }}-prd
           project-id: ${{ inputs.project-id }}
           workload-identity-provider: ${{ inputs.workload-identity-provider }}
+          service-account: ${{ inputs.service-account }}
 
   # --- Deploy production ---
   deploy-production:
