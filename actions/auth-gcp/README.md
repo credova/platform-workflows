@@ -1,6 +1,6 @@
 # auth-gcp
 
-> **Internal action** — consumed by `container`, `deployment`, and `secrets-setup`. Teams should not call this directly.
+> **Internal action** - consumed by `container`, `deployment`, and `secrets-setup`. Teams should not call this directly.
 
 Authenticates to Google Cloud via Workload Identity Federation and configures Docker credentials for Artifact Registry.
 

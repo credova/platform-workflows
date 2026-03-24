@@ -16,9 +16,9 @@ any-repo/
 
 One workflow handles everything. Toggle what you need with flags.
 
-### Service (container build — the default)
+### Service (container build - the default)
 
-The simplest case. Builds a Dockerfile, scans it, runs compliance checks. No language setup needed — the Dockerfile handles everything.
+The simplest case. Builds a Dockerfile, scans it, runs compliance checks. No language setup needed - the Dockerfile handles everything.
 
 ```yaml
 # .github/workflows/pull-request.yaml
@@ -136,7 +136,7 @@ jobs:
 
 ### Push / tag (with GoReleaser)
 
-GoReleaser needs write permissions for releases, packages, and OIDC signing. Callers **must** declare these — GitHub does not allow reusable workflows to escalate beyond what the caller grants.
+GoReleaser needs write permissions for releases, packages, and OIDC signing. Callers **must** declare these - GitHub does not allow reusable workflows to escalate beyond what the caller grants.
 
 ```yaml
 name: Build and Release
@@ -174,9 +174,9 @@ jobs:
 
 | Secret                              | Required       | Description                                          |
 | ----------------------------------- | -------------- | ---------------------------------------------------- |
-| `RELEASE_DOWNLOADER_APP_ID`         | Yes            | GitHub App ID — grants read access to shared-configs |
+| `RELEASE_DOWNLOADER_APP_ID`         | Yes            | GitHub App ID - grants read access to shared-configs |
 | `RELEASE_DOWNLOADER_APP_PRIVATE_KEY`| Yes            | GitHub App private key                               |
-| `HOMEBREW_PUBLISHER_APP_ID`         | Tag builds only| GitHub App ID — publishes to homebrew-tap            |
+| `HOMEBREW_PUBLISHER_APP_ID`         | Tag builds only| GitHub App ID - publishes to homebrew-tap            |
 | `HOMEBREW_PUBLISHER_APP_PRIVATE_KEY`| Tag builds only| GitHub App private key                               |
 
 ### GoReleaser Docker (dockers_v2)
@@ -194,7 +194,7 @@ dockers_v2:
       - "{{ if not .IsNightly }}latest{{ end }}"
 ```
 
-**Dockerfile** — use `$TARGETPLATFORM` to copy the correct binary:
+**Dockerfile** - use `$TARGETPLATFORM` to copy the correct binary:
 
 ```dockerfile
 FROM scratch
@@ -271,7 +271,7 @@ jobs:
       RELEASE_APP_PRIVATE_KEY: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
 ```
 
-### Non-container repo (release only — no deploy)
+### Non-container repo (release only - no deploy)
 
 Runs tests, creates a tag and GitHub Release. No container, no Cloud Run.
 
@@ -326,7 +326,7 @@ jobs:
 
 ## Hotfix Deploy
 
-Same `deploy.yaml` with `hotfix: true`. Skips tests and staging — goes straight to build → [canary] → approve → production. Canary still works if `canary > 0`.
+Same `deploy.yaml` with `hotfix: true`. Skips tests and staging - goes straight to build → [canary] → approve → production. Canary still works if `canary > 0`.
 
 ```yaml
 # .github/workflows/deploy-hotfix.yaml
@@ -350,7 +350,7 @@ jobs:
 
 ## Opting Out of Defaults
 
-Security scanning and compliance checks are on by default. Opt out explicitly — visible in the workflow file, reviewable in PRs.
+Security scanning and compliance checks are on by default. Opt out explicitly - visible in the workflow file, reviewable in PRs.
 
 ```yaml
 jobs:
@@ -363,8 +363,8 @@ jobs:
 
 ### What you cannot disable
 
-- **Container scanning after build** — if you build and push, it gets scanned
-- **Auth via WIF** — no PATs, no service account keys
+- **Container scanning after build** - if you build and push, it gets scanned
+- **Auth via WIF** - no PATs, no service account keys
 
 ---
 
@@ -375,8 +375,8 @@ All workflows run on [WarpBuild](https://warpbuild.com) runners by default (`war
 ### Prerequisites
 
 1. **WarpBuild runners** must be configured in your GitHub organization. All workflows default to `warp-ubuntu-2204-x64-2x`. Override with the `runner` input if needed.
-2. **WarpBuild Docker Builder** (optional) — to use remote Docker builds, you must first create a Docker Builder profile in the [WarpBuild dashboard](https://app.warpbuild.com). The profile name is passed via the `warpbuild-profile` input.
-3. **`WARPBUILD_API_KEY` secret** (optional) — only required if running on non-WarpBuild runners. Not needed when using WarpBuild runners.
+2. **WarpBuild Docker Builder** (optional) - to use remote Docker builds, you must first create a Docker Builder profile in the [WarpBuild dashboard](https://app.warpbuild.com). The profile name is passed via the `warpbuild-profile` input.
+3. **`WARPBUILD_API_KEY` secret** (optional) - only required if running on non-WarpBuild runners. Not needed when using WarpBuild runners.
 
 ### Using WarpBuild Docker Builders
 
@@ -392,9 +392,9 @@ jobs:
 
 Benefits over standard buildx:
 
-- **Built-in layer caching** — no `cache-to`/`cache-from` configuration needed
-- **Native arm64 support** — no QEMU emulation, builds run on real hardware
-- **Faster builds** — dedicated remote build infrastructure
+- **Built-in layer caching** - no `cache-to`/`cache-from` configuration needed
+- **Native arm64 support** - no QEMU emulation, builds run on real hardware
+- **Faster builds** - dedicated remote build infrastructure
 
 ### Overriding the runner
 
@@ -488,12 +488,12 @@ All inputs from pull-request.yaml plus:
 | `canary`                     | number  | `0`            | Canary traffic percentage                                         |
 | `require-approval`           | boolean | `true`         | Require manual approval for production                            |
 | `container-reuse`            | boolean | `true`         | Skip build if image exists for this SHA                           |
-| `hotfix`                     | boolean | `false`        | Hotfix mode: skip tests, staging, canary — straight to production |
+| `hotfix`                     | boolean | `false`        | Hotfix mode: skip tests, staging, canary - straight to production |
 | `notifications`              | boolean | `true`         | Send Slack notifications                                          |
 | `project-id`                 | string  | `""`           | GCP project ID                                                    |
 | `workload-identity-provider` | string  | `""`           | WIF provider resource name                                        |
 
-**Secrets** (both workflows): `WARPBUILD_API_KEY` (optional — only needed on non-WarpBuild runners).
+**Secrets** (both workflows): `WARPBUILD_API_KEY` (optional - only needed on non-WarpBuild runners).
 Deploy also requires: `RELEASE_APP_ID`, `RELEASE_APP_PRIVATE_KEY`.
 
 ---

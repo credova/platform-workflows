@@ -10,14 +10,14 @@ platform-workflows/
 │   ├── pull-request.yaml       # Unified PR validation
 │   └── deploy.yaml             # Unified deploy (+ hotfix mode)
 ├── actions/                    # Composite actions (building blocks)
-│   ├── auth-gcp/               # INTERNAL — WIF login + docker config
+│   ├── auth-gcp/               # INTERNAL - WIF login + docker config
 │   ├── auth-release-token/     # GitHub App token for private repo releases
 │   ├── auth-npm-token/         # GitHub App token for npm publishing
 │   ├── compliance/             # Shortcut ticket check + policy gates
 │   ├── container/              # Build, scan, push, retag (standard + WarpBuild)
 │   ├── deployment/             # Cloud Run deploy via pctl
 │   ├── increment-tag/          # Semver tag incrementor
-│   ├── install-pctl/           # INTERNAL — pctl binary installer
+│   ├── install-pctl/           # INTERNAL - pctl binary installer
 │   ├── notification/           # Slack notifications via pctl
 │   ├── secrets-setup/          # GCP Secret Manager via fnox
 │   ├── security/               # Trivy + OpenGrep scanning
@@ -46,7 +46,7 @@ platform-workflows/
 2. Modify the composite action or reusable workflow
 3. CI runs automatically to validate YAML syntax and structure
 4. Get Platform team approval (required via CODEOWNERS)
-5. Merge to master — release workflow creates a new tag
+5. Merge to master - release workflow creates a new tag
 
 ## Versioning
 

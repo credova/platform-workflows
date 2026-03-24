@@ -1,6 +1,6 @@
 # platform-workflows
 
-Standardized CI/CD workflows and composite actions for all Credova services. One PR workflow, one deploy workflow — toggle what you need with flags.
+Standardized CI/CD workflows and composite actions for all Credova services. One PR workflow, one deploy workflow - toggle what you need with flags.
 
 ## Quick Start
 
@@ -41,25 +41,25 @@ That's it. Security scanning, compliance checks, container build, and deployment
 
 ## Workflows
 
-- **pull-request.yaml** — PR to master: security > test > build > compliance
-- **deploy.yaml** — push to master: test > build > staging > production > release
-- **deploy.yaml** (hotfix) — tag push: build > [canary] > approve > production > release
+- **pull-request.yaml** - PR to master: security > test > build > compliance
+- **deploy.yaml** - push to master: test > build > staging > production > release
+- **deploy.yaml** (hotfix) - tag push: build > [canary] > approve > production > release
 
 ## Key Features
 
-- **WarpBuild runners** by default — override with `runner` input
-- **WarpBuild Docker Builders** (opt-in) — remote builds with native arm64 and built-in layer caching via `warpbuild-profile`
-- **WarpBuild dependency caching** (opt-in) — `cache: true` enables `WarpBuilds/cache@v1` and auto-disables conflicting built-in caches
-- **Multi-image builds** — parallel matrix builds via `images` YAML list
-- **Cross-platform** — `platform` input for arm64 builds (QEMU or native via WarpBuild)
-- **Shortcut ticket enforcement** — compliance checks PRs for `sc-NNNNN` references
+- **WarpBuild runners** by default - override with `runner` input
+- **WarpBuild Docker Builders** (opt-in) - remote builds with native arm64 and built-in layer caching via `warpbuild-profile`
+- **WarpBuild dependency caching** (opt-in) - `cache: true` enables `WarpBuilds/cache@v1` and auto-disables conflicting built-in caches
+- **Multi-image builds** - parallel matrix builds via `images` YAML list
+- **Cross-platform** - `platform` input for arm64 builds (QEMU or native via WarpBuild)
+- **Shortcut ticket enforcement** - compliance checks PRs for `sc-NNNNN` references
 
 ## Actions
 
 | Action                                         | Description                                                        |
 | ---------------------------------------------- | ------------------------------------------------------------------ |
 | [compliance](actions/compliance/)              | Shortcut ticket reference check, automated PR skip                 |
-| [container](actions/container/)                | Build, scan, push, retag — full container lifecycle                |
+| [container](actions/container/)                | Build, scan, push, retag - full container lifecycle                |
 | [deployment](actions/deployment/)              | Cloud Run deploy via pctl (deploy, promote, rollback)              |
 | [increment-tag](actions/increment-tag/)        | Semantic version tag incrementor                                   |
 | [notification](actions/notification/)          | Slack notifications via pctl                                       |
@@ -78,7 +78,7 @@ Internal actions (called by workflows, not directly by teams):
 
 ## Docs
 
-- [Usage Guide](docs/usage.md) — examples for every scenario (multi-image, canary, hotfix, opt-outs)
-- [Architecture](docs/architecture.md) — two-layer design, principles, pipeline ordering
-- [Development](docs/development.md) — how to make changes, versioning, testing
-- [Migration](docs/migration.md) — mapping from psq-ops-actions to platform-workflows
+- [Usage Guide](docs/usage.md) - examples for every scenario (multi-image, canary, hotfix, opt-outs)
+- [Architecture](docs/architecture.md) - two-layer design, principles, pipeline ordering
+- [Development](docs/development.md) - how to make changes, versioning, testing
+- [Migration](docs/migration.md) - mapping from psq-ops-actions to platform-workflows

@@ -1,6 +1,6 @@
 # security
 
-Two-phase security scanning via [Anchore OSS](https://oss.anchore.com) (syft/grype/grant) and [OpenGrep](https://github.com/opengrep/opengrep). All scans run by default — opt out explicitly.
+Two-phase security scanning via [Anchore OSS](https://oss.anchore.com) (syft/grype/grant) and [OpenGrep](https://github.com/opengrep/opengrep). All scans run by default - opt out explicitly.
 
 ## Phases
 
@@ -9,7 +9,7 @@ Two-phase security scanning via [Anchore OSS](https://oss.anchore.com) (syft/gry
 | **Source** | `target: dir:.` (default) | syft, grype, grant, opengrep | Yes - vuln + code at severity threshold |
 | **Image**  | `target: docker:<ref>`    | syft, grype                  | Yes - vuln at severity threshold        |
 
-Phase 1 runs in the security job before build. Phase 2 runs inside the `container` action automatically after every build — no extra wiring needed.
+Phase 1 runs in the security job before build. Phase 2 runs inside the `container` action automatically after every build - no extra wiring needed.
 
 Both phases update the same PR comment. Phase 1 posts first with a "pending" placeholder for the image section; Phase 2 fills it in.
 
@@ -19,7 +19,7 @@ Both phases update the same PR comment. Phase 1 posts first with a "pending" pla
 | ---------- | ------- | ------------------------------------------------------------------------------- |
 | `target`   | `dir:.` | Syft scan target. `dir:.` for source packages, `docker:<image>` for container   |
 | `packages` | `true`  | SBOM generation + vulnerability scan (syft + grype)                             |
-| `licenses` | `true`  | License compliance scan (grant) — informational only, never blocks. Source only |
+| `licenses` | `true`  | License compliance scan (grant) - informational only, never blocks. Source only |
 | `code`     | `true`  | Static analysis (opengrep). Source phase only                                   |
 | `severity` | `HIGH`  | Minimum severity to fail on (`LOW`, `MEDIUM`, `HIGH`, `CRITICAL`)               |
 
@@ -27,14 +27,14 @@ Both phases update the same PR comment. Phase 1 posts first with a "pending" pla
 
 Every scan posts or updates a single `## Security Scan` comment on the PR with sections for:
 
-- **Source Packages** — grype vuln counts + Critical/High details table
-- **Container Image** — grype vuln counts + Critical/High details table (filled in after build)
-- **Code** — opengrep finding count + collapsible findings table
-- **Licenses** — grant license breakdown by risk (informational, never blocks)
+- **Source Packages** - grype vuln counts + Critical/High details table
+- **Container Image** - grype vuln counts + Critical/High details table (filled in after build)
+- **Code** - opengrep finding count + collapsible findings table
+- **Licenses** - grant license breakdown by risk (informational, never blocks)
 
 ## Examples
 
-### Default — all scans (no config needed)
+### Default - all scans (no config needed)
 
 ```yaml
 - uses: credova/platform-workflows/actions/security@master
@@ -68,7 +68,7 @@ Every scan posts or updates a single `## Security Scan` comment on the PR with s
 
 ## Tool Versions
 
-Pinned in [`scripts/install-anchore.sh`](../../scripts/install-anchore.sh). Bump deliberately — do not use `latest`.
+Pinned in [`scripts/install-anchore.sh`](../../scripts/install-anchore.sh). Bump deliberately - do not use `latest`.
 
 | Tool     | Purpose                                         |
 | -------- | ----------------------------------------------- |
@@ -82,7 +82,7 @@ Pinned in [`scripts/install-anchore.sh`](../../scripts/install-anchore.sh). Bump
 | File                        | Contents                          |
 | --------------------------- | --------------------------------- |
 | `sbom.spdx.json`            | SPDX SBOM for the scanned target  |
-| `grype-source-results.json` | Grype vuln results — source scan  |
-| `grype-image-results.json`  | Grype vuln results — image scan   |
+| `grype-source-results.json` | Grype vuln results - source scan  |
+| `grype-image-results.json`  | Grype vuln results - image scan   |
 | `grant-results.json`        | Grant license results             |
 | `opengrep-results.sarif`    | OpenGrep findings in SARIF format |

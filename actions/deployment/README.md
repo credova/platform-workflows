@@ -6,16 +6,16 @@ Deploy to Cloud Run via pctl. Handles auth, notifications, canary, promote, and 
 
 | Input                        | Required | Default       | Description                                      |
 | ---------------------------- | -------- | ------------- | ------------------------------------------------ |
-| `target`                     | Yes      | —             | Target name from CUE config                      |
+| `target`                     | Yes      | -             | Target name from CUE config                      |
 | `tag`                        | No       | `github.sha`  | Image tag to deploy                              |
 | `action`                     | No       | `deploy`      | Action: `deploy`, `promote`, `rollback`, `abort` |
 | `canary`                     | No       | `0`           | Canary traffic percentage (0 = full deploy)      |
 | `config-path`                | No       | `deployments` | Path to CUE config directory                     |
-| `revision`                   | No       | —             | Revision name (for `promote`/`rollback`)         |
-| `project-id`                 | No       | —             | GCP project ID                                   |
-| `workload-identity-provider` | No       | —             | WIF provider resource name                       |
-| `slack-token`                | No       | —             | Slack bot token for deploy notifications         |
-| `token`                      | Yes      | —             | GitHub token for pctl download                   |
+| `revision`                   | No       | -             | Revision name (for `promote`/`rollback`)         |
+| `project-id`                 | No       | -             | GCP project ID                                   |
+| `workload-identity-provider` | No       | -             | WIF provider resource name                       |
+| `slack-token`                | No       | -             | Slack bot token for deploy notifications         |
+| `token`                      | Yes      | -             | GitHub token for pctl download                   |
 | `pctl-version`               | No       | `latest`      | pctl version to install                          |
 
 ## Outputs
@@ -29,11 +29,11 @@ Deploy to Cloud Run via pctl. Handles auth, notifications, canary, promote, and 
 
 When `notifications.enabled` is `true` in the CUE deployment config, pctl automatically sends Slack notifications throughout the deploy lifecycle:
 
-1. **Deploy start** — posts initial "started" notification to the channel
-2. **PR changelog** — thread reply listing PRs between the currently deployed revision and the new one
-3. **Target started** — timeline thread reply when the target begins deploying
-4. **Target completed/failed** — timeline thread reply with status and error message
-5. **Main message update** — updates the original message to `success` or `failed`
+1. **Deploy start** - posts initial "started" notification to the channel
+2. **PR changelog** - thread reply listing PRs between the currently deployed revision and the new one
+3. **Target started** - timeline thread reply when the target begins deploying
+4. **Target completed/failed** - timeline thread reply with status and error message
+5. **Main message update** - updates the original message to `success` or `failed`
 
 To enable, either:
 
@@ -107,5 +107,5 @@ The token is passed to pctl via `PCTL_SLACK_BOT_TOKEN`. The channel and template
 ## Notes
 
 - Canary is only supported for Cloud Run Services, not Jobs. Jobs deploy to 100% immediately.
-- Wraps `pctl deploy execute` — CUE-based, type-safe deployment with native Go Cloud Run API calls.
+- Wraps `pctl deploy execute` - CUE-based, type-safe deployment with native Go Cloud Run API calls.
 - Notification channel and template are configured in the CUE config `notifications` block, not in the action inputs.

@@ -1,6 +1,6 @@
 # auth-release-token
 
-> **Internal action** — used by reusable workflows to generate tokens for downloading releases from private repos.
+> **Internal action** - used by reusable workflows to generate tokens for downloading releases from private repos.
 
 Generates a short-lived GitHub token scoped to specific repositories for release download access. Wraps `actions/create-github-app-token` with the org's release download GitHub App.
 
@@ -8,8 +8,8 @@ Generates a short-lived GitHub token scoped to specific repositories for release
 
 | Input          | Required | Default | Description                                                        |
 | -------------- | -------- | ------- | ------------------------------------------------------------------ |
-| `app-id`       | Yes      | —       | GitHub App ID (from org secret `RELEASE_APP_ID`)                   |
-| `private-key`  | Yes      | —       | GitHub App private key (from org secret `RELEASE_APP_PRIVATE_KEY`) |
+| `app-id`       | Yes      | -       | GitHub App ID (from org secret `RELEASE_APP_ID`)                   |
+| `private-key`  | Yes      | -       | GitHub App private key (from org secret `RELEASE_APP_PRIVATE_KEY`) |
 | `repositories` | No       | `pctl`  | Comma-separated repos to scope the token to                        |
 
 ## Outputs
@@ -46,4 +46,4 @@ jobs:
 
 ## Why this exists
 
-Keeps GitHub App credentials in one place. If the app changes, update this action — every workflow that downloads releases gets the fix automatically.
+Keeps GitHub App credentials in one place. If the app changes, update this action - every workflow that downloads releases gets the fix automatically.

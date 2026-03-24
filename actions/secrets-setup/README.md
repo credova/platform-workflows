@@ -34,7 +34,7 @@ Load secrets from GCP Secret Manager into the workflow environment via mise + fn
 
 ## How It Works
 
-1. `auth-gcp` — authenticates to GCP via Workload Identity Federation
+1. `auth-gcp` - authenticates to GCP via Workload Identity Federation
 2. Sets up mise + fnox
 3. Reads `fnox.toml` in the repo to determine which secrets to load for the given profile
 4. Secrets are exported as environment variables for all subsequent steps

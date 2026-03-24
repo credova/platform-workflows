@@ -1,6 +1,6 @@
 # compliance
 
-Process and policy gates. Ensures teams follow required procedures. All checks run by default — opt out explicitly.
+Process and policy gates. Ensures teams follow required procedures. All checks run by default - opt out explicitly.
 
 **Distinction from security:** Security asks "is this artifact safe?" Compliance asks "did the team follow the process?"
 
@@ -18,7 +18,7 @@ Process and policy gates. Ensures teams follow required procedures. All checks r
 
 ## Examples
 
-### Default — ticket check enabled
+### Default - ticket check enabled
 
 ```yaml
 - uses: credova/platform-workflows/actions/compliance@v1

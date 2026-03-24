@@ -2,7 +2,7 @@ name: security
 description: >
   Two-phase security scanning. Phase 1 (source): package vulns + license
   compliance + static analysis. Phase 2 (image): container image vuln scan.
-  Target determines the phase — dir:. for source, docker:<ref> for image.
+  Target determines the phase - dir:. for source, docker:<ref> for image.
   Posts and maintains a single PR comment with results from both phases.
 
 inputs:
@@ -18,7 +18,7 @@ inputs:
     default: "true"
   licenses:
     description: >
-      Run license compliance scan via grant — informational only, never blocks.
+      Run license compliance scan via grant - informational only, never blocks.
       Only applies when target is dir:.
     required: false
     default: "true"
@@ -104,12 +104,12 @@ runs:
       if: steps.grype.outcome == 'failure'
       shell: bash
       run: |
-        echo "::error::Vulnerability scan found ${{ inputs.severity }}-or-higher issues — see PR comment for details"
+        echo "::error::Vulnerability scan found ${{ inputs.severity }}-or-higher issues - see PR comment for details"
         exit 1
 
     - name: Fail on code issues
       if: steps.opengrep.outcome == 'failure'
       shell: bash
       run: |
-        echo "::error::Code scan found issues — see PR comment for details"
+        echo "::error::Code scan found issues - see PR comment for details"
         exit 1

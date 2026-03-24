@@ -1,6 +1,6 @@
 # auth-npm-token
 
-> **Internal action** — used by reusable workflows to generate tokens for npm package publishing.
+> **Internal action** - used by reusable workflows to generate tokens for npm package publishing.
 
 Generates a short-lived GitHub token for npm publish operations. Wraps `actions/create-github-app-token` with the org's npm publishing GitHub App.
 
@@ -8,9 +8,9 @@ Generates a short-lived GitHub token for npm publish operations. Wraps `actions/
 
 | Input          | Required | Default | Description                                                    |
 | -------------- | -------- | ------- | -------------------------------------------------------------- |
-| `app-id`       | Yes      | —       | GitHub App ID (from org secret `NPM_APP_ID`)                   |
-| `private-key`  | Yes      | —       | GitHub App private key (from org secret `NPM_APP_PRIVATE_KEY`) |
-| `repositories` | No       | —       | Comma-separated repos to scope the token to                    |
+| `app-id`       | Yes      | -       | GitHub App ID (from org secret `NPM_APP_ID`)                   |
+| `private-key`  | Yes      | -       | GitHub App private key (from org secret `NPM_APP_PRIVATE_KEY`) |
+| `repositories` | No       | -       | Comma-separated repos to scope the token to                    |
 
 ## Outputs
 

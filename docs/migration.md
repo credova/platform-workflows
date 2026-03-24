@@ -11,8 +11,8 @@
 | `increment-tag@v11`                    | `actions/increment-tag@v1`                  | Same concept, clean interface       |
 | `slack-deployment-notification@master` | `actions/notification@v1`                   | Also available via pctl             |
 | `configure-gcp-docker@v1`              | `actions/auth-gcp@v1` (internal)            | Now internal, auto-called           |
-| `check-pr-shortcut-ticket`             | `actions/compliance@v1`                     | New — ticket check + policy gates   |
-| N/A                                    | `actions/secrets-setup@v1`                  | New — fnox + GCP Secret Manager     |
+| `check-pr-shortcut-ticket`             | `actions/compliance@v1`                     | New - ticket check + policy gates   |
+| N/A                                    | `actions/secrets-setup@v1`                  | New - fnox + GCP Secret Manager     |
 
 ## Migration Steps
 
@@ -20,6 +20,6 @@
 2. Build composite actions (port + restructure from ops-actions)
 3. Build reusable workflows that call composites
 4. Tag `v1.0.0`
-5. Migrate repos one at a time — replace ops-actions references with platform-workflows
+5. Migrate repos one at a time - replace ops-actions references with platform-workflows
 6. Validate each migration thoroughly
-7. Deprecate `ops-actions` — add deprecation notice, archive after migration complete
+7. Deprecate `ops-actions` - add deprecation notice, archive after migration complete

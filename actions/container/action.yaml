@@ -199,7 +199,7 @@ runs:
         load: ${{ inputs.push != 'true' }}
         build-args: ${{ inputs.build-args }}
 
-    # --- Standard build path (default — no WarpBuild) ---
+    # --- Standard build path (default - no WarpBuild) ---
     - name: Setup Docker Buildx
       if: >
         inputs.warpbuild-profile == '' &&

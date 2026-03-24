@@ -91,7 +91,7 @@ on:
         required: false
         default: true
 
-      # Hotfix mode — tag push → build → approve → production (skip staging/tests)
+      # Hotfix mode - tag push → build → approve → production (skip staging/tests)
       hotfix:
         description: "Hotfix mode: skip staging and tests. Deploy straight to production."
         type: boolean

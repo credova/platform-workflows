@@ -20,7 +20,7 @@ TEST_END="<!-- go-test-end -->"
 
 PR_NUMBER=$(jq -r '.pull_request.number // empty' "$GITHUB_EVENT_PATH")
 if [ -z "$PR_NUMBER" ]; then
-  echo "Not a pull request — skipping comment"
+  echo "Not a pull request - skipping comment"
   exit 0
 fi
 
@@ -85,7 +85,7 @@ build_test_section() {
   fi
 
   if [ -n "$coverage" ]; then
-    echo "${status_icon} $([ "$outcome" = "success" ] && echo "Passed" || echo "Failed") — coverage: **${coverage}**"
+    echo "${status_icon} $([ "$outcome" = "success" ] && echo "Passed" || echo "Failed") - coverage: **${coverage}**"
   else
     echo "${status_icon} $([ "$outcome" = "success" ] && echo "Passed" || echo "Failed")"
   fi

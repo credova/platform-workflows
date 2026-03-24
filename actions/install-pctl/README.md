@@ -1,6 +1,6 @@
 # install-pctl
 
-> **Internal action** — consumed by `deployment` and `notification`. Teams should not call this directly.
+> **Internal action** - consumed by `deployment` and `notification`. Teams should not call this directly.
 
 Installs pctl from the private `credova/pctl` GitHub releases. Handles version resolution, architecture detection, and SHA256 checksum verification.
 
@@ -9,7 +9,7 @@ Installs pctl from the private `credova/pctl` GitHub releases. Handles version r
 | Input     | Required | Default  | Description                                              |
 | --------- | -------- | -------- | -------------------------------------------------------- |
 | `version` | No       | `latest` | pctl version to install                                  |
-| `token`   | Yes      | —        | GitHub token with read access to `credova/pctl` releases |
+| `token`   | Yes      | -        | GitHub token with read access to `credova/pctl` releases |
 
 The token should be generated at the reusable workflow level (e.g. via `actions/create-github-app-token`) and passed down to composites. This keeps GitHub App credentials in one place.
 

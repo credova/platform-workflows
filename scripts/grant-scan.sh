@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Run grant license scan against sbom.spdx.json.
-# Informational only — always exits 0.
+# Informational only - always exits 0.
 # Writes: grant-results.json
 
 if ! command -v grant &>/dev/null; then

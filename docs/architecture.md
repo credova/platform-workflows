@@ -2,9 +2,9 @@
 
 ## Two Layers
 
-**Reusable workflows** (public interface) — the standardized pipelines teams import. These define the pipeline shape, ordering, and gating.
+**Reusable workflows** (public interface) - the standardized pipelines teams import. These define the pipeline shape, ordering, and gating.
 
-**Composite actions** (internal building blocks) — atomic modules that handle one concern. Reusable workflows call these internally.
+**Composite actions** (internal building blocks) - atomic modules that handle one concern. Reusable workflows call these internally.
 
 ```text
 reusable workflow (deploy.yaml)
@@ -16,14 +16,14 @@ reusable workflow (deploy.yaml)
 
 ## Design Principles
 
-- **Fail early, fail fast** — security and compliance checks run first
-- **Opt-out, not opt-in** — security scanning and compliance gates are on by default
-- **On rails** — smart defaults handle conflicts automatically (e.g. enabling WarpBuild cache auto-disables built-in Go/Node caches)
-- **Feature flags, not separate workflows** — one `pull-request.yaml`, one `deploy.yaml` with boolean toggles (`container`, `deploy`, `hotfix`, `cache`)
-- **Self-contained modules** — each composite handles its own auth, dependencies, and setup
-- **One interface, hidden internals** — swap trivy for something else, update one composite
-- **Zero PATs** — all auth uses GitHub Apps, GITHUB_TOKEN, or OIDC (Workload Identity Federation)
-- **WarpBuild-first** — all workflows default to WarpBuild runners, with opt-in Docker Builders and dependency caching
+- **Fail early, fail fast** - security and compliance checks run first
+- **Opt-out, not opt-in** - security scanning and compliance gates are on by default
+- **On rails** - smart defaults handle conflicts automatically (e.g. enabling WarpBuild cache auto-disables built-in Go/Node caches)
+- **Feature flags, not separate workflows** - one `pull-request.yaml`, one `deploy.yaml` with boolean toggles (`container`, `deploy`, `hotfix`, `cache`)
+- **Self-contained modules** - each composite handles its own auth, dependencies, and setup
+- **One interface, hidden internals** - swap trivy for something else, update one composite
+- **Zero PATs** - all auth uses GitHub Apps, GITHUB_TOKEN, or OIDC (Workload Identity Federation)
+- **WarpBuild-first** - all workflows default to WarpBuild runners, with opt-in Docker Builders and dependency caching
 
 ## Workflows
 

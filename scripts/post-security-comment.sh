@@ -3,7 +3,7 @@ set -euo pipefail
 
 # Post or update a unified security scan PR comment.
 # Handles two phases: source (dir:.) and image (docker:<ref>).
-# Both phases write to the same comment — phase 2 preserves phase 1 content.
+# Both phases write to the same comment - phase 2 preserves phase 1 content.
 #
 # Expects:
 #   GH_TOKEN   - GitHub token
@@ -24,7 +24,7 @@ CODE_END="<!-- security-code-end -->"
 
 PR_NUMBER=$(jq -r '.pull_request.number // empty' "$GITHUB_EVENT_PATH")
 if [ -z "$PR_NUMBER" ]; then
-  echo "Not a pull request — skipping comment"
+  echo "Not a pull request - skipping comment"
   exit 0
 fi
 
@@ -55,7 +55,7 @@ build_vuln_section() {
 
   if   [ "$critical" -gt 0 ]; then echo "❌ ${critical} critical, ${high} high, ${medium} medium, ${low} low"
   elif [ "$high"     -gt 0 ]; then echo "❌ ${high} high, ${medium} medium, ${low} low"
-  elif [ "$total"    -gt 0 ]; then echo "⚠️ ${medium} medium, ${low} low — no blockers at ${SEVERITY}+"
+  elif [ "$total"    -gt 0 ]; then echo "⚠️ ${medium} medium, ${low} low - no blockers at ${SEVERITY}+"
   else                              echo "✅ Clean"
   fi
 
@@ -79,7 +79,7 @@ build_vuln_section() {
       | "| \(.artifact.name) | \(.artifact.version) | \(.vulnerability.id) | \(.vulnerability.severity) | \(
           if (.vulnerability.fix.versions | length) > 0
           then .vulnerability.fix.versions[0]
-          else "—"
+          else "-"
           end
         ) |"
     ' "$results_file"
@@ -158,7 +158,7 @@ build_license_section() {
   fi
 
   echo ""
-  echo "> ℹ️ License scan is informational — not blocking."
+  echo "> ℹ️ License scan is informational - not blocking."
 }
 
 # Fetch existing comment if present
@@ -170,7 +170,7 @@ if [ -n "$EXISTING_ID" ]; then
   EXISTING_BODY=$(gh api "repos/${GITHUB_REPOSITORY}/issues/comments/${EXISTING_ID}" --jq '.body')
 fi
 
-# Build each section — use local results for current phase, preserve existing for the other
+# Build each section - use local results for current phase, preserve existing for the other
 if [ "${SCAN_PHASE}" = "source" ]; then
   SOURCE_CONTENT=$(build_vuln_section "grype-source-results.json")
   CODE_CONTENT=$(build_code_section)
@@ -191,17 +191,17 @@ fi
 COMMENT_BODY="${MAIN_MARKER}
 ## Security Scan
 
-### Source — Package & OS Vulnerabilities
+### Source - Package & OS Vulnerabilities
 ${SOURCE_START}
 ${SOURCE_CONTENT}
 ${SOURCE_END}
 
-### Container Image — Package & OS Vulnerabilities
+### Container Image - Package & OS Vulnerabilities
 ${IMAGE_START}
 ${IMAGE_CONTENT}
 ${IMAGE_END}
 
-### Code — Static Analysis
+### Code - Static Analysis
 ${CODE_START}
 ${CODE_CONTENT}
 ${CODE_END}

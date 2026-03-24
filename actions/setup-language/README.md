@@ -8,7 +8,7 @@ Setup a language runtime for the current job. Single action that handles Go, Nod
 | ---------- | -------- | ------------------------------------------------------------------------------------------------- |
 | `language` | Yes      | `go`, `node`, `kotlin`, `python`, `ruby`, or `dotnet`                                             |
 | `version`  | Yes      | Language/runtime version (e.g. `1.24`, `20`, `21`, `3.12`)                                        |
-| `cache`    | No       | `false` — enable WarpBuild dependency caching. Auto-disables built-in Go/Node caches when `true`. |
+| `cache`    | No       | `false` - enable WarpBuild dependency caching. Auto-disables built-in Go/Node caches when `true`. |
 
 ## Examples
 

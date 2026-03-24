@@ -39,7 +39,7 @@ inputs:
     required: false
     default: ""
   thread-ts:
-    description: "Thread timestamp — without reply: updates in-place; with reply: posts thread reply"
+    description: "Thread timestamp - without reply: updates in-place; with reply: posts thread reply"
     required: false
     default: ""
   reply:

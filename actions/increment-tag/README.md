@@ -6,7 +6,7 @@ Auto-increment semantic version tags. Supports suffix-based sequences for enviro
 
 | Input    | Required | Default | Description                                                            |
 | -------- | -------- | ------- | ---------------------------------------------------------------------- |
-| `suffix` | No       | —       | Environment suffix (e.g., `stg`, `prd`) creates tags like `v1.0.0-stg` |
+| `suffix` | No       | -       | Environment suffix (e.g., `stg`, `prd`) creates tags like `v1.0.0-stg` |
 | `prefix` | No       | `v`     | Tag prefix                                                             |
 | `bump`   | No       | `patch` | Version component to bump: `major`, `minor`, `patch`                   |
 
@@ -64,4 +64,4 @@ Auto-increment semantic version tags. Supports suffix-based sequences for enviro
 1. Fetches all git tags
 2. Finds the latest tag matching `{prefix}X.Y.Z[-{suffix}]`
 3. Increments the specified component
-4. Outputs the new tag (does **not** create or push the tag — that's the caller's job)
+4. Outputs the new tag (does **not** create or push the tag - that's the caller's job)
