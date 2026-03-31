@@ -32,6 +32,18 @@ inputs:
     description: Minimum severity to fail on (CRITICAL, HIGH, MEDIUM, LOW)
     required: false
     default: HIGH
+  block-on-packages:
+    description: Fail the workflow if vulnerability scan finds issues at or above severity threshold
+    required: false
+    default: "true"
+  block-on-code:
+    description: Fail the workflow if code static analysis finds issues
+    required: false
+    default: "true"
+  block-on-licenses:
+    description: Fail the workflow if license scan finds issues
+    required: false
+    default: "false"
 
 runs:
   using: composite
@@ -98,18 +110,33 @@ runs:
         SEVERITY: ${{ inputs.severity }}
         PACKAGES: ${{ inputs.packages }}
         LICENSES: ${{ inputs.licenses }}
+        BLOCK_ON_PACKAGES: ${{ inputs.block-on-packages }}
+        BLOCK_ON_CODE: ${{ inputs.block-on-code }}
+        BLOCK_ON_LICENSES: ${{ inputs.block-on-licenses }}
       run: ${{ github.action_path }}/../../scripts/post-security-comment.sh
 
     - name: Fail on vulnerabilities
-      if: steps.grype.outcome == 'failure'
+      if: steps.grype.outcome == 'failure' && inputs.block-on-packages == 'true'
       shell: bash
       run: |
         echo "::error::Vulnerability scan found ${{ inputs.severity }}-or-higher issues - see PR comment for details"
         exit 1
 
     - name: Fail on code issues
-      if: steps.opengrep.outcome == 'failure'
+      if: steps.opengrep.outcome == 'failure' && inputs.block-on-code == 'true'
       shell: bash
       run: |
         echo "::error::Code scan found issues - see PR comment for details"
         exit 1
+
+    - name: Fail on license issues
+      if: inputs.block-on-licenses == 'true' && inputs.licenses == 'true' && inputs.target == 'dir:.'
+      shell: bash
+      run: |
+        if [ -f grant-results.json ]; then
+          high=$(jq '[.[] | select(.risk == "High")] | length' grant-results.json 2>/dev/null || echo 0)
+          if [ "$high" -gt 0 ]; then
+            echo "::error::License scan found high-risk (strong copyleft) licenses - see PR comment for details"
+            exit 1
+          fi
+        fi

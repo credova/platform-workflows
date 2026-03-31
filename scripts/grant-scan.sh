@@ -19,7 +19,15 @@ if [ -f .grant.yaml ]; then
   echo "Using .grant.yaml policy"
 fi
 
-grant "${GRANT_ARGS[@]}" > grant-results.json 2>&1 || true
+grant "${GRANT_ARGS[@]}" | tee grant-results.json || true
 
 echo "::endgroup::"
+
+# Print summary to logs
+if [ -f grant-results.json ]; then
+  echo "::group::Grant results summary"
+  jq -r '.[] | "\(.risk)\t\(.license)\t\(.packageName)"' grant-results.json 2>/dev/null | sort | uniq || true
+  echo "::endgroup::"
+fi
+
 echo "Results written to grant-results.json"

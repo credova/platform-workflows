@@ -66,6 +66,53 @@ Every scan posts or updates a single `## Security Scan` comment on the PR with s
     code: false
 ```
 
+## Suppressing Vulnerabilities
+
+### `.grype.yaml` ignore rules
+
+Add a `.grype.yaml` in the root of your repo to suppress known/accepted vulnerabilities.
+
+> **Important:** Grype reports vulnerabilities using **GHSA IDs** (e.g. `GHSA-r4mg-4433-c7g3`), not CVE IDs. Your ignore rules must use the ID that grype actually reports. Check the PR comment or scan logs for the exact IDs. CVE-based ignore rules will silently not match.
+
+```yaml
+# .grype.yaml
+ignore:
+  # Ignore a specific vulnerability by its GHSA ID (use the ID from scan results)
+  - vulnerability: GHSA-r4mg-4433-c7g3
+
+  # Ignore a vulnerability only when no fix is available
+  - vulnerability: GHSA-9xrj-h377-fr87
+    fix-state: not-fixed
+
+  # Ignore all vulns in a specific package
+  - package:
+      name: libcurl
+
+  # Ignore a specific package at a specific version
+  - package:
+      name: openssl
+      version: 1.1.1g
+
+  # Combine criteria - all must match
+  - vulnerability: GHSA-353f-x4gh-cqq8
+    package:
+      name: nokogiri
+```
+
+Valid `fix-state` values: `fixed`, `not-fixed`, `wont-fix`, `unknown`
+
+Ignored matches are not deleted — they appear under `ignoredMatches` in the JSON output and can be audited.
+
+To only fail on issues that have a fix available:
+
+```yaml
+# .grype.yaml
+ignore:
+  - fix-state: not-fixed
+  - fix-state: wont-fix
+  - fix-state: unknown
+```
+
 ## Tool Versions
 
 Pinned in [`scripts/install-anchore.sh`](../../scripts/install-anchore.sh). Bump deliberately - do not use `latest`.

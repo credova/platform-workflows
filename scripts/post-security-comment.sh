@@ -6,11 +6,14 @@ set -euo pipefail
 # Both phases write to the same comment - phase 2 preserves phase 1 content.
 #
 # Expects:
-#   GH_TOKEN   - GitHub token
-#   SCAN_PHASE - "source" or "image"
-#   SEVERITY   - threshold used (for display)
-#   PACKAGES   - "true"/"false"
-#   LICENSES   - "true"/"false"
+#   GH_TOKEN          - GitHub token
+#   SCAN_PHASE        - "source" or "image"
+#   SEVERITY          - threshold used (for display)
+#   PACKAGES          - "true"/"false"
+#   LICENSES          - "true"/"false"
+#   BLOCK_ON_PACKAGES - "true"/"false"
+#   BLOCK_ON_CODE     - "true"/"false"
+#   BLOCK_ON_LICENSES - "true"/"false"
 
 MAIN_MARKER="<!-- security-scan-report -->"
 SOURCE_START="<!-- security-source-start -->"
@@ -36,6 +39,25 @@ extract_section() {
     || true
 }
 
+BLOCK_ON_PACKAGES="${BLOCK_ON_PACKAGES:-true}"
+BLOCK_ON_CODE="${BLOCK_ON_CODE:-true}"
+BLOCK_ON_LICENSES="${BLOCK_ON_LICENSES:-false}"
+
+# Build a blocking status line for a section
+blocking_status() {
+  local blocking="$1" detail="$2"
+  if [ "$blocking" = "true" ]; then
+    echo "> 🚫 **Blocking** — ${detail}"
+  else
+    echo "> ℹ️ Informational — not blocking."
+  fi
+}
+
+MAX_VULN_FINDINGS="${MAX_VULN_FINDINGS:-20}"
+MAX_CODE_FINDINGS="${MAX_CODE_FINDINGS:-20}"
+MAX_LICENSE_FINDINGS="${MAX_LICENSE_FINDINGS:-20}"
+RUN_URL="https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+
 # Build the vuln table for a results file
 build_vuln_section() {
   local results_file="$1"
@@ -55,7 +77,7 @@ build_vuln_section() {
 
   if   [ "$critical" -gt 0 ]; then echo "❌ ${critical} critical, ${high} high, ${medium} medium, ${low} low"
   elif [ "$high"     -gt 0 ]; then echo "❌ ${high} high, ${medium} medium, ${low} low"
-  elif [ "$total"    -gt 0 ]; then echo "⚠️ ${medium} medium, ${low} low - no blockers at ${SEVERITY}+"
+  elif [ "$total"    -gt 0 ]; then echo "⚠️ ${medium} medium, ${low} low"
   else                              echo "✅ Clean"
   fi
 
@@ -69,13 +91,15 @@ build_vuln_section() {
 
   if [ "$high_plus" -gt 0 ]; then
     echo ""
-    echo "**Critical & High (${high_plus})**"
+    local vuln_shown=$(( high_plus < MAX_VULN_FINDINGS ? high_plus : MAX_VULN_FINDINGS ))
+    echo "**Critical & High (showing ${vuln_shown} of ${high_plus})**"
     echo ""
     echo "| Package | Version | CVE | Severity | Fixed In |"
     echo "|---------|---------|-----|----------|----------|"
-    jq -r '
-      .matches[]
-      | select(.vulnerability.severity == "Critical" or .vulnerability.severity == "High")
+    jq -r --argjson max "$MAX_VULN_FINDINGS" '
+      [ .matches[]
+        | select(.vulnerability.severity == "Critical" or .vulnerability.severity == "High")
+      ] | limit($max; .[])
       | "| \(.artifact.name) | \(.artifact.version) | \(.vulnerability.id) | \(.vulnerability.severity) | \(
           if (.vulnerability.fix.versions | length) > 0
           then .vulnerability.fix.versions[0]
@@ -83,6 +107,10 @@ build_vuln_section() {
           end
         ) |"
     ' "$results_file"
+    if [ "$high_plus" -gt "$MAX_VULN_FINDINGS" ]; then
+      echo ""
+      echo "> $(( high_plus - MAX_VULN_FINDINGS )) more - [see full output](${RUN_URL})"
+    fi
   fi
 }
 
@@ -104,14 +132,15 @@ build_code_section() {
   echo "⚠️ ${count} finding(s)"
   echo ""
   echo "<details>"
-  echo "<summary>Findings (${count})</summary>"
+  local code_shown=$(( count < MAX_CODE_FINDINGS ? count : MAX_CODE_FINDINGS ))
+  echo "<summary>Findings (showing ${code_shown} of ${count})</summary>"
   echo ""
   echo "| File | Rule | Description |"
   echo "|------|------|-------------|"
-  jq -r --arg repo "$GITHUB_REPOSITORY" --arg sha "$GITHUB_SHA" '
+  jq -r --arg repo "$GITHUB_REPOSITORY" --arg sha "$GITHUB_SHA" --argjson max "$MAX_CODE_FINDINGS" '
     .runs[0] |
     (.tool.driver.rules // [] | map({(.id): {uri: .helpUri, desc: (.shortDescription.text // .fullDescription.text // "")}}) | add // {}) as $rules |
-    .results[] |
+    [ .results[] ] | limit($max; .[]) |
     . as $r |
     ($r.locations[0].physicalLocation.artifactLocation.uri) as $file |
     ($r.locations[0].physicalLocation.region.startLine | tostring) as $line |
@@ -119,6 +148,10 @@ build_code_section() {
     "| [\($file)#L\($line)](https://github.com/\($repo)/blob/\($sha)/\($file)#L\($line)) | \(if $rule.uri then "[\($r.ruleId)](\($rule.uri))" else $r.ruleId end) | \($rule.desc // "") |"
   ' opengrep-results.sarif
   echo ""
+  if [ "$count" -gt "$MAX_CODE_FINDINGS" ]; then
+    echo "> $(( count - MAX_CODE_FINDINGS )) more - [see full output](${RUN_URL})"
+    echo ""
+  fi
   echo "</details>"
 }
 
@@ -144,21 +177,23 @@ build_license_section() {
   if [ "$nonfree" -gt 0 ]; then
     echo ""
     echo "<details>"
-    echo "<summary>Non-permissive licenses (${nonfree})</summary>"
+    local lic_shown=$(( nonfree < MAX_LICENSE_FINDINGS ? nonfree : MAX_LICENSE_FINDINGS ))
+    echo "<summary>Non-permissive licenses (showing ${lic_shown} of ${nonfree})</summary>"
     echo ""
     echo "| Package | License | Risk |"
     echo "|---------|---------|------|"
-    jq -r '
-      .[]
-      | select(.risk == "High" or .risk == "Medium")
+    jq -r --argjson max "$MAX_LICENSE_FINDINGS" '
+      [ .[] | select(.risk == "High" or .risk == "Medium") ]
+      | limit($max; .[])
       | "| \(.packageName) | \(.license) | \(.risk) |"
     ' grant-results.json 2>/dev/null || true
+    if [ "$nonfree" -gt "$MAX_LICENSE_FINDINGS" ]; then
+      echo ""
+      echo "> $(( nonfree - MAX_LICENSE_FINDINGS )) more - [see full output](${RUN_URL})"
+    fi
     echo ""
     echo "</details>"
   fi
-
-  echo ""
-  echo "> ℹ️ License scan is informational - not blocking."
 }
 
 # Fetch existing comment if present
@@ -187,39 +222,59 @@ else
   [ -z "$LICENSE_CONTENT" ] && LICENSE_CONTENT="_License scan results unavailable._"
 fi
 
+# Build blocking status lines
+SOURCE_BLOCKING=$(blocking_status "$BLOCK_ON_PACKAGES" "fails on ${SEVERITY}+ severity vulnerabilities")
+IMAGE_BLOCKING=$(blocking_status "$BLOCK_ON_PACKAGES" "fails on ${SEVERITY}+ severity vulnerabilities")
+CODE_BLOCKING=$(blocking_status "$BLOCK_ON_CODE" "fails on code analysis findings")
+LICENSE_BLOCKING=$(blocking_status "$BLOCK_ON_LICENSES" "fails on high-risk (strong copyleft) licenses")
+
 # Assemble
 COMMENT_BODY="${MAIN_MARKER}
 ## Security Scan
 
 ### Source - Package & OS Vulnerabilities
+${SOURCE_BLOCKING}
+
 ${SOURCE_START}
 ${SOURCE_CONTENT}
 ${SOURCE_END}
 
 ### Container Image - Package & OS Vulnerabilities
+${IMAGE_BLOCKING}
+
 ${IMAGE_START}
 ${IMAGE_CONTENT}
 ${IMAGE_END}
 
 ### Code - Static Analysis
+${CODE_BLOCKING}
+
 ${CODE_START}
 ${CODE_CONTENT}
 ${CODE_END}
 
 ### Licenses
+${LICENSE_BLOCKING}
+
 ${LICENSE_START}
 ${LICENSE_CONTENT}
 ${LICENSE_END}"
 
-# Post or update via GitHub API (jq handles special character encoding)
+# Write body to temp file - avoids "Argument list too long" with large outputs
+BODY_FILE=$(mktemp)
+printf '%s' "$COMMENT_BODY" > "$BODY_FILE"
+
+# Post or update via GitHub API
 if [ -n "$EXISTING_ID" ]; then
-  jq -n --arg body "$COMMENT_BODY" '{body: $body}' \
+  jq -n --rawfile body "$BODY_FILE" '{body: $body}' \
     | gh api "repos/${GITHUB_REPOSITORY}/issues/comments/${EXISTING_ID}" \
         --method PATCH --input - > /dev/null
   echo "Updated security comment #${EXISTING_ID}"
 else
-  jq -n --arg body "$COMMENT_BODY" '{body: $body}' \
+  jq -n --rawfile body "$BODY_FILE" '{body: $body}' \
     | gh api "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" \
         --method POST --input - > /dev/null
   echo "Posted new security comment on PR #${PR_NUMBER}"
 fi
+
+rm -f "$BODY_FILE"
