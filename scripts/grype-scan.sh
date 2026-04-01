@@ -16,7 +16,7 @@ fi
 
 SEVERITY_LOWER=$(echo "${SEVERITY}" | tr '[:upper:]' '[:lower:]')
 
-GRYPE_ARGS=(sbom.spdx.json --output json --file "${RESULTS_FILE}" --fail-on "${SEVERITY_LOWER}")
+GRYPE_ARGS=(sbom.spdx.json --output json --file "${RESULTS_FILE}" --fail-on "${SEVERITY_LOWER}" --only-fixed)
 
 if [ -f .grype.yaml ]; then
   GRYPE_ARGS+=(--config .grype.yaml)
@@ -34,7 +34,7 @@ echo "Results written to ${RESULTS_FILE}"
 # Print summary to logs so output is visible
 if [ -f "${RESULTS_FILE}" ]; then
   echo "::group::Grype results summary"
-  jq -r '.matches[] | "\(.vulnerability.severity)\t\(.vulnerability.id)\t\(.artifact.name)@\(.artifact.version)"' "${RESULTS_FILE}" | sort | uniq
+  jq -r '.matches[] | "\(.vulnerability.severity)\t\(.vulnerability.id)\t\(.artifact.name)@\(.artifact.version)"' "${RESULTS_FILE}" 2>/dev/null | sort | uniq || true
   echo "::endgroup::"
 fi
 

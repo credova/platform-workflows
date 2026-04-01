@@ -24,13 +24,26 @@ esac
 # Use auto-detected rules (opengrep default rulesets)
 ARGS="${ARGS} --config auto"
 
-opengrep ${ARGS} . || EXIT_CODE=$?
+OPENGREP_EXIT=0
+opengrep ${ARGS} . || OPENGREP_EXIT=$?
 
 echo "::endgroup::"
 
-# Upload SARIF for GitHub code scanning integration
 if [ -f opengrep-results.sarif ]; then
   echo "SARIF results written to opengrep-results.sarif"
+
+  # Print summary to logs
+  echo "::group::OpenGrep results summary"
+  jq -r '.runs[0].results[] | "\(.locations[0].physicalLocation.artifactLocation.uri)\t\(.ruleId)"' opengrep-results.sarif 2>/dev/null | sort | uniq -c | sort -rn || true
+  echo "::endgroup::"
+
+  # Fail if findings exist (opengrep itself exits 0 even with findings)
+  count=$(jq '[.runs[].results[]] | length' opengrep-results.sarif 2>/dev/null || echo 0)
+  if [ "$count" -gt 0 ]; then
+    echo "OpenGrep found ${count} finding(s)"
+    exit 1
+  fi
 fi
 
-exit "${EXIT_CODE:-0}"
+# Propagate opengrep errors (non-finding failures)
+exit "${OPENGREP_EXIT}"

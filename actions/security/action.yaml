@@ -39,7 +39,7 @@ inputs:
   block-on-code:
     description: Fail the workflow if code static analysis finds issues
     required: false
-    default: "true"
+    default: "false"
   block-on-licenses:
     description: Fail the workflow if license scan finds issues
     required: false

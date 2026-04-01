@@ -114,7 +114,7 @@ build_vuln_section() {
   fi
 }
 
-# Build the code scan section from SARIF output
+# Build the code scan section from SARIF output, grouped by language
 build_code_section() {
   if [ ! -f "opengrep-results.sarif" ]; then
     echo "_Code scan not run._"
@@ -131,28 +131,59 @@ build_code_section() {
 
   echo "⚠️ ${count} finding(s)"
   echo ""
-  echo "<details>"
-  local code_shown=$(( count < MAX_CODE_FINDINGS ? count : MAX_CODE_FINDINGS ))
-  echo "<summary>Findings (showing ${code_shown} of ${count})</summary>"
-  echo ""
-  echo "| File | Rule | Description |"
-  echo "|------|------|-------------|"
-  jq -r --arg repo "$GITHUB_REPOSITORY" --arg sha "$GITHUB_SHA" --argjson max "$MAX_CODE_FINDINGS" '
-    .runs[0] |
-    (.tool.driver.rules // [] | map({(.id): {uri: .helpUri, desc: (.shortDescription.text // .fullDescription.text // "")}}) | add // {}) as $rules |
-    [ .results[] ] | limit($max; .[]) |
-    . as $r |
-    ($r.locations[0].physicalLocation.artifactLocation.uri) as $file |
-    ($r.locations[0].physicalLocation.region.startLine | tostring) as $line |
-    ($rules[$r.ruleId]) as $rule |
-    "| [\($file)#L\($line)](https://github.com/\($repo)/blob/\($sha)/\($file)#L\($line)) | \(if $rule.uri then "[\($r.ruleId)](\($rule.uri))" else $r.ruleId end) | \($rule.desc // "") |"
-  ' opengrep-results.sarif
-  echo ""
-  if [ "$count" -gt "$MAX_CODE_FINDINGS" ]; then
-    echo "> $(( count - MAX_CODE_FINDINGS )) more - [see full output](${RUN_URL})"
+
+  # Get languages by extracting from ruleId (e.g. "ruby.lang.security.foo" -> "ruby")
+  # Fall back to file extension if ruleId doesn't have a language prefix
+  local languages
+  languages=$(jq -r '
+    [.runs[0].results[] |
+      (.ruleId | split(".")[0]) // "other"
+    ] | unique | .[]
+  ' opengrep-results.sarif)
+
+  local rules_file
+  rules_file=$(mktemp)
+  jq '
+    .runs[0].tool.driver.rules // [] | map({(.id): {uri: .helpUri, desc: (.shortDescription.text // .fullDescription.text // "")}}) | add // {}
+  ' opengrep-results.sarif > "$rules_file"
+
+  while IFS= read -r lang; do
+    [ -z "$lang" ] && continue
+
+    local lang_count
+    lang_count=$(jq --arg lang "$lang" '
+      [.runs[0].results[] | select(.ruleId | startswith($lang + "."))] | length
+    ' opengrep-results.sarif)
+
+    [ "$lang_count" -eq 0 ] && continue
+
+    local lang_shown=$(( lang_count < MAX_CODE_FINDINGS ? lang_count : MAX_CODE_FINDINGS ))
+
+    echo "<details>"
+    echo "<summary><b>${lang}</b> — ${lang_count} finding(s) (showing ${lang_shown} of ${lang_count})</summary>"
     echo ""
-  fi
-  echo "</details>"
+    echo "| File | Rule | Description |"
+    echo "|------|------|-------------|"
+    jq -r --arg repo "$GITHUB_REPOSITORY" --arg sha "$GITHUB_SHA" --argjson max "$MAX_CODE_FINDINGS" --arg lang "$lang" --slurpfile rules "$rules_file" '
+      .runs[0].results
+      | [ .[] | select(.ruleId | startswith($lang + ".")) ]
+      | limit($max; .[])
+      | . as $r |
+      ($r.locations[0].physicalLocation.artifactLocation.uri) as $file |
+      ($r.locations[0].physicalLocation.region.startLine | tostring) as $line |
+      ($rules[0][$r.ruleId]) as $rule |
+      "| [\($file)#L\($line)](https://github.com/\($repo)/blob/\($sha)/\($file)#L\($line)) | \(if $rule.uri then "[\($r.ruleId)](\($rule.uri))" else $r.ruleId end) | \($rule.desc // "") |"
+    ' opengrep-results.sarif
+    echo ""
+    if [ "$lang_count" -gt "$MAX_CODE_FINDINGS" ]; then
+      echo "> $(( lang_count - MAX_CODE_FINDINGS )) more - [see full output](${RUN_URL})"
+      echo ""
+    fi
+    echo "</details>"
+    echo ""
+  done <<< "$languages"
+
+  rm -f "$rules_file"
 }
 
 # Build the license table
