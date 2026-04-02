@@ -498,47 +498,357 @@ Deploy also requires: `RELEASE_APP_ID`, `RELEASE_APP_PRIVATE_KEY`.
 
 ---
 
+## Architecture Overview
+
+How the two layers connect: reusable workflows are the public interface, composite actions are internal building blocks.
+
+```mermaid
+graph LR
+    subgraph "Consuming Repo"
+        PR["pull-request.yaml"]
+        DEP["deploy.yaml"]
+        HOT["deploy-hotfix.yaml"]
+    end
+
+    subgraph "Reusable Workflows"
+        PRW["pull-request.yaml"]
+        DW["deploy.yaml"]
+        GW["go.yaml"]
+    end
+
+    subgraph "Composite Actions"
+        SL["setup-language"]
+        SEC["security"]
+        CTR["container"]
+        CMP["compliance"]
+        DPL["deployment"]
+        AG["auth-gcp"]
+        ART["auth-release-token"]
+        IT["increment-tag"]
+        IP["install-pctl"]
+        NTF["notification"]
+        SS["secrets-setup"]
+    end
+
+    PR -->|"uses:"| PRW
+    DEP -->|"uses:"| DW
+    HOT -->|"uses: hotfix: true"| DW
+
+    PRW --> SL & SEC & CTR & CMP
+    DW --> SL & CTR & DPL & ART & IT & NTF
+    CTR --> AG & SEC
+    DPL --> AG & IP
+    NTF --> IP
+    SS --> AG
+```
+
+---
+
 ## Pipeline Flow
 
-### PR: `security → test (optional) → build (optional) → compliance`
+### Pull Request
 
-```bash
-pull-request.yaml
-├── validate-inputs
-├── security          (trivy + opengrep)
-├── test              (only if language is set)
-├── build             (only if container: true)
-│   └── container scan (mandatory)
-└── compliance        (ticket check)
+Jobs run with parallel starts where possible. Dashed borders = conditional (skipped when toggled off).
+
+```mermaid
+flowchart TD
+    START(["PR opened / updated"])
+
+    VI["validate-inputs\n<i>parse image matrix</i>"]
+    SEC["security\n<i>packages + licenses + code</i>"]
+
+    TEST["test\n<i>language-specific tests</i>"]
+    BUILD["build\n<i>docker build per image matrix</i>"]
+
+    CMP["compliance\n<i>ticket reference check</i>"]
+
+    DONE(["PR checks complete"])
+
+    START --> VI & SEC
+    SEC -->|"language set"| TEST
+    VI & SEC --> BUILD
+    TEST & BUILD -->|"always (skip-safe)"| CMP
+    CMP --> DONE
+
+    style TEST stroke-dasharray: 5 5
+    style BUILD stroke-dasharray: 5 5
 ```
 
-### Deploy: `test → build → staging → [canary] → production → release`
+**Toggle map** — what each input controls:
 
-```bash
-deploy.yaml
-├── validate-inputs
-├── auth              (GitHub App token for pctl)
-├── test              (only if language is set)
-├── build-scan-push   (only if container: true)
-├── deploy-staging    (only if deploy: true)
-├── approve-canary    (only if canary > 0)
-├── deploy-canary     (only if canary > 0)
-├── approve-production
-├── deploy-production
-├── release           (tag + GitHub Release)
-└── cancel-superseded (clean up older waiting runs)
+| Input | What it gates |
+| ----- | ------------- |
+| `language` + `language-version` | **test** job runs |
+| `container` (default: `true`) | **build** job runs |
+| `security-packages` | package vulnerability scan inside **security** |
+| `security-licenses` | license compliance scan inside **security** |
+| `security-code` | static code analysis inside **security** |
+| `compliance-ticket` (default: `true`) | ticket reference check inside **compliance** |
+
+### Deploy (standard)
+
+Merge to master triggers the full pipeline. Approval gates are GitHub Environments.
+
+```mermaid
+flowchart TD
+    START(["Push to master"])
+
+    VI["validate-inputs\n<i>parse images, compute deploy tag</i>"]
+    AUTH["auth\n<i>GitHub App token for pctl</i>"]
+
+    TEST["test\n<i>language-specific tests</i>"]
+
+    BSP["build-scan-push\n<i>build → scan → push\nper image matrix</i>"]
+
+    STG["deploy-staging\n<i>Cloud Run via pctl</i>\n🔒 staging env"]
+
+    AC{{"approve-canary\n🔒 production-canary env"}}
+    DC["deploy-canary\n<i>canary % traffic</i>"]
+
+    AP{{"approve-production\n🔒 production env"}}
+    RETAG["retag-production\n<i>tag images as *-prd</i>"]
+    DP["deploy-production\n<i>full production rollout</i>"]
+
+    REL["release\n<i>increment tag + GitHub Release</i>"]
+    CS["cancel-superseded\n<i>cancel older waiting runs</i>"]
+
+    DONE(["Deploy complete"])
+
+    START --> VI & AUTH
+    VI --> TEST
+    VI & TEST --> BSP
+    AUTH & BSP & TEST & VI --> STG
+
+    STG & BSP --> AC
+    AUTH & AC & VI --> DC
+
+    BSP & STG & DC --> AP
+    AP & VI --> RETAG
+    AUTH & AP & RETAG & VI --> DP
+
+    DP & VI --> REL
+    DP --> CS
+    REL & CS --> DONE
+
+    style TEST stroke-dasharray: 5 5
+    style AC stroke-dasharray: 5 5
+    style DC stroke-dasharray: 5 5
 ```
 
-### Hotfix: `build → [canary] → approve → production → release`
+**Toggle map:**
 
-```text
-deploy.yaml (hotfix: true)
-├── validate-inputs   (uses tag name instead of SHA)
-├── auth              (GitHub App token for pctl)
-├── build-scan-push   (always rebuilds, no reuse)
-├── approve-canary    (only if canary > 0)
-├── deploy-canary     (only if canary > 0)
-├── approve-production
-├── deploy-production (skips staging, not canary)
-└── release           (from the tag that triggered)
+| Input | What it gates |
+| ----- | ------------- |
+| `language` + `language-version` | **test** job runs |
+| `container` (default: `true`) | **build-scan-push** and **retag-production** jobs run |
+| `deploy` (default: `true`) | **staging**, **approval**, **canary**, and **production** jobs run |
+| `canary` (default: `0`) | **approve-canary** and **deploy-canary** jobs run (set > 0 to enable) |
+| `require-approval` (default: `true`) | **approve-production** gate runs |
+| `notifications` (default: `true`) | Slack notifications in **deploy-production** |
+| `container-reuse` (default: `true`) | **build-scan-push** skips build if image already exists for this SHA |
+
+### Deploy (hotfix)
+
+Tag push with `hotfix: true`. Skips tests and staging — straight to build → production.
+
+```mermaid
+flowchart TD
+    START(["Tag push v*"])
+
+    VI["validate-inputs\n<i>uses tag name as deploy tag</i>"]
+    AUTH["auth\n<i>GitHub App token</i>"]
+
+    BSP["build-scan-push\n<i>always rebuilds, no reuse</i>"]
+
+    AC{{"approve-canary\n🔒 production-canary env"}}
+    DC["deploy-canary\n<i>canary % traffic</i>"]
+
+    AP{{"approve-production\n🔒 production env"}}
+    RETAG["retag-production\n<i>tag as *-prd</i>"]
+    DP["deploy-production\n<i>full production rollout</i>"]
+
+    REL["release\n<i>from existing tag</i>"]
+
+    DONE(["Hotfix complete"])
+
+    START --> VI & AUTH
+    VI --> BSP
+
+    BSP --> AC
+    AUTH & AC & VI --> DC
+
+    BSP & DC --> AP
+    AP & VI --> RETAG
+    AUTH & AP & RETAG & VI --> DP
+
+    DP & VI --> REL --> DONE
+
+    style AC stroke-dasharray: 5 5
+    style DC stroke-dasharray: 5 5
 ```
+
+**Key differences from standard deploy:** no test job, no staging, no cancel-superseded. Deploy tag is the pushed tag (e.g. `v1.2.3`) instead of the commit SHA.
+
+### Go Workflow
+
+For Go repos using mise and GoReleaser. Three parallel checks, then optional release.
+
+```mermaid
+flowchart TD
+    START(["PR or push"])
+
+    LINT["lint\n<i>mise run lint</i>"]
+    SECTST["security\n<i>mise run security</i>"]
+    TEST["test\n<i>mise run test</i>"]
+
+    GR["goreleaser\n<i>release --clean</i>"]
+
+    DONE(["Complete"])
+
+    START --> LINT & SECTST & TEST
+    LINT & SECTST & TEST --> GR --> DONE
+
+    style LINT stroke-dasharray: 5 5
+    style SECTST stroke-dasharray: 5 5
+    style TEST stroke-dasharray: 5 5
+    style GR stroke-dasharray: 5 5
+```
+
+**Toggle map:**
+
+| Input | What it gates |
+| ----- | ------------- |
+| `lint` (default: `true`) | **lint** job |
+| `security` (default: `true`) | **security** job |
+| `test` (default: `true`) | **test** job |
+| `goreleaser` (default: `true`) | **goreleaser** job (runs `--snapshot` on non-tag builds) |
+
+All four jobs are independently toggleable. GoReleaser waits for the other three.
+
+---
+
+## Composite Action Internals
+
+### container action
+
+The most complex action — handles the full image lifecycle with multiple modes.
+
+```mermaid
+flowchart TD
+    IN(["container action called"])
+
+    VAL["Validate inputs"]
+    GCP["Authenticate to GCP\n<i>via auth-gcp</i>"]
+
+    RETAG_CHECK{"retag mode?"}
+    RETAG["Retag existing image\n<i>gcrane cp source → target</i>"]
+
+    REUSE_CHECK{"reuse enabled?"}
+    REUSE["Check for existing image\n<i>gcrane ls</i>"]
+    EXISTS{"image exists?"}
+
+    WARP_CHECK{"warpbuild-profile\nset?"}
+    WARP_SETUP["Configure WarpBuild\nDocker Builder"]
+    WARP_BUILD["Build image\n<i>WarpBuild</i>"]
+
+    BUILDX["Setup Docker Buildx"]
+    QEMU{"platform ≠\nlinux/amd64?"}
+    QEMU_SETUP["Setup QEMU"]
+    STD_BUILD["Build image\n<i>standard buildx</i>"]
+
+    SCAN["Scan container image\n<i>via security action</i>"]
+    PUSH["Tag and push image"]
+
+    OUT(["outputs: image, digest, reused"])
+
+    IN --> VAL --> GCP --> RETAG_CHECK
+
+    RETAG_CHECK -->|yes| RETAG --> OUT
+    RETAG_CHECK -->|no| REUSE_CHECK
+
+    REUSE_CHECK -->|yes| REUSE --> EXISTS
+    REUSE_CHECK -->|no| WARP_CHECK
+    EXISTS -->|yes| OUT
+    EXISTS -->|no| WARP_CHECK
+
+    WARP_CHECK -->|yes| WARP_SETUP --> WARP_BUILD --> SCAN
+    WARP_CHECK -->|no| BUILDX --> QEMU
+    QEMU -->|yes| QEMU_SETUP --> STD_BUILD --> SCAN
+    QEMU -->|no| STD_BUILD
+
+    SCAN --> PUSH --> OUT
+```
+
+### security action
+
+Two-phase scanning. Phase 1 scans source code (`dir:.`), phase 2 scans container images (`docker:<ref>`).
+
+```mermaid
+flowchart TD
+    IN(["security action called"])
+
+    INSTALL["Install Anchore tools\n<i>syft + grype + grant</i>"]
+    SBOM["Generate SBOM\n<i>syft scan</i>"]
+
+    PKG{"packages\nenabled?"}
+    GRYPE["Package vulnerability scan\n<i>grype</i>"]
+
+    LIC{"licenses enabled\n& source scan?"}
+    GRANT["License compliance scan\n<i>grant</i>"]
+
+    CODE{"code enabled\n& source scan?"}
+    OG_INSTALL["Install opengrep"]
+    OG_SCAN["Code static analysis\n<i>opengrep</i>"]
+
+    COMMENT["Post security PR comment\n<i>single comment, both phases</i>"]
+
+    FAIL_PKG{"grype failed &\nblock-on-packages?"}
+    FAIL_CODE{"opengrep failed &\nblock-on-code?"}
+    FAIL_LIC{"block-on-licenses?"}
+
+    OUT_PASS(["Pass"])
+    OUT_FAIL(["Fail"])
+
+    IN --> INSTALL --> SBOM
+
+    SBOM --> PKG
+    PKG -->|yes| GRYPE --> LIC
+    PKG -->|no| LIC
+
+    LIC -->|yes| GRANT --> CODE
+    LIC -->|no| CODE
+
+    CODE -->|yes| OG_INSTALL --> OG_SCAN --> COMMENT
+    CODE -->|no| COMMENT
+
+    COMMENT --> FAIL_PKG
+    FAIL_PKG -->|yes| OUT_FAIL
+    FAIL_PKG -->|no| FAIL_CODE
+    FAIL_CODE -->|yes| OUT_FAIL
+    FAIL_CODE -->|no| FAIL_LIC
+    FAIL_LIC -->|yes| OUT_FAIL
+    FAIL_LIC -->|no| OUT_PASS
+```
+
+### deployment action
+
+Deploys to Cloud Run via pctl. Self-contained — handles its own auth.
+
+```mermaid
+flowchart TD
+    IN(["deployment action called"])
+
+    GCP["Authenticate to GCP\n<i>via auth-gcp</i>"]
+    PCTL["Install pctl\n<i>via install-pctl</i>"]
+    DEPLOY["Execute deployment\n<i>deploy.sh</i>"]
+
+    OUT(["outputs: revision, traffic"])
+
+    IN --> GCP --> PCTL --> DEPLOY --> OUT
+```
+
+`deploy.sh` supports four actions via the `action` input:
+- **deploy** — full deploy (or canary if `canary > 0`)
+- **promote** — promote canary to full traffic
+- **rollback** — rollback to a previous revision
+- **abort** — abort an in-progress canary
