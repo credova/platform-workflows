@@ -752,7 +752,7 @@ flowchart TD
     WARP_BUILD["Build image\n<i>WarpBuild</i>"]
 
     BUILDX["Setup Docker Buildx"]
-    QEMU{"platform ≠\nlinux/amd64?"}
+    QEMU{"platform is not\nlinux/amd64?"}
     QEMU_SETUP["Setup QEMU"]
     STD_BUILD["Build image\n<i>standard buildx</i>"]
 
