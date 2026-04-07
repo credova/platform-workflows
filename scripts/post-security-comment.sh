@@ -3,11 +3,12 @@ set -euo pipefail
 
 # Post or update a unified security scan PR comment.
 # Handles two phases: source (dir:.) and image (docker:<ref>).
-# Both phases write to the same comment - phase 2 preserves phase 1 content.
+# Multiple images each get their own section, keyed by IMAGE_NAME.
 #
 # Expects:
 #   GH_TOKEN          - GitHub token
 #   SCAN_PHASE        - "source" or "image"
+#   IMAGE_NAME        - image name for multi-image support (only used for image phase)
 #   SEVERITY          - threshold used (for display)
 #   PACKAGES          - "true"/"false"
 #   LICENSES          - "true"/"false"
@@ -18,12 +19,14 @@ set -euo pipefail
 MAIN_MARKER="<!-- security-scan-report -->"
 SOURCE_START="<!-- security-source-start -->"
 SOURCE_END="<!-- security-source-end -->"
-IMAGE_START="<!-- security-image-start -->"
-IMAGE_END="<!-- security-image-end -->"
 LICENSE_START="<!-- security-license-start -->"
 LICENSE_END="<!-- security-license-end -->"
 CODE_START="<!-- security-code-start -->"
 CODE_END="<!-- security-code-end -->"
+IMAGES_START="<!-- security-images-start -->"
+IMAGES_END="<!-- security-images-end -->"
+
+IMAGE_NAME="${IMAGE_NAME:-}"
 
 PR_NUMBER=$(jq -r '.pull_request.number // empty' "$GITHUB_EVENT_PATH")
 if [ -z "$PR_NUMBER" ]; then
@@ -236,15 +239,54 @@ if [ -n "$EXISTING_ID" ]; then
   EXISTING_BODY=$(gh api "repos/${GITHUB_REPOSITORY}/issues/comments/${EXISTING_ID}" --jq '.body')
 fi
 
-# Build each section - use local results for current phase, preserve existing for the other
+# --- Build sections based on scan phase ---
+
 if [ "${SCAN_PHASE}" = "source" ]; then
+  # Source phase: build source/code/license sections, preserve images section
   SOURCE_CONTENT=$(build_vuln_section "grype-source-results.json")
   CODE_CONTENT=$(build_code_section)
   LICENSE_CONTENT=$(build_license_section)
-  IMAGE_CONTENT=$(extract_section "$IMAGE_START" "$IMAGE_END" "$EXISTING_BODY")
-  [ -z "$IMAGE_CONTENT" ] && IMAGE_CONTENT="_Container image scan runs after build._"
+  IMAGES_CONTENT=$(extract_section "$IMAGES_START" "$IMAGES_END" "$EXISTING_BODY")
+  [ -z "$IMAGES_CONTENT" ] && IMAGES_CONTENT="_Container image scans run after build._"
 else
-  IMAGE_CONTENT=$(build_vuln_section "grype-image-results.json")
+  # Image phase: build this image's section, merge into existing images content
+  IMAGE_VULN_CONTENT=$(build_vuln_section "grype-image-results.json")
+
+  # Use image name for the section, fall back to "default"
+  LABEL="${IMAGE_NAME:-default}"
+  IMG_MARKER_START="<!-- security-image-${LABEL}-start -->"
+  IMG_MARKER_END="<!-- security-image-${LABEL}-end -->"
+  IMAGE_BLOCKING=$(blocking_status "$BLOCK_ON_PACKAGES" "fails on ${SEVERITY}+ severity vulnerabilities")
+
+  # Build this image's block
+  THIS_IMAGE_BLOCK="${IMG_MARKER_START}
+#### \`${LABEL}\`
+${IMAGE_BLOCKING}
+
+${IMAGE_VULN_CONTENT}
+${IMG_MARKER_END}"
+
+  # Get existing images content
+  EXISTING_IMAGES=$(extract_section "$IMAGES_START" "$IMAGES_END" "$EXISTING_BODY")
+
+  if [ -n "$EXISTING_IMAGES" ] && printf '%s' "$EXISTING_IMAGES" | grep -qF "$IMG_MARKER_START"; then
+    # Replace this image's existing block
+    IMAGES_CONTENT=$(printf '%s' "$EXISTING_IMAGES" | awk \
+      -v start="$IMG_MARKER_START" \
+      -v end="$IMG_MARKER_END" \
+      -v replacement="$THIS_IMAGE_BLOCK" \
+      'index($0, start){skip=1; printed=0} skip && index($0, end){print replacement; skip=0; printed=1; next} !skip{print}')
+  elif [ -n "$EXISTING_IMAGES" ] && ! printf '%s' "$EXISTING_IMAGES" | grep -qF "_Container image scans run after build._"; then
+    # Append this image after existing images
+    IMAGES_CONTENT="${EXISTING_IMAGES}
+
+${THIS_IMAGE_BLOCK}"
+  else
+    # First image
+    IMAGES_CONTENT="$THIS_IMAGE_BLOCK"
+  fi
+
+  # Preserve source sections from existing comment
   SOURCE_CONTENT=$(extract_section "$SOURCE_START" "$SOURCE_END" "$EXISTING_BODY")
   CODE_CONTENT=$(extract_section "$CODE_START" "$CODE_END" "$EXISTING_BODY")
   LICENSE_CONTENT=$(extract_section "$LICENSE_START" "$LICENSE_END" "$EXISTING_BODY")
@@ -253,9 +295,8 @@ else
   [ -z "$LICENSE_CONTENT" ] && LICENSE_CONTENT="_License scan results unavailable._"
 fi
 
-# Build blocking status lines
+# Build blocking status lines for source sections
 SOURCE_BLOCKING=$(blocking_status "$BLOCK_ON_PACKAGES" "fails on ${SEVERITY}+ severity vulnerabilities")
-IMAGE_BLOCKING=$(blocking_status "$BLOCK_ON_PACKAGES" "fails on ${SEVERITY}+ severity vulnerabilities")
 CODE_BLOCKING=$(blocking_status "$BLOCK_ON_CODE" "fails on code analysis findings")
 LICENSE_BLOCKING=$(blocking_status "$BLOCK_ON_LICENSES" "fails on high-risk (strong copyleft) licenses")
 
@@ -270,12 +311,11 @@ ${SOURCE_START}
 ${SOURCE_CONTENT}
 ${SOURCE_END}
 
-### Container Image - Package & OS Vulnerabilities
-${IMAGE_BLOCKING}
+### Container Images - Package & OS Vulnerabilities
 
-${IMAGE_START}
-${IMAGE_CONTENT}
-${IMAGE_END}
+${IMAGES_START}
+${IMAGES_CONTENT}
+${IMAGES_END}
 
 ### Code - Static Analysis
 ${CODE_BLOCKING}

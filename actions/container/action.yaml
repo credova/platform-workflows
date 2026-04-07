@@ -248,6 +248,7 @@ runs:
       uses: ./actions/security
       with:
         target: docker:${{ steps.meta.outputs.image }}
+        image-name: ${{ inputs.name }}
         packages: "true"
         licenses: "false"
         code: "false"

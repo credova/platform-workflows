@@ -44,6 +44,12 @@ inputs:
     description: Fail the workflow if license scan finds issues
     required: false
     default: "false"
+  image-name:
+    description: >
+      Human-readable image name for multi-image PR comments (e.g. "api", "worker").
+      Only used when target is docker:<ref>. Each unique name gets its own section.
+    required: false
+    default: ""
 
 runs:
   using: composite
@@ -107,6 +113,7 @@ runs:
       env:
         GH_TOKEN: ${{ github.token }}
         SCAN_PHASE: ${{ inputs.target == 'dir:.' && 'source' || 'image' }}
+        IMAGE_NAME: ${{ inputs.image-name }}
         SEVERITY: ${{ inputs.severity }}
         PACKAGES: ${{ inputs.packages }}
         LICENSES: ${{ inputs.licenses }}
