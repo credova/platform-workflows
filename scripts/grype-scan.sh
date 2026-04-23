@@ -16,7 +16,7 @@ fi
 
 SEVERITY_LOWER=$(echo "${SEVERITY}" | tr '[:upper:]' '[:lower:]')
 
-GRYPE_ARGS=(sbom.spdx.json --output json --file "${RESULTS_FILE}" --fail-on "${SEVERITY_LOWER}" --only-fixed)
+GRYPE_ARGS=(sbom.spdx.json --output json --file "${RESULTS_FILE}" --fail-on "${SEVERITY_LOWER}" --only-fixed --update-db)
 
 if [ -f .grype.yaml ]; then
   GRYPE_ARGS+=(--config .grype.yaml)
