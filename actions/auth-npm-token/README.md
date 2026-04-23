@@ -8,7 +8,7 @@ Generates a short-lived GitHub token for npm publish operations. Wraps `actions/
 
 | Input          | Required | Default | Description                                                    |
 | -------------- | -------- | ------- | -------------------------------------------------------------- |
-| `app-id`       | Yes      | -       | GitHub App ID (from org secret `NPM_APP_ID`)                   |
+| `client-id`    | Yes      | -       | GitHub App client ID (from org secret `NPM_APP_ID`)            |
 | `private-key`  | Yes      | -       | GitHub App private key (from org secret `NPM_APP_PRIVATE_KEY`) |
 | `repositories` | No       | -       | Comma-separated repos to scope the token to                    |
 
@@ -35,7 +35,7 @@ jobs:
         id: npm-token
         uses: ./actions/auth-npm-token
         with:
-          app-id: ${{ secrets.NPM_APP_ID }}
+          client-id: ${{ secrets.NPM_APP_ID }}
           private-key: ${{ secrets.NPM_APP_PRIVATE_KEY }}
 
       - name: Publish package

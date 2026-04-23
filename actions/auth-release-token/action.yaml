@@ -4,8 +4,8 @@ description: >
   Uses the org-level GitHub App credentials. Single source of truth for release download auth.
 
 inputs:
-  app-id:
-    description: GitHub App ID (from org secret)
+  client-id:
+    description: GitHub App client ID (from org secret)
     required: true
   private-key:
     description: GitHub App private key PEM (from org secret)
@@ -27,7 +27,7 @@ runs:
       id: generate
       uses: actions/create-github-app-token@v3
       with:
-        app-id: ${{ inputs.app-id }}
+        client-id: ${{ inputs.client-id }}
         private-key: ${{ inputs.private-key }}
         owner: credova
         repositories: ${{ inputs.repositories }}

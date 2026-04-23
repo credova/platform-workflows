@@ -203,7 +203,7 @@ jobs:
         id: token
         uses: credova/platform-workflows/actions/auth-release-token@master
         with:
-          app-id: ${{ secrets.RELEASE_APP_ID }}
+          client-id: ${{ secrets.RELEASE_APP_ID }}
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
 
   # --- Tests (only when language is set, skipped for hotfix) ---

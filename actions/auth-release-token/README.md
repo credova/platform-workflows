@@ -8,7 +8,7 @@ Generates a short-lived GitHub token scoped to specific repositories for release
 
 | Input          | Required | Default | Description                                                        |
 | -------------- | -------- | ------- | ------------------------------------------------------------------ |
-| `app-id`       | Yes      | -       | GitHub App ID (from org secret `RELEASE_APP_ID`)                   |
+| `client-id`    | Yes      | -       | GitHub App client ID (from org secret `RELEASE_APP_ID`)            |
 | `private-key`  | Yes      | -       | GitHub App private key (from org secret `RELEASE_APP_PRIVATE_KEY`) |
 | `repositories` | No       | `pctl`  | Comma-separated repos to scope the token to                        |
 
@@ -35,7 +35,7 @@ jobs:
         id: release-token
         uses: ./actions/auth-release-token
         with:
-          app-id: ${{ secrets.RELEASE_APP_ID }}
+          client-id: ${{ secrets.RELEASE_APP_ID }}
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
 
       - name: Install pctl

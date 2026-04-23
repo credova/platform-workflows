@@ -205,7 +205,7 @@ jobs:
         id: token
         uses: credova/platform-workflows/actions/auth-release-token@master
         with:
-          app-id: ${{ secrets.RELEASE_APP_ID }}
+          client-id: ${{ secrets.RELEASE_APP_ID }}
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
 
   # --- Tests (skipped for hotfix) ---
@@ -219,7 +219,7 @@ jobs:
         id: cross-repo-token
         uses: actions/create-github-app-token@v3
         with:
-          app-id: ${{ secrets.RELEASE_DOWNLOADER_APP_ID }}
+          client-id: ${{ secrets.RELEASE_DOWNLOADER_APP_ID }}
           private-key: ${{ secrets.RELEASE_DOWNLOADER_APP_PRIVATE_KEY }}
           owner: credova
           repositories: shared-configs
@@ -263,7 +263,7 @@ jobs:
         id: cross-repo-token
         uses: actions/create-github-app-token@v3
         with:
-          app-id: ${{ secrets.RELEASE_DOWNLOADER_APP_ID }}
+          client-id: ${{ secrets.RELEASE_DOWNLOADER_APP_ID }}
           private-key: ${{ secrets.RELEASE_DOWNLOADER_APP_PRIVATE_KEY }}
           owner: credova
           repositories: shared-configs
@@ -303,7 +303,7 @@ jobs:
         id: homebrew-token
         uses: actions/create-github-app-token@v3
         with:
-          app-id: ${{ secrets.HOMEBREW_PUBLISHER_APP_ID }}
+          client-id: ${{ secrets.HOMEBREW_PUBLISHER_APP_ID }}
           private-key: ${{ secrets.HOMEBREW_PUBLISHER_APP_PRIVATE_KEY }}
           owner: credova
           repositories: homebrew-tap
