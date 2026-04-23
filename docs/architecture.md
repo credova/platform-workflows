@@ -21,7 +21,7 @@ reusable workflow (deploy.yaml)
 - **On rails** - smart defaults handle conflicts automatically (e.g. enabling WarpBuild cache auto-disables built-in Go/Node caches)
 - **Feature flags, not separate workflows** - one `pull-request.yaml`, one `deploy.yaml` with boolean toggles (`container`, `deploy`, `hotfix`, `cache`)
 - **Self-contained modules** - each composite handles its own auth, dependencies, and setup
-- **One interface, hidden internals** - swap trivy for something else, update one composite
+- **One interface, hidden internals** - swap grype for something else, update one composite
 - **Zero PATs** - all auth uses GitHub Apps, GITHUB_TOKEN, or OIDC (Workload Identity Federation)
 - **WarpBuild-first** - all workflows default to WarpBuild runners, with opt-in Docker Builders and dependency caching
 

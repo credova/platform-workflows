@@ -679,6 +679,11 @@ Deploy also requires: `RELEASE_APP_ID`, `RELEASE_APP_PRIVATE_KEY`.
 How the two layers connect: reusable workflows are the public interface, composite actions are internal building blocks.
 
 ```mermaid
+---
+config:
+  layout: elk
+  theme: neo-dark
+---
 graph LR
     subgraph "Consuming Repo"
         PR["pull-request.yaml"]
@@ -686,28 +691,10 @@ graph LR
         HOT["deploy-hotfix.yaml"]
     end
 
-    subgraph "Language-Specific Workflows (Recommended)"
-        GOPR["go-pull-request.yaml"]
-        GODP["go-deploy.yaml"]
-        NODEPR["node-pull-request.yaml"]
-        NODEDP["node-deploy.yaml"]
-        NETPR["dotnet-pull-request.yaml"]
-        NETDP["dotnet-deploy.yaml"]
-        KTPR["kotlin-pull-request.yaml"]
-        KTDP["kotlin-deploy.yaml"]
-        PHPPR["php-pull-request.yaml"]
-        PHPDP["php-deploy.yaml"]
-        PYPR["python-pull-request.yaml"]
-        PYDP["python-deploy.yaml"]
-        RBPR["ruby-pull-request.yaml"]
-        RBDP["ruby-deploy.yaml"]
-        SR["shared-release.yaml"]
-        DAM["dependabot-auto-merge.yaml"]
-    end
-
-    subgraph "Generic Workflows (Escape Hatch)"
-        PRW["pull-request.yaml"]
-        DW["deploy.yaml"]
+    subgraph "Reusable Workflows"
+        LSW["go/node/kotlin/python/ruby/dotnet/php\n-pull-request.yaml\n-deploy.yaml"]
+        PRW["pull-request.yaml\n(generic)"]
+        DW["deploy.yaml\n(generic)"]
     end
 
     subgraph "Composite Actions"
@@ -724,16 +711,12 @@ graph LR
         SS["secrets-setup"]
     end
 
-    PR -->|"uses:"| GOPR & NODEPR & NETPR & KTPR & PHPPR & PYPR & RBPR
-    PR -->|"uses: (escape hatch)"| PRW
-    DEP -->|"uses:"| GODP & NODEDP & NETDP & KTDP & PHPDP & PYDP & RBDP
-    DEP -->|"uses: (escape hatch)"| DW
-    HOT -->|"uses: hotfix: true"| DW
+    PR --> LSW & PRW
+    DEP --> LSW & DW
+    HOT -->|"hotfix: true"| DW
 
-    GOPR & NODEPR & NETPR & KTPR & PHPPR & PYPR & RBPR --> SL & SEC & CTR & CMP
-    GODP & NODEDP & NETDP & KTDP & PHPDP & PYDP & RBDP --> SL & CTR & DPL & ART & IT & NTF
-    PRW --> SL & SEC & CTR & CMP
-    DW --> SL & CTR & DPL & ART & IT & NTF
+    LSW & PRW --> SL & SEC & CTR & CMP
+    LSW & DW --> DPL & ART & IT & NTF
     CTR --> AG & SEC
     DPL --> AG & IP
     NTF --> IP
@@ -749,6 +732,11 @@ graph LR
 Jobs run with parallel starts where possible. Dashed borders = conditional (skipped when toggled off).
 
 ```mermaid
+---
+config:
+  layout: elk
+  theme: neo-dark
+---
 flowchart TD
     START(["PR opened / updated"])
 
@@ -788,6 +776,11 @@ flowchart TD
 Merge to master triggers the full pipeline. Approval gates are GitHub Environments.
 
 ```mermaid
+---
+config:
+  layout: elk
+  theme: neo-dark
+---
 flowchart TD
     START(["Push to master"])
 
@@ -850,6 +843,11 @@ flowchart TD
 Tag push with `hotfix: true`. Skips tests and staging — straight to build → production.
 
 ```mermaid
+---
+config:
+  layout: elk
+  theme: neo-dark
+---
 flowchart TD
     START(["Tag push v*"])
 
@@ -892,6 +890,11 @@ flowchart TD
 For Go repos using mise and GoReleaser. Three parallel checks, then optional release.
 
 ```mermaid
+---
+config:
+  layout: elk
+  theme: neo-dark
+---
 flowchart TD
     START(["PR or push"])
 
@@ -932,6 +935,11 @@ All four jobs are independently toggleable. GoReleaser waits for the other three
 The most complex action — handles the full image lifecycle with multiple modes.
 
 ```mermaid
+---
+config:
+  layout: elk
+  theme: neo-dark
+---
 flowchart TD
     IN(["container action called"])
 
@@ -982,6 +990,11 @@ flowchart TD
 Two-phase scanning. Phase 1 scans source code (`dir:.`), phase 2 scans container images (`docker:<ref>`).
 
 ```mermaid
+---
+config:
+  layout: elk
+  theme: neo-dark
+---
 flowchart TD
     IN(["security action called"])
 
@@ -1033,6 +1046,11 @@ flowchart TD
 Deploys to Cloud Run via pctl. Self-contained — handles its own auth.
 
 ```mermaid
+---
+config:
+  layout: elk
+  theme: neo-dark
+---
 flowchart TD
     IN(["deployment action called"])
 

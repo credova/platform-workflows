@@ -41,9 +41,29 @@ That's it. Security scanning, compliance checks, container build, and deployment
 
 ## Workflows
 
+### Generic
+
 - **pull-request.yaml** - PR to master: security > test > build > compliance
 - **deploy.yaml** - push to master: test > build > staging > production > release
 - **deploy.yaml** (hotfix) - tag push: build > [canary] > approve > production > release
+
+### Language-specific
+
+| Workflow | PR                         | Deploy               |
+| -------- | -------------------------- | -------------------- |
+| Go       | `go-pull-request.yaml`     | `go-deploy.yaml`     |
+| Node.js  | `node-pull-request.yaml`   | `node-deploy.yaml`   |
+| Kotlin   | `kotlin-pull-request.yaml` | `kotlin-deploy.yaml` |
+| Python   | `python-pull-request.yaml` | `python-deploy.yaml` |
+| Ruby     | `ruby-pull-request.yaml`   | `ruby-deploy.yaml`   |
+| .NET     | `dotnet-pull-request.yaml` | `dotnet-deploy.yaml` |
+| PHP      | `php-pull-request.yaml`    | `php-deploy.yaml`    |
+
+### Other
+
+- **go.yaml** - Go repos with mise + GoReleaser (lint, security, test, release)
+- **shared-release.yaml** - package publishing (npm, NuGet) with edge/semantic release modes
+- **dependabot-auto-merge.yaml** - auto-merge Dependabot PRs
 
 ## Key Features
 
@@ -56,16 +76,18 @@ That's it. Security scanning, compliance checks, container build, and deployment
 
 ## Actions
 
-| Action                                    | Description                                                         |
-| ----------------------------------------- | ------------------------------------------------------------------- |
-| [compliance](actions/compliance/)         | Shortcut ticket reference check, automated PR skip                  |
-| [container](actions/container/)           | Build, scan, push, retag - full container lifecycle                 |
-| [deployment](actions/deployment/)         | Cloud Run deploy via pctl (deploy, promote, rollback)               |
-| [increment-tag](actions/increment-tag/)   | Semantic version tag incrementor                                    |
-| [notification](actions/notification/)     | Slack notifications via pctl                                        |
-| [secrets-setup](actions/secrets-setup/)   | GCP Secret Manager loading via mise + fnox                          |
-| [security](actions/security/)             | Trivy package scan + OpenGrep static analysis                       |
-| [setup-language](actions/setup-language/) | Multi-language runtime setup (Go, Node, Kotlin, Python, Ruby, .NET) |
+| Action                                    | Description                                                          |
+| ----------------------------------------- | -------------------------------------------------------------------- |
+| [compliance](actions/compliance/)         | Shortcut ticket reference check, automated PR skip                   |
+| [container](actions/container/)           | Build, scan, push, retag - full container lifecycle                  |
+| [deployment](actions/deployment/)         | Cloud Run deploy via pctl (deploy, promote, rollback)                |
+| [increment-tag](actions/increment-tag/)   | Semantic version tag incrementor                                     |
+| [notification](actions/notification/)     | Slack notifications via pctl                                         |
+| [secrets-setup](actions/secrets-setup/)   | GCP Secret Manager loading via mise + fnox                           |
+| [security](actions/security/)             | Syft + Grype vuln scan, Grant license scan, OpenGrep static analysis |
+| [run-job](actions/run-job/)               | Deploy and execute a Cloud Run Job                                   |
+| [setup-language](actions/setup-language/) | Multi-language runtime setup (Go, Node, Kotlin, Python, Ruby, .NET)  |
+| [terrateam](actions/terrateam/)           | Terrateam composite for Pulumi/Terraform repos                       |
 
 Internal actions (called by workflows, not directly by teams):
 

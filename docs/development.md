@@ -20,7 +20,7 @@ platform-workflows/
 │   ├── install-pctl/           # INTERNAL - pctl binary installer
 │   ├── notification/           # Slack notifications via pctl
 │   ├── secrets-setup/          # GCP Secret Manager via fnox
-│   ├── security/               # Trivy + OpenGrep scanning
+│   ├── security/               # syft + grype + grant + opengrep scanning
 │   └── setup-language/         # Runtime setup + WarpBuild dep caching
 ├── scripts/                    # Shell scripts (called by actions)
 │   ├── check-shortcut-ticket.sh  # Shortcut ticket pattern matching
