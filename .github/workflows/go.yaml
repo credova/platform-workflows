@@ -270,7 +270,7 @@ jobs:
 
       - name: Authenticate to GCP
         if: startsWith(github.ref, 'refs/tags/v') && inputs.workload-identity-provider != ''
-        uses: ./actions/auth-gcp
+        uses: credova/platform-workflows/actions/auth-gcp@master
         with:
           project-id: ${{ inputs.project-id }}
           workload-identity-provider: ${{ inputs.workload-identity-provider }}

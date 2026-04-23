@@ -337,7 +337,7 @@ jobs:
       - name: Compute next version
         if: steps.bump.outputs.has-changes == 'true'
         id: version
-        uses: ./actions/increment-tag
+        uses: credova/platform-workflows/actions/increment-tag@master
         with:
           bump: ${{ steps.bump.outputs.bump }}
           prefix: ${{ inputs.tag-prefix }}
@@ -436,7 +436,7 @@ jobs:
 
       - name: Compute next version
         id: version
-        uses: ./actions/increment-tag
+        uses: credova/platform-workflows/actions/increment-tag@master
         with:
           bump: ${{ github.event.inputs.bump || 'patch' }}
           prefix: ${{ inputs.tag-prefix }}

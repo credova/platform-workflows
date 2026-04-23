@@ -1,0 +1,43 @@
+name: parse-images
+description: Parse image/images inputs into a JSON matrix for strategy.matrix.include
+
+inputs:
+  image:
+    description: "Single image - name:dockerfile or just name (defaults to ./Dockerfile)"
+    required: false
+    default: ""
+  images:
+    description: "Multi-image YAML list with name, dockerfile, optional target, context, platform"
+    required: false
+    default: ""
+  container:
+    description: Whether container builds are enabled
+    required: false
+    default: "true"
+  platform:
+    description: Target platform for single-image builds
+    required: false
+    default: linux/amd64
+  repo-name:
+    description: Fallback image name (repository name)
+    required: false
+    default: ""
+
+outputs:
+  image-matrix:
+    description: JSON array for strategy.matrix.include
+    value: ${{ steps.parse.outputs.image-matrix }}
+
+runs:
+  using: composite
+  steps:
+    - name: Parse image inputs
+      id: parse
+      shell: bash
+      env:
+        IMAGE: ${{ inputs.image }}
+        IMAGES: ${{ inputs.images }}
+        CONTAINER: ${{ inputs.container }}
+        PLATFORM: ${{ inputs.platform }}
+        REPO_NAME: ${{ inputs.repo-name }}
+      run: bash "${{ github.action_path }}/../../scripts/parse-images.sh"

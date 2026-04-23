@@ -122,14 +122,13 @@ jobs:
 
       - name: Parse image inputs
         id: parse
-        env:
-          IMAGE: ${{ inputs.image }}
-          IMAGES: ${{ inputs.images }}
-          CONTAINER: ${{ inputs.container && 'true' || 'false' }}
-          PLATFORM: ${{ inputs.platform }}
-          REPO_NAME: ${{ github.event.repository.name }}
-        shell: bash
-        run: ./scripts/parse-images.sh
+        uses: credova/platform-workflows/actions/parse-images@master
+        with:
+          image: ${{ inputs.image }}
+          images: ${{ inputs.images }}
+          container: ${{ inputs.container && 'true' || 'false' }}
+          platform: ${{ inputs.platform }}
+          repo-name: ${{ github.event.repository.name }}
 
   # ============================================================
   # LINEAR mode: Lint -> Security -> Test -> Container
@@ -140,7 +139,7 @@ jobs:
     runs-on: ${{ inputs.runner }}
     steps:
       - uses: actions/checkout@v6
-      - uses: ./actions/setup-language
+      - uses: credova/platform-workflows/actions/setup-language@master
         with:
           language: node
           version: ${{ inputs.node-version }}
@@ -169,7 +168,7 @@ jobs:
     runs-on: ${{ inputs.runner }}
     steps:
       - uses: actions/checkout@v6
-      - uses: ./actions/setup-language
+      - uses: credova/platform-workflows/actions/setup-language@master
         with:
           language: node
           version: ${{ inputs.node-version }}
@@ -185,7 +184,7 @@ jobs:
           if mise task ls 2>/dev/null | grep -q '^security '; then
             mise run security
           fi
-      - uses: ./actions/security
+      - uses: credova/platform-workflows/actions/security@master
         with:
           packages: ${{ inputs.security-packages && 'true' || 'false' }}
           licenses: ${{ inputs.security-licenses && 'true' || 'false' }}
@@ -198,7 +197,7 @@ jobs:
     runs-on: ${{ inputs.runner }}
     steps:
       - uses: actions/checkout@v6
-      - uses: ./actions/setup-language
+      - uses: credova/platform-workflows/actions/setup-language@master
         with:
           language: node
           version: ${{ inputs.node-version }}
@@ -232,7 +231,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - name: Build container (${{ matrix.name }})
-        uses: ./actions/container
+        uses: credova/platform-workflows/actions/container@master
         with:
           name: ${{ matrix.name }}
           dockerfile: ${{ matrix.dockerfile }}
@@ -253,7 +252,7 @@ jobs:
     runs-on: ${{ inputs.runner }}
     steps:
       - uses: actions/checkout@v6
-      - uses: ./actions/setup-language
+      - uses: credova/platform-workflows/actions/setup-language@master
         with:
           language: node
           version: ${{ inputs.node-version }}
@@ -281,7 +280,7 @@ jobs:
     runs-on: ${{ inputs.runner }}
     steps:
       - uses: actions/checkout@v6
-      - uses: ./actions/setup-language
+      - uses: credova/platform-workflows/actions/setup-language@master
         with:
           language: node
           version: ${{ inputs.node-version }}
@@ -297,7 +296,7 @@ jobs:
           if mise task ls 2>/dev/null | grep -q '^security '; then
             mise run security
           fi
-      - uses: ./actions/security
+      - uses: credova/platform-workflows/actions/security@master
         with:
           packages: ${{ inputs.security-packages && 'true' || 'false' }}
           licenses: ${{ inputs.security-licenses && 'true' || 'false' }}
@@ -309,7 +308,7 @@ jobs:
     runs-on: ${{ inputs.runner }}
     steps:
       - uses: actions/checkout@v6
-      - uses: ./actions/setup-language
+      - uses: credova/platform-workflows/actions/setup-language@master
         with:
           language: node
           version: ${{ inputs.node-version }}
@@ -343,7 +342,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - name: Build container (${{ matrix.name }})
-        uses: ./actions/container
+        uses: credova/platform-workflows/actions/container@master
         with:
           name: ${{ matrix.name }}
           dockerfile: ${{ matrix.dockerfile }}
@@ -364,7 +363,7 @@ jobs:
     runs-on: ${{ inputs.runner }}
     steps:
       - uses: actions/checkout@v6
-      - uses: ./actions/setup-language
+      - uses: credova/platform-workflows/actions/setup-language@master
         with:
           language: node
           version: ${{ inputs.node-version }}
@@ -380,7 +379,7 @@ jobs:
           if mise task ls 2>/dev/null | grep -q '^security '; then
             mise run security
           fi
-      - uses: ./actions/security
+      - uses: credova/platform-workflows/actions/security@master
         with:
           packages: ${{ inputs.security-packages && 'true' || 'false' }}
           licenses: ${{ inputs.security-licenses && 'true' || 'false' }}
@@ -393,7 +392,7 @@ jobs:
     runs-on: ${{ inputs.runner }}
     steps:
       - uses: actions/checkout@v6
-      - uses: ./actions/setup-language
+      - uses: credova/platform-workflows/actions/setup-language@master
         with:
           language: node
           version: ${{ inputs.node-version }}
@@ -422,7 +421,7 @@ jobs:
     runs-on: ${{ inputs.runner }}
     steps:
       - uses: actions/checkout@v6
-      - uses: ./actions/setup-language
+      - uses: credova/platform-workflows/actions/setup-language@master
         with:
           language: node
           version: ${{ inputs.node-version }}
@@ -456,7 +455,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - name: Build container (${{ matrix.name }})
-        uses: ./actions/container
+        uses: credova/platform-workflows/actions/container@master
         with:
           name: ${{ matrix.name }}
           dockerfile: ${{ matrix.dockerfile }}
@@ -490,6 +489,6 @@ jobs:
     runs-on: ${{ inputs.runner }}
     steps:
       - uses: actions/checkout@v6
-      - uses: ./actions/compliance
+      - uses: credova/platform-workflows/actions/compliance@master
         with:
           ticket: ${{ inputs.compliance-ticket && 'true' || 'false' }}
