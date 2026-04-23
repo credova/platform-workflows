@@ -16,7 +16,7 @@ fi
 
 SEVERITY_LOWER=$(echo "${SEVERITY}" | tr '[:upper:]' '[:lower:]')
 
-GRYPE_ARGS=(sbom.spdx.json --output json --file "${RESULTS_FILE}" --fail-on "${SEVERITY_LOWER}" --only-fixed --update-db)
+GRYPE_ARGS=(sbom.spdx.json --output json --file "${RESULTS_FILE}" --fail-on "${SEVERITY_LOWER}" --only-fixed)
 
 if [ -f .grype.yaml ]; then
   GRYPE_ARGS+=(--config .grype.yaml)
@@ -24,6 +24,9 @@ if [ -f .grype.yaml ]; then
 fi
 
 echo "::group::Grype vulnerability scan (fail-on: ${SEVERITY})"
+
+# Force fresh DB on every run -- prevents stale CVE state from cached runners.
+GRYPE_DB_AUTO_UPDATE=true grype db update || true
 
 GRYPE_EXIT=0
 grype "${GRYPE_ARGS[@]}" || GRYPE_EXIT=$?
