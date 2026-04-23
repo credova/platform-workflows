@@ -1,16 +1,187 @@
 # Usage Guide
 
-Every consuming repo uses the same file names:
+Every consuming repo needs one or two workflow files. Pick the language-specific workflow for your stack.
 
 ```bash
 any-repo/
 └── .github/workflows/
-    ├── pull-request.yaml    # PR validation
+    ├── pull-request.yaml    # PR validation (calls a language-specific or generic workflow)
     ├── deploy.yaml          # merge to master → staging → production
     └── deploy-hotfix.yaml   # tag push → straight to production (hotfix)
 ```
 
 ---
+
+## Language-Specific Workflows (Recommended)
+
+The primary interface to platform-workflows. Each language has a matched pair of reusable workflows: one for PR validation and one for deploy. Pick your language, wire up both files, and you are done.
+
+### Available workflows
+
+| Language | PR Workflow                | Deploy Workflow          | Default version |
+| -------- | -------------------------- | ------------------------ | --------------- |
+| Go       | `go-pull-request.yaml`     | `go-deploy.yaml`         | (from mise)     |
+| Node.js  | `node-pull-request.yaml`   | `node-deploy.yaml`       | `20`            |
+| .NET     | `dotnet-pull-request.yaml` | `dotnet-deploy.yaml`     | `8.0`           |
+| Kotlin   | `kotlin-pull-request.yaml` | `kotlin-deploy.yaml`     | `21`            |
+| PHP      | `php-pull-request.yaml`    | `php-deploy.yaml`        | `8.2`           |
+| Python   | `python-pull-request.yaml` | `python-deploy.yaml`     | `3.12`          |
+| Ruby     | `ruby-pull-request.yaml`   | `ruby-deploy.yaml`       | `3.3`           |
+
+### How it works
+
+Each language workflow uses [mise](https://mise.jdx.dev/) as the default task runner. If your repo has a `mise.toml` with `lint`, `security`, and/or `test` tasks, the workflow picks them up automatically. No extra configuration needed.
+
+For repos not yet on mise, override inputs are available: `lint-command`, `test-command` (all languages except Go, which always uses mise).
+
+### Run-order options
+
+Every language workflow supports a `run-order` input that controls how lint, security, test, and container-build jobs execute:
+
+| Mode | Description |
+| ---- | ----------- |
+| `linear` | Lint -> Security -> Test -> Container build. Fail-fast: the first failure stops the pipeline. Default for most languages. |
+| `parallel` | All jobs run simultaneously. Fastest wall-clock time. Default for Go. |
+| `checks-first` | Security runs first, then lint and test run in parallel, then container build. Good for repos where security is the cheapest gate. |
+
+### Examples
+
+**Go** (PR):
+
+```yaml
+name: Pull Request
+on:
+  pull_request:
+    branches: [master]
+
+jobs:
+  ci:
+    uses: credova/platform-workflows/.github/workflows/go-pull-request.yaml@master
+    secrets: inherit
+```
+
+**Node.js** (PR):
+
+```yaml
+name: Pull Request
+on:
+  pull_request:
+    branches: [master]
+
+jobs:
+  ci:
+    uses: credova/platform-workflows/.github/workflows/node-pull-request.yaml@master
+    secrets: inherit
+```
+
+**.NET** (PR):
+
+```yaml
+name: Pull Request
+on:
+  pull_request:
+    branches: [master]
+
+jobs:
+  ci:
+    uses: credova/platform-workflows/.github/workflows/dotnet-pull-request.yaml@master
+    secrets: inherit
+```
+
+**Kotlin** (PR):
+
+```yaml
+name: Pull Request
+on:
+  pull_request:
+    branches: [master]
+
+jobs:
+  ci:
+    uses: credova/platform-workflows/.github/workflows/kotlin-pull-request.yaml@master
+    secrets: inherit
+```
+
+**PHP** (PR):
+
+```yaml
+name: Pull Request
+on:
+  pull_request:
+    branches: [master]
+
+jobs:
+  ci:
+    uses: credova/platform-workflows/.github/workflows/php-pull-request.yaml@master
+    secrets: inherit
+```
+
+**Python** (PR):
+
+```yaml
+name: Pull Request
+on:
+  pull_request:
+    branches: [master]
+
+jobs:
+  ci:
+    uses: credova/platform-workflows/.github/workflows/python-pull-request.yaml@master
+    secrets: inherit
+```
+
+**Ruby** (PR):
+
+```yaml
+name: Pull Request
+on:
+  pull_request:
+    branches: [master]
+
+jobs:
+  ci:
+    uses: credova/platform-workflows/.github/workflows/ruby-pull-request.yaml@master
+    secrets: inherit
+```
+
+### Shared Release workflow
+
+For SDK and package repos that publish artifacts (npm, NuGet, etc.), use `shared-release.yaml` instead of (or alongside) a deploy workflow. It supports edge and semantic release modes with built-in publishing to npm and NuGet registries.
+
+```yaml
+name: Release
+on:
+  push:
+    branches: [master]
+
+jobs:
+  release:
+    uses: credova/platform-workflows/.github/workflows/shared-release.yaml@master
+    secrets: inherit
+    with:
+      mode: semantic
+      publish-npm: true
+```
+
+### Dependabot auto-merge
+
+For repos using Dependabot, wire up `dependabot-auto-merge.yaml` to automatically merge patch and minor version updates after CI passes.
+
+```yaml
+name: Dependabot Auto-Merge
+on:
+  pull_request:
+
+jobs:
+  auto-merge:
+    uses: credova/platform-workflows/.github/workflows/dependabot-auto-merge.yaml@master
+```
+
+---
+
+## Generic Pull Request Workflow
+
+> **Note:** The following generic workflows are available as escape hatches for repos that don't fit a language-specific workflow. For most repos, use the language-specific workflows above.
 
 ## Pull Request Workflow
 
@@ -29,7 +200,7 @@ on:
 
 jobs:
   ci:
-    uses: credova/platform-workflows/.github/workflows/pull-request.yaml@v1
+    uses: credova/platform-workflows/.github/workflows/pull-request.yaml@master
 ```
 
 ### Service with explicit image
@@ -37,7 +208,7 @@ jobs:
 ```yaml
 jobs:
   ci:
-    uses: credova/platform-workflows/.github/workflows/pull-request.yaml@v1
+    uses: credova/platform-workflows/.github/workflows/pull-request.yaml@master
     with:
       image: api:src/Dockerfile
 ```
@@ -47,7 +218,7 @@ jobs:
 ```yaml
 jobs:
   ci:
-    uses: credova/platform-workflows/.github/workflows/pull-request.yaml@v1
+    uses: credova/platform-workflows/.github/workflows/pull-request.yaml@master
     with:
       images: |
         - name: api
@@ -63,7 +234,7 @@ Some repos need to run language-specific tests in CI in addition to the containe
 ```yaml
 jobs:
   ci:
-    uses: credova/platform-workflows/.github/workflows/pull-request.yaml@v1
+    uses: credova/platform-workflows/.github/workflows/pull-request.yaml@master
     with:
       language: go
       language-version: "1.24"
@@ -76,7 +247,7 @@ Disable the container build. Language setup and tests run instead.
 ```yaml
 jobs:
   ci:
-    uses: credova/platform-workflows/.github/workflows/pull-request.yaml@v1
+    uses: credova/platform-workflows/.github/workflows/pull-request.yaml@master
     with:
       language: go
       language-version: "1.24"
@@ -90,7 +261,7 @@ Override the default test command for your language.
 ```yaml
 jobs:
   ci:
-    uses: credova/platform-workflows/.github/workflows/pull-request.yaml@v1
+    uses: credova/platform-workflows/.github/workflows/pull-request.yaml@master
     with:
       language: go
       language-version: "1.24"
@@ -105,6 +276,7 @@ jobs:
 | Go       | `go`             | `1.24`          | `go test ./...`                           |
 | Node.js  | `node`           | `20`            | `npm ci && npm test`                      |
 | Kotlin   | `kotlin`         | `21`            | `./gradlew test`                          |
+| PHP      | `php`            | `8.2`           | `composer install && vendor/bin/phpunit`  |
 | Python   | `python`         | `3.12`          | `pip install -e ".[test]" && pytest`      |
 | Ruby     | `ruby`           | `3.3`           | `bundle install && bundle exec rake test` |
 | .NET     | `dotnet`         | `8.0`           | `dotnet test`                             |
@@ -128,7 +300,7 @@ permissions:
 
 jobs:
   go:
-    uses: credova/platform-workflows/.github/workflows/go.yaml@v1
+    uses: credova/platform-workflows/.github/workflows/go.yaml@master
     secrets: inherit
     with:
       goreleaser: false
@@ -152,7 +324,7 @@ permissions:
 
 jobs:
   go:
-    uses: credova/platform-workflows/.github/workflows/go.yaml@v1
+    uses: credova/platform-workflows/.github/workflows/go.yaml@master
     secrets: inherit
 ```
 
@@ -232,6 +404,10 @@ mise run docker-test
 
 ---
 
+## Generic Deploy Workflow
+
+> **Note:** The following generic deploy workflow is available as an escape hatch for repos that don't fit a language-specific workflow. For most repos, use the language-specific deploy workflows above (e.g. `node-deploy.yaml`, `dotnet-deploy.yaml`).
+
 ## Deploy Workflow
 
 One workflow handles everything. Same flags as pull-request plus deployment options.
@@ -249,7 +425,7 @@ on:
 
 jobs:
   deploy:
-    uses: credova/platform-workflows/.github/workflows/deploy.yaml@v1
+    uses: credova/platform-workflows/.github/workflows/deploy.yaml@master
     with:
       config-path: deployments/
     secrets:
@@ -262,7 +438,7 @@ jobs:
 ```yaml
 jobs:
   deploy:
-    uses: credova/platform-workflows/.github/workflows/deploy.yaml@v1
+    uses: credova/platform-workflows/.github/workflows/deploy.yaml@master
     with:
       config-path: deployments/
       canary: 30
@@ -278,7 +454,7 @@ Runs tests, creates a tag and GitHub Release. No container, no Cloud Run.
 ```yaml
 jobs:
   deploy:
-    uses: credova/platform-workflows/.github/workflows/deploy.yaml@v1
+    uses: credova/platform-workflows/.github/workflows/deploy.yaml@master
     with:
       language: go
       language-version: "1.24"
@@ -293,7 +469,7 @@ Runs tests, builds container, deploys to Cloud Run.
 ```yaml
 jobs:
   deploy:
-    uses: credova/platform-workflows/.github/workflows/deploy.yaml@v1
+    uses: credova/platform-workflows/.github/workflows/deploy.yaml@master
     with:
       language: go
       language-version: "1.24"
@@ -308,7 +484,7 @@ jobs:
 ```yaml
 jobs:
   deploy:
-    uses: credova/platform-workflows/.github/workflows/deploy.yaml@v1
+    uses: credova/platform-workflows/.github/workflows/deploy.yaml@master
     with:
       config-path: deployments/
       images: |
@@ -337,7 +513,7 @@ on:
 
 jobs:
   hotfix:
-    uses: credova/platform-workflows/.github/workflows/deploy.yaml@v1
+    uses: credova/platform-workflows/.github/workflows/deploy.yaml@master
     with:
       config-path: deployments/
       hotfix: true
@@ -355,7 +531,7 @@ Security scanning and compliance checks are on by default. Opt out explicitly - 
 ```yaml
 jobs:
   ci:
-    uses: credova/platform-workflows/.github/workflows/pull-request.yaml@v1
+    uses: credova/platform-workflows/.github/workflows/pull-request.yaml@master
     with:
       security-code: false       # Skip static analysis
       compliance-ticket: false   # Skip ticket reference check
@@ -385,7 +561,7 @@ Pass your Docker Builder profile name to enable remote builds:
 ```yaml
 jobs:
   ci:
-    uses: credova/platform-workflows/.github/workflows/pull-request.yaml@v1
+    uses: credova/platform-workflows/.github/workflows/pull-request.yaml@master
     with:
       warpbuild-profile: my-docker-builder
 ```
@@ -403,7 +579,7 @@ To use a different runner (e.g. for repos not yet on WarpBuild):
 ```yaml
 jobs:
   ci:
-    uses: credova/platform-workflows/.github/workflows/pull-request.yaml@v1
+    uses: credova/platform-workflows/.github/workflows/pull-request.yaml@master
     with:
       runner: ubuntu-latest
 ```
@@ -434,7 +610,7 @@ Enable `WarpBuilds/cache@v1` for dependency caching. This is a drop-in replaceme
 ```yaml
 jobs:
   ci:
-    uses: credova/platform-workflows/.github/workflows/pull-request.yaml@v1
+    uses: credova/platform-workflows/.github/workflows/pull-request.yaml@master
     with:
       language: go
       language-version: "1.24"
@@ -510,10 +686,28 @@ graph LR
         HOT["deploy-hotfix.yaml"]
     end
 
-    subgraph "Reusable Workflows"
+    subgraph "Language-Specific Workflows (Recommended)"
+        GOPR["go-pull-request.yaml"]
+        GODP["go-deploy.yaml"]
+        NODEPR["node-pull-request.yaml"]
+        NODEDP["node-deploy.yaml"]
+        NETPR["dotnet-pull-request.yaml"]
+        NETDP["dotnet-deploy.yaml"]
+        KTPR["kotlin-pull-request.yaml"]
+        KTDP["kotlin-deploy.yaml"]
+        PHPPR["php-pull-request.yaml"]
+        PHPDP["php-deploy.yaml"]
+        PYPR["python-pull-request.yaml"]
+        PYDP["python-deploy.yaml"]
+        RBPR["ruby-pull-request.yaml"]
+        RBDP["ruby-deploy.yaml"]
+        SR["shared-release.yaml"]
+        DAM["dependabot-auto-merge.yaml"]
+    end
+
+    subgraph "Generic Workflows (Escape Hatch)"
         PRW["pull-request.yaml"]
         DW["deploy.yaml"]
-        GW["go.yaml"]
     end
 
     subgraph "Composite Actions"
@@ -530,10 +724,14 @@ graph LR
         SS["secrets-setup"]
     end
 
-    PR -->|"uses:"| PRW
-    DEP -->|"uses:"| DW
+    PR -->|"uses:"| GOPR & NODEPR & NETPR & KTPR & PHPPR & PYPR & RBPR
+    PR -->|"uses: (escape hatch)"| PRW
+    DEP -->|"uses:"| GODP & NODEDP & NETDP & KTDP & PHPDP & PYDP & RBDP
+    DEP -->|"uses: (escape hatch)"| DW
     HOT -->|"uses: hotfix: true"| DW
 
+    GOPR & NODEPR & NETPR & KTPR & PHPPR & PYPR & RBPR --> SL & SEC & CTR & CMP
+    GODP & NODEDP & NETDP & KTDP & PHPDP & PYDP & RBDP --> SL & CTR & DPL & ART & IT & NTF
     PRW --> SL & SEC & CTR & CMP
     DW --> SL & CTR & DPL & ART & IT & NTF
     CTR --> AG & SEC

@@ -1,0 +1,86 @@
+name: run-job
+description: >
+  Deploy and execute a Cloud Run Job. Handles the common pattern of deploying
+  a container as a Cloud Run Job via pctl, then triggering it with gcloud.
+  Replaces db-migrate and memorystore patterns.
+
+inputs:
+  target:
+    description: "pctl deploy target (e.g. gcp-staging)"
+    required: true
+  config-path:
+    description: "Path to CUE/pctl config for the job (e.g. deployments/migrations.yaml)"
+    required: true
+  tag:
+    description: Image tag to deploy
+    required: false
+    default: ""
+  job-name:
+    description: "Cloud Run Job name to execute (e.g. fp-migrations-staging)"
+    required: true
+  project:
+    description: GCP project ID for job execution
+    required: true
+  region:
+    description: GCP region
+    required: false
+    default: us-east4
+  wait:
+    description: Wait for job completion
+    required: false
+    default: "true"
+  project-id:
+    description: GCP project ID for auth
+    required: true
+  workload-identity-provider:
+    description: Workload Identity Provider resource name
+    required: true
+  service-account:
+    description: Service account email
+    required: false
+    default: ""
+  token:
+    description: GitHub token for pctl download
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Deploy job container
+      uses: ./actions/deployment
+      with:
+        target: ${{ inputs.target }}
+        tag: ${{ inputs.tag }}
+        config-path: ${{ inputs.config-path }}
+        project-id: ${{ inputs.project-id }}
+        workload-identity-provider: ${{ inputs.workload-identity-provider }}
+        token: ${{ inputs.token }}
+
+    - name: Authenticate to GCP
+      uses: google-github-actions/auth@v2
+      with:
+        project_id: ${{ inputs.project-id }}
+        workload_identity_provider: ${{ inputs.workload-identity-provider }}
+        service_account: ${{ inputs.service-account }}
+
+    - name: Setup gcloud
+      uses: google-github-actions/setup-gcloud@v3
+
+    - name: Execute Cloud Run Job
+      shell: bash
+      env:
+        JOB_NAME: ${{ inputs.job-name }}
+        PROJECT: ${{ inputs.project }}
+        REGION: ${{ inputs.region }}
+        WAIT: ${{ inputs.wait }}
+      run: |
+        WAIT_FLAG=""
+        if [ "${WAIT}" = "true" ]; then
+          WAIT_FLAG="--wait"
+        fi
+        echo "Executing Cloud Run Job: ${JOB_NAME} in ${PROJECT} (${REGION})"
+        gcloud run jobs execute \
+          --region "${REGION}" \
+          --project "${PROJECT}" \
+          "${JOB_NAME}" \
+          ${WAIT_FLAG}

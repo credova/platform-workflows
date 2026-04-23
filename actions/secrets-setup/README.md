@@ -15,7 +15,7 @@ Load secrets from GCP Secret Manager into the workflow environment via mise + fn
 ### Load dev secrets
 
 ```yaml
-- uses: credova/platform-workflows/actions/secrets-setup@v1
+- uses: credova/platform-workflows/actions/secrets-setup@master
   with:
     profile: dev
     project-id: psq-shd-ops
@@ -25,7 +25,7 @@ Load secrets from GCP Secret Manager into the workflow environment via mise + fn
 ### Load production secrets
 
 ```yaml
-- uses: credova/platform-workflows/actions/secrets-setup@v1
+- uses: credova/platform-workflows/actions/secrets-setup@master
   with:
     profile: prd
     project-id: psq-shd-ops

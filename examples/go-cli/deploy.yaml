@@ -1,0 +1,18 @@
+# Example: Go CLI with GoReleaser
+name: Build and Release
+on:
+  push:
+    branches: [master]
+    tags: ["v*"]
+permissions:
+  contents: write
+  packages: write
+  id-token: write
+jobs:
+  release:
+    uses: credova/platform-workflows/.github/workflows/go-deploy.yaml@master
+    secrets: inherit
+    with:
+      container: false
+      deploy: false
+      goreleaser: true

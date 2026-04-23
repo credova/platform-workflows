@@ -1,0 +1,39 @@
+# Example: Terrateam workflow for Pulumi/Terraform repos
+name: 'Terrateam Workflow'
+on:
+  workflow_dispatch:
+    inputs:
+      work-token:
+        description: 'Work Token'
+        required: true
+      api-base-url:
+        description: 'API Base URL'
+      environment:
+        description: 'Environment in which to run the action'
+        type: environment
+      runs_on:
+        description: 'runs-on configuration'
+        type: string
+        default: '"warp-ubuntu-2204-x64-2x"'
+jobs:
+  terrateam:
+    permissions:
+      id-token: write
+      contents: read
+    runs-on: ${{ fromJSON(github.event.inputs.runs_on) }}
+    timeout-minutes: 1440
+    name: Terrateam Action
+    environment: '${{ github.event.inputs.environment }}'
+    steps:
+      - uses: credova/platform-workflows/actions/terrateam@master
+        with:
+          project-id: fxt-ops-shd
+          workload-identity-provider: projects/640813936102/locations/global/workloadIdentityPools/github-actions/providers/github
+          service-account: repo-YOUR-REPO-access@fxt-ops-shd.iam.gserviceaccount.com
+          work-token: ${{ github.event.inputs.work-token }}
+          api-base-url: ${{ github.event.inputs.api-base-url }}
+          github-app-id: ${{ vars.IAC_TOKEN_APP_ID }}
+          github-app-private-key: ${{ secrets.IAC_TOKEN_APP_PRIVATE_KEY }}
+        env:
+          SECRETS_CONTEXT: ${{ toJson(secrets) }}
+          VARIABLES_CONTEXT: ${{ toJson(vars) }}

@@ -29,7 +29,7 @@ secrets:
 
 jobs:
   deploy:
-    runs-on: ubuntu-latest
+    runs-on: warp-ubuntu-2204-x64-2x
     steps:
       - name: Get release download token
         id: release-token

@@ -1,0 +1,518 @@
+name: "Shared: Release"
+
+on:
+  workflow_call:
+    inputs:
+      # Release mode
+      mode:
+        description: "Release mode: edge (default) or semantic"
+        type: string
+        required: false
+        default: edge
+
+      # Package publishing
+      publish-npm:
+        description: Publish to npm registry
+        type: boolean
+        required: false
+        default: false
+      npm-package-dir:
+        description: "Path(s) to npm package dir (comma-separated for multi-package)"
+        type: string
+        required: false
+        default: "."
+      publish-nuget:
+        description: Publish NuGet package
+        type: boolean
+        required: false
+        default: false
+      nuget-project:
+        description: "Path to .csproj or directory for NuGet publish"
+        type: string
+        required: false
+        default: "."
+
+      # Release assets
+      release-assets:
+        description: "Glob pattern for assets to attach to the release (e.g. '*.zip')"
+        type: string
+        required: false
+        default: ""
+
+      # Version
+      tag-prefix:
+        description: Tag prefix
+        type: string
+        required: false
+        default: v
+
+      # Language versions (for package publish steps)
+      node-version:
+        description: Node.js version (for npm publish)
+        type: string
+        required: false
+        default: "20"
+      dotnet-version:
+        description: .NET version (for NuGet publish)
+        type: string
+        required: false
+        default: "8.0"
+
+      # Runner
+      runner:
+        description: "GitHub Actions runner label"
+        type: string
+        required: false
+        default: warp-ubuntu-2204-x64-2x
+
+jobs:
+  # ============================================================
+  # EDGE MODE: Push to master -> edge prerelease
+  # ============================================================
+  edge-release:
+    if: inputs.mode == 'edge' && github.event_name == 'push' && !startsWith(github.ref, 'refs/tags/')
+    runs-on: ${{ inputs.runner }}
+    permissions:
+      contents: write
+      id-token: write
+      packages: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Compute edge version
+        id: version
+        shell: bash
+        env:
+          PREFIX: ${{ inputs.tag-prefix }}
+        run: |
+          # Find latest stable tag
+          LATEST_STABLE=$(git tag -l "${PREFIX}[0-9]*" --sort=-v:refname | grep -v -E '(edge|alpha|beta|rc)\.' | head -1)
+          if [ -z "${LATEST_STABLE}" ]; then
+            LATEST_STABLE="${PREFIX}0.1.0"
+          fi
+
+          # Strip prefix to get version
+          BASE_VERSION="${LATEST_STABLE#${PREFIX}}"
+
+          # Increment patch for edge base
+          IFS='.' read -r MAJOR MINOR PATCH <<< "${BASE_VERSION}"
+          NEXT_PATCH=$((PATCH + 1))
+          EDGE_BASE="${MAJOR}.${MINOR}.${NEXT_PATCH}"
+
+          # Find latest edge tag for this base and increment counter
+          LATEST_EDGE=$(git tag -l "${PREFIX}${EDGE_BASE}-edge.*" --sort=-v:refname | head -1)
+          if [ -z "${LATEST_EDGE}" ]; then
+            EDGE_NUM=1
+          else
+            EDGE_NUM=$(echo "${LATEST_EDGE}" | grep -oE 'edge\.[0-9]+' | grep -oE '[0-9]+')
+            EDGE_NUM=$((EDGE_NUM + 1))
+          fi
+
+          EDGE_TAG="${PREFIX}${EDGE_BASE}-edge.${EDGE_NUM}"
+          echo "tag=${EDGE_TAG}" >> "$GITHUB_OUTPUT"
+          echo "version=${EDGE_BASE}-edge.${EDGE_NUM}" >> "$GITHUB_OUTPUT"
+          echo "Edge version: ${EDGE_TAG}"
+
+      - name: Create edge tag
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          git tag "${TAG}"
+          git push origin "${TAG}"
+
+      - name: Create GitHub prerelease
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          gh release create "${TAG}" \
+            --title "${TAG}" \
+            --generate-notes \
+            --prerelease
+
+      - name: Setup Node.js
+        if: inputs.publish-npm
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ inputs.node-version }}
+          registry-url: https://registry.npmjs.org
+
+      - name: Publish npm packages (edge)
+        if: inputs.publish-npm
+        shell: bash
+        env:
+          NODE_AUTH_TOKEN: ${{ github.token }}
+          NPM_DIRS: ${{ inputs.npm-package-dir }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          IFS=',' read -ra DIRS <<< "${NPM_DIRS}"
+          for dir in "${DIRS[@]}"; do
+            dir=$(echo "${dir}" | xargs)
+            echo "Publishing ${dir} as edge..."
+            cd "${dir}"
+            npm version "${VERSION}" --no-git-tag-version --allow-same-version 2>/dev/null || true
+            npm publish --tag edge --provenance --access public
+            cd -
+          done
+
+      - name: Setup .NET
+        if: inputs.publish-nuget
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: ${{ inputs.dotnet-version }}
+
+      - name: Publish NuGet package (prerelease)
+        if: inputs.publish-nuget
+        shell: bash
+        env:
+          NUGET_AUTH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          dotnet pack "${{ inputs.nuget-project }}" \
+            -c Release \
+            -p:PackageVersion="${VERSION}" \
+            -o ./nupkg
+          dotnet nuget push ./nupkg/*.nupkg \
+            --source "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json" \
+            --api-key "${NUGET_AUTH_TOKEN}"
+
+  # ============================================================
+  # EDGE MODE: Tag push -> full release
+  # ============================================================
+  edge-full-release:
+    if: inputs.mode == 'edge' && startsWith(github.ref, 'refs/tags/')
+    runs-on: ${{ inputs.runner }}
+    permissions:
+      contents: write
+      id-token: write
+      packages: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Extract version from tag
+        id: version
+        shell: bash
+        env:
+          PREFIX: ${{ inputs.tag-prefix }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          VERSION="${REF_NAME#${PREFIX}}"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tag=${REF_NAME}" >> "$GITHUB_OUTPUT"
+          echo "Full release version: ${VERSION}"
+
+      - name: Create GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          gh release create "${TAG}" \
+            --title "${TAG}" \
+            --generate-notes
+
+      - name: Upload release assets
+        if: inputs.release-assets != ''
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+          PATTERN: ${{ inputs.release-assets }}
+        run: |
+          for file in ${PATTERN}; do
+            if [ -f "${file}" ]; then
+              gh release upload "${TAG}" "${file}" --clobber
+            fi
+          done
+
+      - name: Setup Node.js
+        if: inputs.publish-npm
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ inputs.node-version }}
+          registry-url: https://registry.npmjs.org
+
+      - name: Publish npm packages (latest)
+        if: inputs.publish-npm
+        shell: bash
+        env:
+          NODE_AUTH_TOKEN: ${{ github.token }}
+          NPM_DIRS: ${{ inputs.npm-package-dir }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          IFS=',' read -ra DIRS <<< "${NPM_DIRS}"
+          for dir in "${DIRS[@]}"; do
+            dir=$(echo "${dir}" | xargs)
+            echo "Publishing ${dir} as latest..."
+            cd "${dir}"
+            npm version "${VERSION}" --no-git-tag-version --allow-same-version 2>/dev/null || true
+            npm publish --provenance --access public
+            cd -
+          done
+
+      - name: Setup .NET
+        if: inputs.publish-nuget
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: ${{ inputs.dotnet-version }}
+
+      - name: Publish NuGet package (stable)
+        if: inputs.publish-nuget
+        shell: bash
+        env:
+          NUGET_AUTH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          dotnet pack "${{ inputs.nuget-project }}" \
+            -c Release \
+            -p:PackageVersion="${VERSION}" \
+            -o ./nupkg
+          dotnet nuget push ./nupkg/*.nupkg \
+            --source "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json" \
+            --api-key "${NUGET_AUTH_TOKEN}"
+
+  # ============================================================
+  # SEMANTIC MODE: Push to master -> parse commits, auto release
+  # ============================================================
+  semantic-release:
+    if: inputs.mode == 'semantic' && github.event_name == 'push' && !startsWith(github.ref, 'refs/tags/')
+    runs-on: ${{ inputs.runner }}
+    permissions:
+      contents: write
+      id-token: write
+      packages: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Determine version bump
+        id: bump
+        shell: bash
+        env:
+          PREFIX: ${{ inputs.tag-prefix }}
+        run: |
+          LATEST_TAG=$(git tag -l "${PREFIX}[0-9]*" --sort=-v:refname | grep -v -E '(edge|alpha|beta|rc)\.' | head -1)
+          if [ -z "${LATEST_TAG}" ]; then
+            echo "bump=minor" >> "$GITHUB_OUTPUT"
+            echo "has-changes=true" >> "$GITHUB_OUTPUT"
+            echo "No previous tags, defaulting to minor bump"
+            exit 0
+          fi
+
+          COMMITS=$(git log "${LATEST_TAG}..HEAD" --pretty=format:"%s%n%b" 2>/dev/null || true)
+          if [ -z "${COMMITS}" ]; then
+            echo "has-changes=false" >> "$GITHUB_OUTPUT"
+            echo "No commits since ${LATEST_TAG}, skipping release"
+            exit 0
+          fi
+
+          echo "has-changes=true" >> "$GITHUB_OUTPUT"
+
+          # Breaking changes -> major
+          if echo "${COMMITS}" | grep -qE '(BREAKING CHANGE|^[a-z]+(\(.+\))?!:)'; then
+            echo "bump=major" >> "$GITHUB_OUTPUT"
+            echo "Detected: major (breaking change)"
+            exit 0
+          fi
+
+          # Features -> minor
+          if echo "${COMMITS}" | grep -qE '^feat(\(.+\))?:'; then
+            echo "bump=minor" >> "$GITHUB_OUTPUT"
+            echo "Detected: minor (new feature)"
+            exit 0
+          fi
+
+          # Everything else -> patch
+          echo "bump=patch" >> "$GITHUB_OUTPUT"
+          echo "Detected: patch"
+
+      - name: Compute next version
+        if: steps.bump.outputs.has-changes == 'true'
+        id: version
+        uses: ./actions/increment-tag
+        with:
+          bump: ${{ steps.bump.outputs.bump }}
+          prefix: ${{ inputs.tag-prefix }}
+
+      - name: Create tag and GitHub Release
+        if: steps.bump.outputs.has-changes == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          git tag "${TAG}"
+          git push origin "${TAG}"
+          gh release create "${TAG}" \
+            --title "${TAG}" \
+            --generate-notes
+
+      - name: Upload release assets
+        if: steps.bump.outputs.has-changes == 'true' && inputs.release-assets != ''
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+          PATTERN: ${{ inputs.release-assets }}
+        run: |
+          for file in ${PATTERN}; do
+            if [ -f "${file}" ]; then
+              gh release upload "${TAG}" "${file}" --clobber
+            fi
+          done
+
+      - name: Setup Node.js
+        if: steps.bump.outputs.has-changes == 'true' && inputs.publish-npm
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ inputs.node-version }}
+          registry-url: https://registry.npmjs.org
+
+      - name: Publish npm packages
+        if: steps.bump.outputs.has-changes == 'true' && inputs.publish-npm
+        shell: bash
+        env:
+          NODE_AUTH_TOKEN: ${{ github.token }}
+          NPM_DIRS: ${{ inputs.npm-package-dir }}
+          VERSION: ${{ steps.version.outputs.tag }}
+          PREFIX: ${{ inputs.tag-prefix }}
+        run: |
+          VERSION="${VERSION#${PREFIX}}"
+          IFS=',' read -ra DIRS <<< "${NPM_DIRS}"
+          for dir in "${DIRS[@]}"; do
+            dir=$(echo "${dir}" | xargs)
+            echo "Publishing ${dir}..."
+            cd "${dir}"
+            npm version "${VERSION}" --no-git-tag-version --allow-same-version 2>/dev/null || true
+            npm publish --provenance --access public
+            cd -
+          done
+
+      - name: Setup .NET
+        if: steps.bump.outputs.has-changes == 'true' && inputs.publish-nuget
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: ${{ inputs.dotnet-version }}
+
+      - name: Publish NuGet package
+        if: steps.bump.outputs.has-changes == 'true' && inputs.publish-nuget
+        shell: bash
+        env:
+          NUGET_AUTH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.tag }}
+          PREFIX: ${{ inputs.tag-prefix }}
+        run: |
+          VERSION="${VERSION#${PREFIX}}"
+          dotnet pack "${{ inputs.nuget-project }}" \
+            -c Release \
+            -p:PackageVersion="${VERSION}" \
+            -o ./nupkg
+          dotnet nuget push ./nupkg/*.nupkg \
+            --source "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json" \
+            --api-key "${NUGET_AUTH_TOKEN}"
+
+  # ============================================================
+  # MANUAL MODE: workflow_dispatch (both modes)
+  # ============================================================
+  manual-release:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ${{ inputs.runner }}
+    permissions:
+      contents: write
+      id-token: write
+      packages: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Compute next version
+        id: version
+        uses: ./actions/increment-tag
+        with:
+          bump: ${{ github.event.inputs.bump || 'patch' }}
+          prefix: ${{ inputs.tag-prefix }}
+
+      - name: Create tag and GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          git tag "${TAG}"
+          git push origin "${TAG}"
+          gh release create "${TAG}" \
+            --title "${TAG}" \
+            --generate-notes
+
+      - name: Upload release assets
+        if: inputs.release-assets != ''
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+          PATTERN: ${{ inputs.release-assets }}
+        run: |
+          for file in ${PATTERN}; do
+            if [ -f "${file}" ]; then
+              gh release upload "${TAG}" "${file}" --clobber
+            fi
+          done
+
+      - name: Setup Node.js
+        if: inputs.publish-npm
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ inputs.node-version }}
+          registry-url: https://registry.npmjs.org
+
+      - name: Publish npm packages
+        if: inputs.publish-npm
+        shell: bash
+        env:
+          NODE_AUTH_TOKEN: ${{ github.token }}
+          NPM_DIRS: ${{ inputs.npm-package-dir }}
+          VERSION: ${{ steps.version.outputs.tag }}
+          PREFIX: ${{ inputs.tag-prefix }}
+        run: |
+          VERSION="${VERSION#${PREFIX}}"
+          IFS=',' read -ra DIRS <<< "${NPM_DIRS}"
+          for dir in "${DIRS[@]}"; do
+            dir=$(echo "${dir}" | xargs)
+            echo "Publishing ${dir}..."
+            cd "${dir}"
+            npm version "${VERSION}" --no-git-tag-version --allow-same-version 2>/dev/null || true
+            npm publish --provenance --access public
+            cd -
+          done
+
+      - name: Setup .NET
+        if: inputs.publish-nuget
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: ${{ inputs.dotnet-version }}
+
+      - name: Publish NuGet package
+        if: inputs.publish-nuget
+        shell: bash
+        env:
+          NUGET_AUTH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.tag }}
+          PREFIX: ${{ inputs.tag-prefix }}
+        run: |
+          VERSION="${VERSION#${PREFIX}}"
+          dotnet pack "${{ inputs.nuget-project }}" \
+            -c Release \
+            -p:PackageVersion="${VERSION}" \
+            -o ./nupkg
+          dotnet nuget push ./nupkg/*.nupkg \
+            --source "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json" \
+            --api-key "${NUGET_AUTH_TOKEN}"

@@ -21,13 +21,13 @@ Process and policy gates. Ensures teams follow required procedures. All checks r
 ### Default - ticket check enabled
 
 ```yaml
-- uses: credova/platform-workflows/actions/compliance@v1
+- uses: credova/platform-workflows/actions/compliance@master
 ```
 
 ### Opt out of ticket check
 
 ```yaml
-- uses: credova/platform-workflows/actions/compliance@v1
+- uses: credova/platform-workflows/actions/compliance@master
   with:
     ticket: false
 ```

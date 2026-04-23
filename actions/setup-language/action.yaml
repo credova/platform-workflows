@@ -1,11 +1,11 @@
 name: setup-language
 description: >
   Setup language runtime for the current job.
-  Supports Go, Node.js, Kotlin/JDK, Python, Ruby, and .NET.
+  Supports Go, Node.js, Kotlin/JDK, Python, Ruby, .NET, and PHP.
 
 inputs:
   language:
-    description: "Language to setup: go, node, kotlin, python, ruby, dotnet"
+    description: "Language to setup: go, node, kotlin, python, ruby, dotnet, php"
     required: true
   version:
     description: Language/runtime version
@@ -50,7 +50,7 @@ runs:
         key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json', '**/yarn.lock') }}
         restore-keys: ${{ runner.os }}-node-
 
-    # Kotlin / JDK
+    # Kotlin / JDK + Gradle
     - name: Setup JDK (Kotlin)
       if: inputs.language == 'kotlin'
       uses: actions/setup-java@v5
@@ -58,7 +58,13 @@ runs:
         distribution: temurin
         java-version: ${{ inputs.version }}
 
-    - name: Cache Gradle
+    - name: Setup Gradle
+      if: inputs.language == 'kotlin'
+      uses: gradle/actions/setup-gradle@v4
+      with:
+        cache-disabled: ${{ inputs.cache == 'true' }}
+
+    - name: Cache Gradle (WarpBuild)
       if: inputs.language == 'kotlin' && inputs.cache == 'true'
       uses: WarpBuilds/cache@v1
       with:
@@ -113,6 +119,21 @@ runs:
         key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', '**/packages.lock.json') }}
         restore-keys: ${{ runner.os }}-nuget-
 
+    # PHP
+    - name: Setup PHP
+      if: inputs.language == 'php'
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: ${{ inputs.version }}
+
+    - name: Cache Composer
+      if: inputs.language == 'php' && inputs.cache == 'true'
+      uses: WarpBuilds/cache@v1
+      with:
+        path: ~/.composer/cache
+        key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
+        restore-keys: ${{ runner.os }}-composer-
+
     # Unknown
     - name: Validate language
       shell: bash
@@ -120,6 +141,6 @@ runs:
         LANGUAGE: ${{ inputs.language }}
       run: |
         case "${LANGUAGE}" in
-          go|node|kotlin|python|ruby|dotnet) ;;
-          *) echo "::error::Unsupported language: ${LANGUAGE}. Supported: go, node, kotlin, python, ruby, dotnet"; exit 1 ;;
+          go|node|kotlin|python|ruby|dotnet|php) ;;
+          *) echo "::error::Unsupported language: ${LANGUAGE}. Supported: go, node, kotlin, python, ruby, dotnet, php"; exit 1 ;;
         esac

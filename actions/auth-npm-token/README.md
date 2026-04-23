@@ -29,7 +29,7 @@ secrets:
 
 jobs:
   publish:
-    runs-on: ubuntu-latest
+    runs-on: warp-ubuntu-2204-x64-2x
     steps:
       - name: Get npm publish token
         id: npm-token

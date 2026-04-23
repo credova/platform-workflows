@@ -1,0 +1,25 @@
+# Example: Node.js SDK with edge releases and npm publish
+name: Release
+on:
+  push:
+    branches: [master]
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "Version bump: major, minor, patch"
+        required: false
+        default: patch
+        type: choice
+        options: [patch, minor, major]
+permissions:
+  contents: write
+  id-token: write
+  packages: write
+jobs:
+  release:
+    uses: credova/platform-workflows/.github/workflows/shared-release.yaml@master
+    with:
+      mode: edge
+      publish-npm: true
+      npm-package-dir: "dist"

@@ -1,0 +1,90 @@
+name: terrateam
+description: >
+  Shared Terrateam action. Handles GCP OIDC auth, optional GitHub App token,
+  optional Tailscale VPN, and Terrateam execution. Repos keep a thin
+  terrateam.yml wrapper with workflow_dispatch triggers.
+
+  IMPORTANT: The caller workflow must pass SECRETS_CONTEXT and VARIABLES_CONTEXT
+  as env vars on the step that uses this action, since composite actions cannot
+  access the secrets or vars contexts directly. Example:
+    env:
+      SECRETS_CONTEXT: ${{ toJson(secrets) }}
+      VARIABLES_CONTEXT: ${{ toJson(vars) }}
+
+inputs:
+  project-id:
+    description: GCP project ID
+    required: true
+  workload-identity-provider:
+    description: GCP Workload Identity Provider resource name
+    required: true
+  service-account:
+    description: GCP service account email
+    required: true
+  work-token:
+    description: Terrateam work token (from workflow_dispatch input)
+    required: true
+  api-base-url:
+    description: Terrateam API base URL (from workflow_dispatch input)
+    required: false
+    default: ""
+  github-app-id:
+    description: GitHub App ID for cross-repo token generation (optional)
+    required: false
+    default: ""
+  github-app-private-key:
+    description: GitHub App private key PEM (optional)
+    required: false
+    default: ""
+  tailscale:
+    description: Connect to Tailscale VPN before running
+    required: false
+    default: "false"
+  tailscale-oauth-client-id:
+    description: Tailscale OAuth client ID (required if tailscale is true)
+    required: false
+    default: ""
+  tailscale-oauth-secret:
+    description: Tailscale OAuth secret (required if tailscale is true)
+    required: false
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/checkout@v6
+
+    - name: Connect to Tailscale VPN
+      if: inputs.tailscale == 'true'
+      uses: tailscale/github-action@v2
+      with:
+        oauth-client-id: ${{ inputs.tailscale-oauth-client-id }}
+        oauth-secret: ${{ inputs.tailscale-oauth-secret }}
+        tags: tag:githubactions
+
+    - name: Authenticate to GCP
+      uses: google-github-actions/auth@v2
+      with:
+        project_id: ${{ inputs.project-id }}
+        workload_identity_provider: ${{ inputs.workload-identity-provider }}
+        service_account: ${{ inputs.service-account }}
+
+    - name: Generate GitHub App token
+      if: inputs.github-app-id != ''
+      id: generate-token
+      uses: actions/create-github-app-token@v3
+      with:
+        app-id: ${{ inputs.github-app-id }}
+        private-key: ${{ inputs.github-app-private-key }}
+        owner: credova
+
+    - name: Run Terrateam Action
+      id: terrateam
+      uses: TheFynx/terrateam-action@hotfix/pulumi_fixes
+      with:
+        work-token: ${{ inputs.work-token }}
+        api-base-url: ${{ inputs.api-base-url }}
+      env:
+        SECRETS_CONTEXT: ${{ env.SECRETS_CONTEXT }}
+        VARIABLES_CONTEXT: ${{ env.VARIABLES_CONTEXT }}
+        GITHUB_TOKEN: ${{ inputs.github-app-id != '' && steps.generate-token.outputs.token || github.token }}

@@ -47,7 +47,7 @@ The token is passed to pctl via `PCTL_SLACK_BOT_TOKEN`. The channel and template
 ### Standard deploy
 
 ```yaml
-- uses: credova/platform-workflows/actions/deployment@v1
+- uses: credova/platform-workflows/actions/deployment@master
   with:
     target: gcp-stg-central1
     tag: v1.2.3
@@ -60,7 +60,7 @@ The token is passed to pctl via `PCTL_SLACK_BOT_TOKEN`. The channel and template
 ### Deploy with Slack notifications
 
 ```yaml
-- uses: credova/platform-workflows/actions/deployment@v1
+- uses: credova/platform-workflows/actions/deployment@master
   with:
     target: gcp-prd-central1
     tag: ${{ github.sha }}
@@ -74,7 +74,7 @@ The token is passed to pctl via `PCTL_SLACK_BOT_TOKEN`. The channel and template
 ### Canary deploy (30% traffic)
 
 ```yaml
-- uses: credova/platform-workflows/actions/deployment@v1
+- uses: credova/platform-workflows/actions/deployment@master
   with:
     target: gcp-prd-central1
     tag: v1.2.3
@@ -86,7 +86,7 @@ The token is passed to pctl via `PCTL_SLACK_BOT_TOKEN`. The channel and template
 ### Promote canary to 100%
 
 ```yaml
-- uses: credova/platform-workflows/actions/deployment@v1
+- uses: credova/platform-workflows/actions/deployment@master
   with:
     target: gcp-prd-central1
     action: promote
@@ -97,7 +97,7 @@ The token is passed to pctl via `PCTL_SLACK_BOT_TOKEN`. The channel and template
 ### Rollback
 
 ```yaml
-- uses: credova/platform-workflows/actions/deployment@v1
+- uses: credova/platform-workflows/actions/deployment@master
   with:
     target: gcp-prd-central1
     action: rollback

@@ -23,7 +23,7 @@ Auto-increment semantic version tags. Supports suffix-based sequences for enviro
 
 ```yaml
 - id: tag
-  uses: credova/platform-workflows/actions/increment-tag@v1
+  uses: credova/platform-workflows/actions/increment-tag@master
 
 - run: echo "New tag: ${{ steps.tag.outputs.tag }}"
 # v1.0.0 → v1.0.1
@@ -33,7 +33,7 @@ Auto-increment semantic version tags. Supports suffix-based sequences for enviro
 
 ```yaml
 - id: tag
-  uses: credova/platform-workflows/actions/increment-tag@v1
+  uses: credova/platform-workflows/actions/increment-tag@master
   with:
     suffix: stg
 # v1.0.0-stg → v1.0.1-stg
@@ -43,7 +43,7 @@ Auto-increment semantic version tags. Supports suffix-based sequences for enviro
 
 ```yaml
 - id: tag
-  uses: credova/platform-workflows/actions/increment-tag@v1
+  uses: credova/platform-workflows/actions/increment-tag@master
   with:
     bump: minor
 # v1.2.3 → v1.3.0
@@ -53,7 +53,7 @@ Auto-increment semantic version tags. Supports suffix-based sequences for enviro
 
 ```yaml
 - id: tag
-  uses: credova/platform-workflows/actions/increment-tag@v1
+  uses: credova/platform-workflows/actions/increment-tag@master
   with:
     bump: major
 # v1.2.3 → v2.0.0

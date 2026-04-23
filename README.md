@@ -15,7 +15,7 @@ on:
 
 jobs:
   ci:
-    uses: credova/platform-workflows/.github/workflows/pull-request.yaml@v1
+    uses: credova/platform-workflows/.github/workflows/pull-request.yaml@master
 ```
 
 ### Deploy
@@ -29,7 +29,7 @@ on:
 
 jobs:
   deploy:
-    uses: credova/platform-workflows/.github/workflows/deploy.yaml@v1
+    uses: credova/platform-workflows/.github/workflows/deploy.yaml@master
     with:
       config-path: deployments/
     secrets:
@@ -56,25 +56,25 @@ That's it. Security scanning, compliance checks, container build, and deployment
 
 ## Actions
 
-| Action                                         | Description                                                        |
-| ---------------------------------------------- | ------------------------------------------------------------------ |
-| [compliance](actions/compliance/)              | Shortcut ticket reference check, automated PR skip                 |
-| [container](actions/container/)                | Build, scan, push, retag - full container lifecycle                |
-| [deployment](actions/deployment/)              | Cloud Run deploy via pctl (deploy, promote, rollback)              |
-| [increment-tag](actions/increment-tag/)        | Semantic version tag incrementor                                   |
-| [notification](actions/notification/)          | Slack notifications via pctl                                       |
-| [secrets-setup](actions/secrets-setup/)        | GCP Secret Manager loading via mise + fnox                         |
-| [security](actions/security/)                  | Trivy package scan + OpenGrep static analysis                      |
-| [setup-language](actions/setup-language/)      | Multi-language runtime setup (Go, Node, Kotlin, Python, Ruby, .NET)|
+| Action                                    | Description                                                         |
+| ----------------------------------------- | ------------------------------------------------------------------- |
+| [compliance](actions/compliance/)         | Shortcut ticket reference check, automated PR skip                  |
+| [container](actions/container/)           | Build, scan, push, retag - full container lifecycle                 |
+| [deployment](actions/deployment/)         | Cloud Run deploy via pctl (deploy, promote, rollback)               |
+| [increment-tag](actions/increment-tag/)   | Semantic version tag incrementor                                    |
+| [notification](actions/notification/)     | Slack notifications via pctl                                        |
+| [secrets-setup](actions/secrets-setup/)   | GCP Secret Manager loading via mise + fnox                          |
+| [security](actions/security/)             | Trivy package scan + OpenGrep static analysis                       |
+| [setup-language](actions/setup-language/) | Multi-language runtime setup (Go, Node, Kotlin, Python, Ruby, .NET) |
 
 Internal actions (called by workflows, not directly by teams):
 
-| Action                                             | Description                                        |
-| -------------------------------------------------- | -------------------------------------------------- |
-| [auth-gcp](actions/auth-gcp/)                      | Workload Identity Federation login                 |
-| [auth-npm-token](actions/auth-npm-token/)          | GitHub App token for npm publishing                |
-| [auth-release-token](actions/auth-release-token/)  | GitHub App token for private repo releases         |
-| [install-pctl](actions/install-pctl/)              | pctl binary installer with checksum verification   |
+| Action                                            | Description                                      |
+| ------------------------------------------------- | ------------------------------------------------ |
+| [auth-gcp](actions/auth-gcp/)                     | Workload Identity Federation login               |
+| [auth-npm-token](actions/auth-npm-token/)         | GitHub App token for npm publishing              |
+| [auth-release-token](actions/auth-release-token/) | GitHub App token for private repo releases       |
+| [install-pctl](actions/install-pctl/)             | pctl binary installer with checksum verification |
 
 ## Docs
 

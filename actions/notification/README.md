@@ -62,7 +62,7 @@ These only appear in the notification if a value is provided:
 ### Post a deploy started notification
 
 ```yaml
-- uses: credova/platform-workflows/actions/notification@v1
+- uses: credova/platform-workflows/actions/notification@master
   id: notify
   with:
     channel: C025J9R5YQP
@@ -77,7 +77,7 @@ These only appear in the notification if a value is provided:
 ### Update the original message to success
 
 ```yaml
-- uses: credova/platform-workflows/actions/notification@v1
+- uses: credova/platform-workflows/actions/notification@master
   with:
     channel: C025J9R5YQP
     status: success
@@ -90,7 +90,7 @@ These only appear in the notification if a value is provided:
 ### Post a thread reply (timeline event)
 
 ```yaml
-- uses: credova/platform-workflows/actions/notification@v1
+- uses: credova/platform-workflows/actions/notification@master
   with:
     channel: C025J9R5YQP
     status: failed
@@ -105,7 +105,7 @@ These only appear in the notification if a value is provided:
 ### Custom message with general template
 
 ```yaml
-- uses: credova/platform-workflows/actions/notification@v1
+- uses: credova/platform-workflows/actions/notification@master
   with:
     channel: C025J9R5YQP
     status: started

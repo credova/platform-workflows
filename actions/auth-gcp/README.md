@@ -23,7 +23,7 @@ This action is called internally by other actions. You should not need to refere
 
 ```yaml
 # Called internally by container, deployment, secrets-setup
-- uses: credova/platform-workflows/actions/auth-gcp@v1
+- uses: credova/platform-workflows/actions/auth-gcp@master
   with:
     project-id: psq-shd-operations
     workload-identity-provider: projects/123456/locations/global/workloadIdentityPools/github/providers/github

@@ -1,0 +1,14 @@
+# Example: Node.js SDK/library (no container, no deploy)
+name: Pull Request
+on:
+  pull_request:
+    branches: [master]
+permissions:
+  contents: read
+  pull-requests: write
+jobs:
+  ci:
+    uses: credova/platform-workflows/.github/workflows/node-pull-request.yaml@master
+    secrets: inherit
+    with:
+      container: false
