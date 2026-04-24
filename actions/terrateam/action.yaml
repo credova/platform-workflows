@@ -3,13 +3,8 @@ description: >
   Shared Terrateam action. Handles GCP OIDC auth, optional GitHub App token,
   optional Tailscale VPN, and Terrateam execution. Repos keep a thin
   terrateam.yml wrapper with workflow_dispatch triggers.
-
-  IMPORTANT: The caller workflow must pass SECRETS_CONTEXT and VARIABLES_CONTEXT
-  as env vars on the step that uses this action, since composite actions cannot
-  access the secrets or vars contexts directly. Example:
-    env:
-      SECRETS_CONTEXT: ${{ toJson(secrets) }}
-      VARIABLES_CONTEXT: ${{ toJson(vars) }}
+  Caller must pass SECRETS_CONTEXT and VARIABLES_CONTEXT as step env vars
+  using toJson(secrets) and toJson(vars) respectively.
 
 inputs:
   project-id:
