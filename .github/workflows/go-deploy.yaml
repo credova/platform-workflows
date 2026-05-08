@@ -64,6 +64,11 @@ on:
         type: boolean
         required: false
         default: true
+      target:
+        description: pctl deployment target name (from CUE config). Required when deploy is true.
+        type: string
+        required: false
+        default: ""
       config-path:
         description: Path to CUE config directory
         type: string
@@ -159,9 +164,15 @@ jobs:
         env:
           IMAGE: ${{ inputs.image }}
           IMAGES: ${{ inputs.images }}
+          DEPLOY: ${{ inputs.deploy }}
+          TARGET: ${{ inputs.target }}
         run: |
           if [ -n "${IMAGE}" ] && [ -n "${IMAGES}" ]; then
             echo "::error::Cannot specify both 'image' and 'images'. Use one or the other."
+            exit 1
+          fi
+          if [ "${DEPLOY}" = "true" ] && [ -z "${TARGET}" ]; then
+            echo "::error::'target' input is required when deploy is true (pctl deploy execute needs a target name)."
             exit 1
           fi
 
@@ -355,7 +366,7 @@ jobs:
       - name: Deploy to staging
         uses: credova/platform-workflows/actions/deployment@master
         with:
-          target: ${{ inputs.config-path }}
+          target: ${{ inputs.target }}
           tag: ${{ needs.validate.outputs.deploy-tag }}
           config-path: ${{ inputs.config-path }}
           project-id: ${{ inputs.project-id }}
@@ -381,7 +392,7 @@ jobs:
       - name: Deploy canary
         uses: credova/platform-workflows/actions/deployment@master
         with:
-          target: ${{ inputs.config-path }}
+          target: ${{ inputs.target }}
           tag: ${{ needs.validate.outputs.deploy-tag }}
           canary: ${{ inputs.canary }}
           config-path: ${{ inputs.config-path }}
@@ -444,7 +455,7 @@ jobs:
         if: inputs.canary > 0
         uses: credova/platform-workflows/actions/deployment@master
         with:
-          target: ${{ inputs.config-path }}
+          target: ${{ inputs.target }}
           action: promote
           config-path: ${{ inputs.config-path }}
           project-id: ${{ inputs.project-id }}
@@ -456,7 +467,7 @@ jobs:
         if: inputs.canary == 0
         uses: credova/platform-workflows/actions/deployment@master
         with:
-          target: ${{ inputs.config-path }}
+          target: ${{ inputs.target }}
           tag: ${{ needs.validate.outputs.deploy-tag }}-prd
           config-path: ${{ inputs.config-path }}
           project-id: ${{ inputs.project-id }}
