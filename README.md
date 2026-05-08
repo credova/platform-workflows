@@ -33,8 +33,8 @@ jobs:
     with:
       config-path: deployments/
     secrets:
-      RELEASE_APP_ID: ${{ secrets.RELEASE_APP_ID }}
-      RELEASE_APP_PRIVATE_KEY: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+      RELEASE_DOWNLOADER_APP_ID: ${{ secrets.RELEASE_DOWNLOADER_APP_ID }}
+      RELEASE_DOWNLOADER_APP_PRIVATE_KEY: ${{ secrets.RELEASE_DOWNLOADER_APP_PRIVATE_KEY }}
 ```
 
 That's it. Security scanning, compliance checks, container build, and deployment are all on by default. All workflows run on [WarpBuild](https://warpbuild.com) runners (`warp-ubuntu-2204-x64-2x`) by default. See [usage guide](docs/usage.md) for customization.

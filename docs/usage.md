@@ -429,8 +429,8 @@ jobs:
     with:
       config-path: deployments/
     secrets:
-      RELEASE_APP_ID: ${{ secrets.RELEASE_APP_ID }}
-      RELEASE_APP_PRIVATE_KEY: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+      RELEASE_DOWNLOADER_APP_ID: ${{ secrets.RELEASE_DOWNLOADER_APP_ID }}
+      RELEASE_DOWNLOADER_APP_PRIVATE_KEY: ${{ secrets.RELEASE_DOWNLOADER_APP_PRIVATE_KEY }}
 ```
 
 ### Service with canary
@@ -443,8 +443,8 @@ jobs:
       config-path: deployments/
       canary: 30
     secrets:
-      RELEASE_APP_ID: ${{ secrets.RELEASE_APP_ID }}
-      RELEASE_APP_PRIVATE_KEY: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+      RELEASE_DOWNLOADER_APP_ID: ${{ secrets.RELEASE_DOWNLOADER_APP_ID }}
+      RELEASE_DOWNLOADER_APP_PRIVATE_KEY: ${{ secrets.RELEASE_DOWNLOADER_APP_PRIVATE_KEY }}
 ```
 
 ### Non-container repo (release only - no deploy)
@@ -475,8 +475,8 @@ jobs:
       language-version: "1.24"
       config-path: deployments/
     secrets:
-      RELEASE_APP_ID: ${{ secrets.RELEASE_APP_ID }}
-      RELEASE_APP_PRIVATE_KEY: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+      RELEASE_DOWNLOADER_APP_ID: ${{ secrets.RELEASE_DOWNLOADER_APP_ID }}
+      RELEASE_DOWNLOADER_APP_PRIVATE_KEY: ${{ secrets.RELEASE_DOWNLOADER_APP_PRIVATE_KEY }}
 ```
 
 ### Multi-image monorepo
@@ -494,8 +494,8 @@ jobs:
         - name: admin-portal
           dockerfile: apps/admin-portal/Dockerfile
     secrets:
-      RELEASE_APP_ID: ${{ secrets.RELEASE_APP_ID }}
-      RELEASE_APP_PRIVATE_KEY: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+      RELEASE_DOWNLOADER_APP_ID: ${{ secrets.RELEASE_DOWNLOADER_APP_ID }}
+      RELEASE_DOWNLOADER_APP_PRIVATE_KEY: ${{ secrets.RELEASE_DOWNLOADER_APP_PRIVATE_KEY }}
 ```
 
 ---
@@ -518,8 +518,8 @@ jobs:
       config-path: deployments/
       hotfix: true
     secrets:
-      RELEASE_APP_ID: ${{ secrets.RELEASE_APP_ID }}
-      RELEASE_APP_PRIVATE_KEY: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+      RELEASE_DOWNLOADER_APP_ID: ${{ secrets.RELEASE_DOWNLOADER_APP_ID }}
+      RELEASE_DOWNLOADER_APP_PRIVATE_KEY: ${{ secrets.RELEASE_DOWNLOADER_APP_PRIVATE_KEY }}
 ```
 
 ---
@@ -670,7 +670,7 @@ All inputs from pull-request.yaml plus:
 | `workload-identity-provider` | string  | `""`           | WIF provider resource name                                        |
 
 **Secrets** (both workflows): `WARPBUILD_API_KEY` (optional - only needed on non-WarpBuild runners).
-Deploy also requires: `RELEASE_APP_ID`, `RELEASE_APP_PRIVATE_KEY`.
+Deploy also requires: `RELEASE_DOWNLOADER_APP_ID`, `RELEASE_DOWNLOADER_APP_PRIVATE_KEY`.
 
 ---
 
