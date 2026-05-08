@@ -195,7 +195,9 @@ jobs:
           SHA: ${{ github.sha }}
         run: |
           if [ "${HOTFIX}" = "true" ]; then
-            echo "deploy-tag=${REF_NAME}" >> "$GITHUB_OUTPUT"
+            # Docker tags can't contain '/'; replace path separators in branch refs
+            SAFE_REF="${REF_NAME//\//-}"
+            echo "deploy-tag=${SAFE_REF}" >> "$GITHUB_OUTPUT"
           else
             echo "deploy-tag=${SHA}" >> "$GITHUB_OUTPUT"
           fi
