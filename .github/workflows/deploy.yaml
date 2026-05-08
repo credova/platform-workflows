@@ -130,9 +130,9 @@ on:
         default: ""
 
     secrets:
-      RELEASE_APP_ID:
+      RELEASE_DOWNLOADER_APP_ID:
         required: false
-      RELEASE_APP_PRIVATE_KEY:
+      RELEASE_DOWNLOADER_APP_PRIVATE_KEY:
         required: false
       WARPBUILD_API_KEY:
         required: false
@@ -203,8 +203,8 @@ jobs:
         id: token
         uses: credova/platform-workflows/actions/auth-release-token@master
         with:
-          client-id: ${{ secrets.RELEASE_APP_ID }}
-          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          client-id: ${{ secrets.RELEASE_DOWNLOADER_APP_ID }}
+          private-key: ${{ secrets.RELEASE_DOWNLOADER_APP_PRIVATE_KEY }}
 
   # --- Tests (only when language is set, skipped for hotfix) ---
   test:

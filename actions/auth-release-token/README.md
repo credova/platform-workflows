@@ -8,8 +8,8 @@ Generates a short-lived GitHub token scoped to specific repositories for release
 
 | Input          | Required | Default | Description                                                        |
 | -------------- | -------- | ------- | ------------------------------------------------------------------ |
-| `client-id`    | Yes      | -       | GitHub App client ID (from org secret `RELEASE_APP_ID`)            |
-| `private-key`  | Yes      | -       | GitHub App private key (from org secret `RELEASE_APP_PRIVATE_KEY`) |
+| `client-id`    | Yes      | -       | GitHub App client ID (from org secret `RELEASE_DOWNLOADER_APP_ID`)            |
+| `private-key`  | Yes      | -       | GitHub App private key (from org secret `RELEASE_DOWNLOADER_APP_PRIVATE_KEY`) |
 | `repositories` | No       | `pctl`  | Comma-separated repos to scope the token to                        |
 
 ## Outputs
@@ -22,9 +22,9 @@ Generates a short-lived GitHub token scoped to specific repositories for release
 
 ```yaml
 secrets:
-  RELEASE_APP_ID:
+  RELEASE_DOWNLOADER_APP_ID:
     required: true
-  RELEASE_APP_PRIVATE_KEY:
+  RELEASE_DOWNLOADER_APP_PRIVATE_KEY:
     required: true
 
 jobs:
@@ -35,8 +35,8 @@ jobs:
         id: release-token
         uses: ./actions/auth-release-token
         with:
-          client-id: ${{ secrets.RELEASE_APP_ID }}
-          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          client-id: ${{ secrets.RELEASE_DOWNLOADER_APP_ID }}
+          private-key: ${{ secrets.RELEASE_DOWNLOADER_APP_PRIVATE_KEY }}
 
       - name: Install pctl
         uses: ./actions/install-pctl
