@@ -30,14 +30,18 @@ case "${ARCH}" in
 esac
 
 ARCHIVE="pctl_${OS}_${ARCH}.tar.gz"
-URL="https://github.com/credova/pctl/releases/download/v${PCTL_VERSION}/${ARCHIVE}"
 
-echo "Downloading pctl v${PCTL_VERSION} from ${URL}"
-curl -fsSL -o "/tmp/${ARCHIVE}" "${URL}"
+echo "Downloading pctl v${PCTL_VERSION} (${ARCHIVE}) from credova/pctl"
+# gh handles auth for private-repo release assets via GH_TOKEN; plain curl
+# 404s because the redirect target requires an Authorization header.
+gh release download "v${PCTL_VERSION}" \
+  --repo credova/pctl \
+  --pattern "${ARCHIVE}" \
+  --pattern "checksums.txt" \
+  --dir /tmp \
+  --clobber
 
 # Verify checksum
-CHECKSUMS_URL="https://github.com/credova/pctl/releases/download/v${PCTL_VERSION}/checksums.txt"
-curl -fsSL -o /tmp/checksums.txt "${CHECKSUMS_URL}"
 EXPECTED=$(grep "${ARCHIVE}" /tmp/checksums.txt | awk '{print $1}')
 ACTUAL=$(sha256sum "/tmp/${ARCHIVE}" | awk '{print $1}')
 if [ "${EXPECTED}" != "${ACTUAL}" ]; then
