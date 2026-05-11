@@ -202,21 +202,6 @@ jobs:
             echo "deploy-tag=${SHA}" >> "$GITHUB_OUTPUT"
           fi
 
-  # --- Generate release download token (for pctl) ---
-  auth:
-    if: inputs.deploy
-    runs-on: ${{ inputs.runner }}
-    outputs:
-      token: ${{ steps.token.outputs.token }}
-    steps:
-      - uses: actions/checkout@v6
-      - name: Generate release download token
-        id: token
-        uses: credova/platform-workflows/actions/auth-release-token@master
-        with:
-          client-id: ${{ secrets.RELEASE_DOWNLOADER_APP_ID }}
-          private-key: ${{ secrets.RELEASE_DOWNLOADER_APP_PRIVATE_KEY }}
-
   # --- Tests (skipped for hotfix) ---
   test:
     if: inputs.test && !inputs.hotfix
@@ -360,11 +345,17 @@ jobs:
   # --- Deploy staging (skipped for hotfix) ---
   deploy-staging:
     if: inputs.deploy && !inputs.hotfix && always() && !failure() && !cancelled()
-    needs: [auth, build-scan-push, test, validate]
+    needs: [build-scan-push, test, validate]
     runs-on: ${{ inputs.runner }}
     environment: staging
     steps:
       - uses: actions/checkout@v6
+      - name: Generate release download token
+        id: token
+        uses: credova/platform-workflows/actions/auth-release-token@master
+        with:
+          client-id: ${{ secrets.RELEASE_DOWNLOADER_APP_ID }}
+          private-key: ${{ secrets.RELEASE_DOWNLOADER_APP_PRIVATE_KEY }}
       - name: Deploy to staging
         uses: credova/platform-workflows/actions/deployment@master
         with:
@@ -374,7 +365,7 @@ jobs:
           project-id: ${{ inputs.project-id }}
           workload-identity-provider: ${{ inputs.workload-identity-provider }}
           slack-token: ${{ secrets.PCTL_SLACK_BOT_TOKEN }}
-          token: ${{ needs.auth.outputs.token }}
+          token: ${{ steps.token.outputs.token }}
 
   # --- Canary flow ---
   approve-canary:
@@ -387,10 +378,16 @@ jobs:
 
   deploy-canary:
     if: inputs.deploy && inputs.canary > 0
-    needs: [auth, approve-canary, validate]
+    needs: [approve-canary, validate]
     runs-on: ${{ inputs.runner }}
     steps:
       - uses: actions/checkout@v6
+      - name: Generate release download token
+        id: token
+        uses: credova/platform-workflows/actions/auth-release-token@master
+        with:
+          client-id: ${{ secrets.RELEASE_DOWNLOADER_APP_ID }}
+          private-key: ${{ secrets.RELEASE_DOWNLOADER_APP_PRIVATE_KEY }}
       - name: Deploy canary
         uses: credova/platform-workflows/actions/deployment@master
         with:
@@ -401,7 +398,7 @@ jobs:
           project-id: ${{ inputs.project-id }}
           workload-identity-provider: ${{ inputs.workload-identity-provider }}
           slack-token: ${{ secrets.PCTL_SLACK_BOT_TOKEN }}
-          token: ${{ needs.auth.outputs.token }}
+          token: ${{ steps.token.outputs.token }}
 
   # --- Production approval ---
   approve-production:
@@ -437,7 +434,7 @@ jobs:
   # --- Deploy production ---
   deploy-production:
     if: inputs.deploy && always() && !failure() && !cancelled()
-    needs: [auth, approve-production, retag-production, validate]
+    needs: [approve-production, retag-production, validate]
     runs-on: ${{ inputs.runner }}
     steps:
       - uses: actions/checkout@v6
@@ -453,6 +450,13 @@ jobs:
             exit 1
           fi
 
+      - name: Generate release download token
+        id: token
+        uses: credova/platform-workflows/actions/auth-release-token@master
+        with:
+          client-id: ${{ secrets.RELEASE_DOWNLOADER_APP_ID }}
+          private-key: ${{ secrets.RELEASE_DOWNLOADER_APP_PRIVATE_KEY }}
+
       - name: Promote canary to production
         if: inputs.canary > 0
         uses: credova/platform-workflows/actions/deployment@master
@@ -463,7 +467,7 @@ jobs:
           project-id: ${{ inputs.project-id }}
           workload-identity-provider: ${{ inputs.workload-identity-provider }}
           slack-token: ${{ secrets.PCTL_SLACK_BOT_TOKEN }}
-          token: ${{ needs.auth.outputs.token }}
+          token: ${{ steps.token.outputs.token }}
 
       - name: Deploy to production (full)
         if: inputs.canary == 0
@@ -475,7 +479,7 @@ jobs:
           project-id: ${{ inputs.project-id }}
           workload-identity-provider: ${{ inputs.workload-identity-provider }}
           slack-token: ${{ secrets.PCTL_SLACK_BOT_TOKEN }}
-          token: ${{ needs.auth.outputs.token }}
+          token: ${{ steps.token.outputs.token }}
 
   # --- Release ---
   release:
