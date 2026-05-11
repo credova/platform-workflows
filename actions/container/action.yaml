@@ -253,6 +253,7 @@ runs:
         licenses: "false"
         code: "false"
         severity: ${{ inputs.severity }}
+        platform: ${{ inputs.platform }}
 
     - name: Tag and push image
       id: push-image
