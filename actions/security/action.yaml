@@ -85,7 +85,10 @@ runs:
       run: |
         rm -f sbom.spdx.json
         SYFT_ARGS=("$TARGET" -o spdx-json=sbom.spdx.json)
-        if [ -n "$PLATFORM" ]; then
+        # syft --platform accepts a single platform only. For multi-arch
+        # images (registry has a manifest list), docker resolves the runner's
+        # native arch automatically, so skip --platform entirely.
+        if [ -n "$PLATFORM" ] && [[ "$PLATFORM" != *,* ]]; then
           SYFT_ARGS+=(--platform "$PLATFORM")
         fi
         syft "${SYFT_ARGS[@]}"
