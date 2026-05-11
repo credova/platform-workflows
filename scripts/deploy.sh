@@ -43,7 +43,10 @@ case "${ACTION}" in
 esac
 
 echo "Running: ${CMD_ARGS[*]}"
-OUTPUT=$("${CMD_ARGS[@]}" 2>&1) || { echo "${OUTPUT}"; exit 1; }
+# pctl's deploy commands launch a bubbletea TUI that requires /dev/tty.
+# `script` allocates a PTY so the TUI runs without aborting on CI runners.
+# -q quiet, -e propagate exit code, -c command, /dev/null discards typescript.
+OUTPUT=$(script -q -e -c "${CMD_ARGS[*]}" /dev/null 2>&1) || { echo "${OUTPUT}"; exit 1; }
 echo "${OUTPUT}"
 
 # Parse outputs from pctl
