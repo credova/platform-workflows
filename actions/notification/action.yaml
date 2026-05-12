@@ -100,7 +100,7 @@ runs:
   using: composite
   steps:
     - name: Install pctl
-      uses: ./actions/install-pctl
+      uses: credova/platform-workflows/actions/install-pctl@master
       with:
         version: ${{ inputs.pctl-version }}
         token: ${{ inputs.token }}

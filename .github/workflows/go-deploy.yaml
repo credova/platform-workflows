@@ -64,6 +64,11 @@ on:
         type: boolean
         required: false
         default: true
+      target:
+        description: pctl deployment target name (from CUE config). Required when deploy is true.
+        type: string
+        required: false
+        default: ""
       config-path:
         description: Path to CUE config directory
         type: string
@@ -159,9 +164,15 @@ jobs:
         env:
           IMAGE: ${{ inputs.image }}
           IMAGES: ${{ inputs.images }}
+          DEPLOY: ${{ inputs.deploy }}
+          TARGET: ${{ inputs.target }}
         run: |
           if [ -n "${IMAGE}" ] && [ -n "${IMAGES}" ]; then
             echo "::error::Cannot specify both 'image' and 'images'. Use one or the other."
+            exit 1
+          fi
+          if [ "${DEPLOY}" = "true" ] && [ -z "${TARGET}" ]; then
+            echo "::error::'target' input is required when deploy is true (pctl deploy execute needs a target name)."
             exit 1
           fi
 
@@ -184,25 +195,12 @@ jobs:
           SHA: ${{ github.sha }}
         run: |
           if [ "${HOTFIX}" = "true" ]; then
-            echo "deploy-tag=${REF_NAME}" >> "$GITHUB_OUTPUT"
+            # Docker tags can't contain '/'; replace path separators in branch refs
+            SAFE_REF="${REF_NAME//\//-}"
+            echo "deploy-tag=${SAFE_REF}" >> "$GITHUB_OUTPUT"
           else
             echo "deploy-tag=${SHA}" >> "$GITHUB_OUTPUT"
           fi
-
-  # --- Generate release download token (for pctl) ---
-  auth:
-    if: inputs.deploy
-    runs-on: ${{ inputs.runner }}
-    outputs:
-      token: ${{ steps.token.outputs.token }}
-    steps:
-      - uses: actions/checkout@v6
-      - name: Generate release download token
-        id: token
-        uses: credova/platform-workflows/actions/auth-release-token@master
-        with:
-          client-id: ${{ secrets.RELEASE_DOWNLOADER_APP_ID }}
-          private-key: ${{ secrets.RELEASE_DOWNLOADER_APP_PRIVATE_KEY }}
 
   # --- Tests (skipped for hotfix) ---
   test:
@@ -347,21 +345,27 @@ jobs:
   # --- Deploy staging (skipped for hotfix) ---
   deploy-staging:
     if: inputs.deploy && !inputs.hotfix && always() && !failure() && !cancelled()
-    needs: [auth, build-scan-push, test, validate]
+    needs: [build-scan-push, test, validate]
     runs-on: ${{ inputs.runner }}
     environment: staging
     steps:
       - uses: actions/checkout@v6
+      - name: Generate release download token
+        id: token
+        uses: credova/platform-workflows/actions/auth-release-token@master
+        with:
+          client-id: ${{ secrets.RELEASE_DOWNLOADER_APP_ID }}
+          private-key: ${{ secrets.RELEASE_DOWNLOADER_APP_PRIVATE_KEY }}
       - name: Deploy to staging
         uses: credova/platform-workflows/actions/deployment@master
         with:
-          target: ${{ inputs.config-path }}
+          target: ${{ inputs.target }}
           tag: ${{ needs.validate.outputs.deploy-tag }}
           config-path: ${{ inputs.config-path }}
           project-id: ${{ inputs.project-id }}
           workload-identity-provider: ${{ inputs.workload-identity-provider }}
           slack-token: ${{ secrets.PCTL_SLACK_BOT_TOKEN }}
-          token: ${{ needs.auth.outputs.token }}
+          token: ${{ steps.token.outputs.token }}
 
   # --- Canary flow ---
   approve-canary:
@@ -374,21 +378,27 @@ jobs:
 
   deploy-canary:
     if: inputs.deploy && inputs.canary > 0
-    needs: [auth, approve-canary, validate]
+    needs: [approve-canary, validate]
     runs-on: ${{ inputs.runner }}
     steps:
       - uses: actions/checkout@v6
+      - name: Generate release download token
+        id: token
+        uses: credova/platform-workflows/actions/auth-release-token@master
+        with:
+          client-id: ${{ secrets.RELEASE_DOWNLOADER_APP_ID }}
+          private-key: ${{ secrets.RELEASE_DOWNLOADER_APP_PRIVATE_KEY }}
       - name: Deploy canary
         uses: credova/platform-workflows/actions/deployment@master
         with:
-          target: ${{ inputs.config-path }}
+          target: ${{ inputs.target }}
           tag: ${{ needs.validate.outputs.deploy-tag }}
           canary: ${{ inputs.canary }}
           config-path: ${{ inputs.config-path }}
           project-id: ${{ inputs.project-id }}
           workload-identity-provider: ${{ inputs.workload-identity-provider }}
           slack-token: ${{ secrets.PCTL_SLACK_BOT_TOKEN }}
-          token: ${{ needs.auth.outputs.token }}
+          token: ${{ steps.token.outputs.token }}
 
   # --- Production approval ---
   approve-production:
@@ -424,7 +434,7 @@ jobs:
   # --- Deploy production ---
   deploy-production:
     if: inputs.deploy && always() && !failure() && !cancelled()
-    needs: [auth, approve-production, retag-production, validate]
+    needs: [approve-production, retag-production, validate]
     runs-on: ${{ inputs.runner }}
     steps:
       - uses: actions/checkout@v6
@@ -440,29 +450,36 @@ jobs:
             exit 1
           fi
 
+      - name: Generate release download token
+        id: token
+        uses: credova/platform-workflows/actions/auth-release-token@master
+        with:
+          client-id: ${{ secrets.RELEASE_DOWNLOADER_APP_ID }}
+          private-key: ${{ secrets.RELEASE_DOWNLOADER_APP_PRIVATE_KEY }}
+
       - name: Promote canary to production
         if: inputs.canary > 0
         uses: credova/platform-workflows/actions/deployment@master
         with:
-          target: ${{ inputs.config-path }}
+          target: ${{ inputs.target }}
           action: promote
           config-path: ${{ inputs.config-path }}
           project-id: ${{ inputs.project-id }}
           workload-identity-provider: ${{ inputs.workload-identity-provider }}
           slack-token: ${{ secrets.PCTL_SLACK_BOT_TOKEN }}
-          token: ${{ needs.auth.outputs.token }}
+          token: ${{ steps.token.outputs.token }}
 
       - name: Deploy to production (full)
         if: inputs.canary == 0
         uses: credova/platform-workflows/actions/deployment@master
         with:
-          target: ${{ inputs.config-path }}
+          target: ${{ inputs.target }}
           tag: ${{ needs.validate.outputs.deploy-tag }}-prd
           config-path: ${{ inputs.config-path }}
           project-id: ${{ inputs.project-id }}
           workload-identity-provider: ${{ inputs.workload-identity-provider }}
           slack-token: ${{ secrets.PCTL_SLACK_BOT_TOKEN }}
-          token: ${{ needs.auth.outputs.token }}
+          token: ${{ steps.token.outputs.token }}
 
   # --- Release ---
   release:

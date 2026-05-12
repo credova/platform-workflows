@@ -50,6 +50,13 @@ inputs:
       Only used when target is docker:<ref>. Each unique name gets its own section.
     required: false
     default: ""
+  platform:
+    description: >
+      Platform to scan when target is a docker:<ref>. Passed to syft as --platform.
+      Required when the image manifest does not advertise the runner's native
+      platform (e.g. an amd64-only image scanned on an arm64 runner).
+    required: false
+    default: ""
 
 runs:
   using: composite
@@ -74,9 +81,17 @@ runs:
       shell: bash
       env:
         TARGET: ${{ inputs.target }}
+        PLATFORM: ${{ inputs.platform }}
       run: |
         rm -f sbom.spdx.json
-        syft "$TARGET" -o spdx-json=sbom.spdx.json
+        SYFT_ARGS=("$TARGET" -o spdx-json=sbom.spdx.json)
+        # syft --platform accepts a single platform only. For multi-arch
+        # images (registry has a manifest list), docker resolves the runner's
+        # native arch automatically, so skip --platform entirely.
+        if [ -n "$PLATFORM" ] && [[ "$PLATFORM" != *,* ]]; then
+          SYFT_ARGS+=(--platform "$PLATFORM")
+        fi
+        syft "${SYFT_ARGS[@]}"
 
     - name: Package vulnerability scan
       if: inputs.packages == 'true'

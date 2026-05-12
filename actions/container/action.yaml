@@ -136,7 +136,7 @@ runs:
 
     - name: Authenticate to GCP
       if: inputs.project-id != '' && inputs.workload-identity-provider != ''
-      uses: ./actions/auth-gcp
+      uses: credova/platform-workflows/actions/auth-gcp@master
       with:
         project-id: ${{ inputs.project-id }}
         workload-identity-provider: ${{ inputs.workload-identity-provider }}
@@ -245,7 +245,7 @@ runs:
         inputs.build == 'true' &&
         inputs.retag != 'true' &&
         steps.reuse-check.outputs.exists != 'true'
-      uses: ./actions/security
+      uses: credova/platform-workflows/actions/security@master
       with:
         target: docker:${{ steps.meta.outputs.image }}
         image-name: ${{ inputs.name }}
@@ -253,6 +253,7 @@ runs:
         licenses: "false"
         code: "false"
         severity: ${{ inputs.severity }}
+        platform: ${{ inputs.platform }}
 
     - name: Tag and push image
       id: push-image
