@@ -1,8 +1,9 @@
 name: install-pctl
 description: >
-  Internal: Install pctl from GitHub releases.
-  Accepts a pre-generated token with access to credova/pctl.
-  Handles version resolution, architecture detection, and checksum verification.
+  Internal: Install pctl. By default, downloads from credova/pctl releases.
+  If the caller workflow has checked out the pctl source (detected by a
+  go.mod with `module github.com/credova/pctl`), builds from that checkout
+  instead so unreleased fixes can be exercised in CI.
 
 inputs:
   version:
@@ -16,19 +17,46 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Check if pctl is already installed
+    - name: Check for existing install and local source
       id: check
       shell: bash
       run: |
         if command -v pctl &> /dev/null; then
-          echo "pctl already installed: $(pctl version)"
+          echo "pctl already installed: $(pctl version 2>&1 | head -1)"
           echo "installed=true" >> "$GITHUB_OUTPUT"
         else
           echo "installed=false" >> "$GITHUB_OUTPUT"
         fi
 
-    - name: Install pctl
-      if: steps.check.outputs.installed != 'true'
+        if [ -n "${GITHUB_WORKSPACE:-}" ] && [ -f "${GITHUB_WORKSPACE}/go.mod" ] && \
+           grep -q "^module github.com/credova/pctl$" "${GITHUB_WORKSPACE}/go.mod" 2>/dev/null; then
+          echo "Local pctl source detected at ${GITHUB_WORKSPACE}"
+          echo "from_source=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "from_source=false" >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: Setup Go (for source build)
+      if: steps.check.outputs.installed != 'true' && steps.check.outputs.from_source == 'true'
+      uses: actions/setup-go@v5
+      with:
+        go-version-file: ${{ github.workspace }}/go.mod
+        cache: false
+
+    - name: Build pctl from local source
+      if: steps.check.outputs.installed != 'true' && steps.check.outputs.from_source == 'true'
+      shell: bash
+      working-directory: ${{ github.workspace }}
+      run: |
+        echo "::group::Build pctl from source"
+        go build -trimpath -ldflags="-s -w" -o /tmp/pctl .
+        sudo install -m 755 /tmp/pctl /usr/local/bin/pctl
+        rm -f /tmp/pctl
+        echo "Built pctl: $(pctl version 2>&1 | head -1)"
+        echo "::endgroup::"
+
+    - name: Install pctl from release
+      if: steps.check.outputs.installed != 'true' && steps.check.outputs.from_source != 'true'
       shell: bash
       env:
         PCTL_VERSION: ${{ inputs.version }}
