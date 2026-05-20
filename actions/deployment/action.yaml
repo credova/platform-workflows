@@ -50,6 +50,11 @@ inputs:
   token:
     description: GitHub token with read access to credova/pctl releases (e.g. from a GitHub App)
     required: true
+  # Dash0 deployment annotations
+  dash0-token:
+    description: Dash0 ingest token. When set, pctl emits a deployment.succeeded OTel log event to Dash0 on success.
+    required: false
+    default: ""
 
 outputs:
   revision:
@@ -86,4 +91,9 @@ runs:
         CONFIG_PATH: ${{ inputs.config-path }}
         REVISION: ${{ inputs.revision }}
         PCTL_SLACK_BOT_TOKEN: ${{ inputs.slack-token }}
+        # Dash0 annotation env: only set when a token is provided so pctl's
+        # telemetry resolver treats it as disabled in repos that haven't
+        # wired the secret yet.
+        OTEL_EXPORTER_OTLP_ENDPOINT: ${{ inputs.dash0-token != '' && 'https://ingress.us-west-2.aws.dash0.com' || '' }}
+        OTEL_EXPORTER_OTLP_HEADERS: ${{ inputs.dash0-token != '' && format('Authorization=Bearer {0}', inputs.dash0-token) || '' }}
       run: ${{ github.action_path }}/../../scripts/deploy.sh

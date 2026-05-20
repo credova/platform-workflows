@@ -148,6 +148,8 @@ on:
         required: false
       PCTL_SLACK_BOT_TOKEN:
         required: false
+      DASH0_TOKEN:
+        required: false
 
 jobs:
   # --- Input validation and image parsing ---
@@ -365,6 +367,7 @@ jobs:
           project-id: ${{ inputs.project-id }}
           workload-identity-provider: ${{ inputs.workload-identity-provider }}
           slack-token: ${{ secrets.PCTL_SLACK_BOT_TOKEN }}
+          dash0-token: ${{ secrets.DASH0_TOKEN }}
           token: ${{ steps.token.outputs.token }}
 
   # --- Canary flow ---
@@ -398,6 +401,7 @@ jobs:
           project-id: ${{ inputs.project-id }}
           workload-identity-provider: ${{ inputs.workload-identity-provider }}
           slack-token: ${{ secrets.PCTL_SLACK_BOT_TOKEN }}
+          dash0-token: ${{ secrets.DASH0_TOKEN }}
           token: ${{ steps.token.outputs.token }}
 
   # --- Production approval ---
@@ -467,6 +471,7 @@ jobs:
           project-id: ${{ inputs.project-id }}
           workload-identity-provider: ${{ inputs.workload-identity-provider }}
           slack-token: ${{ secrets.PCTL_SLACK_BOT_TOKEN }}
+          dash0-token: ${{ secrets.DASH0_TOKEN }}
           token: ${{ steps.token.outputs.token }}
 
       - name: Deploy to production (full)
@@ -479,6 +484,7 @@ jobs:
           project-id: ${{ inputs.project-id }}
           workload-identity-provider: ${{ inputs.workload-identity-provider }}
           slack-token: ${{ secrets.PCTL_SLACK_BOT_TOKEN }}
+          dash0-token: ${{ secrets.DASH0_TOKEN }}
           token: ${{ steps.token.outputs.token }}
 
   # --- Release ---
