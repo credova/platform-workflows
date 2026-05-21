@@ -52,7 +52,7 @@ inputs:
     required: true
   # Dash0 deployment annotations
   dash0-url:
-    description: Dash0 OTLP ingest base URL (e.g. https://ingress.us-west-2.aws.dash0.com). Required for annotations.
+    description: Dash0 OTLP ingest base URL (region-specific). Required for annotations.
     required: false
     default: ""
   dash0-token:
