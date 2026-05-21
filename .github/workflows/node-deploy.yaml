@@ -67,6 +67,11 @@ on:
         type: boolean
         required: false
         default: false
+      dash0-annotations:
+        description: Emit a deployment.succeeded annotation to Dash0 after each successful deploy. Requires DASH0_URL and DASH0_TOKEN org-level vars/secrets.
+        type: boolean
+        required: false
+        default: false
 
       # Release
       release:
@@ -273,8 +278,8 @@ jobs:
           project-id: ${{ inputs.project-id }}
           workload-identity-provider: ${{ inputs.workload-identity-provider }}
           slack-token: ${{ secrets.PCTL_SLACK_BOT_TOKEN }}
-          dash0-url: ${{ vars.DASH0_URL }}
-          dash0-token: ${{ secrets.DASH0_TOKEN }}
+          dash0-url: ${{ inputs.dash0-annotations && vars.DASH0_URL || '' }}
+          dash0-token: ${{ inputs.dash0-annotations && secrets.DASH0_TOKEN || '' }}
           token: ${{ needs.auth.outputs.token }}
 
   # --- Canary flow ---
@@ -302,8 +307,8 @@ jobs:
           project-id: ${{ inputs.project-id }}
           workload-identity-provider: ${{ inputs.workload-identity-provider }}
           slack-token: ${{ secrets.PCTL_SLACK_BOT_TOKEN }}
-          dash0-url: ${{ vars.DASH0_URL }}
-          dash0-token: ${{ secrets.DASH0_TOKEN }}
+          dash0-url: ${{ inputs.dash0-annotations && vars.DASH0_URL || '' }}
+          dash0-token: ${{ inputs.dash0-annotations && secrets.DASH0_TOKEN || '' }}
           token: ${{ needs.auth.outputs.token }}
 
   # --- Production approval ---
@@ -366,8 +371,8 @@ jobs:
           project-id: ${{ inputs.project-id }}
           workload-identity-provider: ${{ inputs.workload-identity-provider }}
           slack-token: ${{ secrets.PCTL_SLACK_BOT_TOKEN }}
-          dash0-url: ${{ vars.DASH0_URL }}
-          dash0-token: ${{ secrets.DASH0_TOKEN }}
+          dash0-url: ${{ inputs.dash0-annotations && vars.DASH0_URL || '' }}
+          dash0-token: ${{ inputs.dash0-annotations && secrets.DASH0_TOKEN || '' }}
           token: ${{ needs.auth.outputs.token }}
 
       - name: Deploy to production (full)
@@ -380,8 +385,8 @@ jobs:
           project-id: ${{ inputs.project-id }}
           workload-identity-provider: ${{ inputs.workload-identity-provider }}
           slack-token: ${{ secrets.PCTL_SLACK_BOT_TOKEN }}
-          dash0-url: ${{ vars.DASH0_URL }}
-          dash0-token: ${{ secrets.DASH0_TOKEN }}
+          dash0-url: ${{ inputs.dash0-annotations && vars.DASH0_URL || '' }}
+          dash0-token: ${{ inputs.dash0-annotations && secrets.DASH0_TOKEN || '' }}
           token: ${{ needs.auth.outputs.token }}
 
   # --- Release ---
