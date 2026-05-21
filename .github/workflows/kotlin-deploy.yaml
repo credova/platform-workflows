@@ -273,6 +273,7 @@ jobs:
           project-id: ${{ inputs.project-id }}
           workload-identity-provider: ${{ inputs.workload-identity-provider }}
           slack-token: ${{ secrets.PCTL_SLACK_BOT_TOKEN }}
+          dash0-url: ${{ vars.DASH0_URL }}
           dash0-token: ${{ secrets.DASH0_TOKEN }}
           token: ${{ needs.auth.outputs.token }}
 
@@ -301,6 +302,7 @@ jobs:
           project-id: ${{ inputs.project-id }}
           workload-identity-provider: ${{ inputs.workload-identity-provider }}
           slack-token: ${{ secrets.PCTL_SLACK_BOT_TOKEN }}
+          dash0-url: ${{ vars.DASH0_URL }}
           dash0-token: ${{ secrets.DASH0_TOKEN }}
           token: ${{ needs.auth.outputs.token }}
 
@@ -364,6 +366,7 @@ jobs:
           project-id: ${{ inputs.project-id }}
           workload-identity-provider: ${{ inputs.workload-identity-provider }}
           slack-token: ${{ secrets.PCTL_SLACK_BOT_TOKEN }}
+          dash0-url: ${{ vars.DASH0_URL }}
           dash0-token: ${{ secrets.DASH0_TOKEN }}
           token: ${{ needs.auth.outputs.token }}
 
@@ -377,6 +380,7 @@ jobs:
           project-id: ${{ inputs.project-id }}
           workload-identity-provider: ${{ inputs.workload-identity-provider }}
           slack-token: ${{ secrets.PCTL_SLACK_BOT_TOKEN }}
+          dash0-url: ${{ vars.DASH0_URL }}
           dash0-token: ${{ secrets.DASH0_TOKEN }}
           token: ${{ needs.auth.outputs.token }}
 
