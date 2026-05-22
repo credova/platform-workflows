@@ -87,7 +87,6 @@ That's it. Security scanning, compliance checks, container build, and deployment
 | [security](actions/security/)             | Syft + Grype vuln scan, Grant license scan, OpenGrep static analysis |
 | [run-job](actions/run-job/)               | Deploy and execute a Cloud Run Job                                   |
 | [setup-language](actions/setup-language/) | Multi-language runtime setup (Go, Node, Kotlin, Python, Ruby, .NET)  |
-| [terrateam](actions/terrateam/)           | Terrateam composite for Pulumi/Terraform repos                       |
 
 Internal actions (called by workflows, not directly by teams):
 
@@ -97,6 +96,36 @@ Internal actions (called by workflows, not directly by teams):
 | [auth-npm-token](actions/auth-npm-token/)         | GitHub App token for npm publishing              |
 | [auth-release-token](actions/auth-release-token/) | GitHub App token for private repo releases       |
 | [install-pctl](actions/install-pctl/)             | pctl binary installer with checksum verification |
+
+## Releases
+
+Releases are tagged manually. Pin to a major version tag for automatic patch/minor updates:
+
+```yaml
+uses: credova/platform-workflows/.github/workflows/pull-request.yaml@v1
+```
+
+| Tag | Behavior |
+| --- | -------- |
+| `@v1` | Floating - gets all `v1.x.x` updates automatically |
+| `@v1.2.3` | Frozen - exact version forever |
+| `@master` | Unreleased tip - not recommended for production |
+
+To cut a release, either push a tag directly:
+
+```bash
+git tag v1.2.3 && git push origin v1.2.3
+```
+
+Or trigger via dispatch to auto-increment:
+
+```bash
+gh workflow run release.yaml -R credova/platform-workflows -f bump=patch   # v1.0.1
+gh workflow run release.yaml -R credova/platform-workflows -f bump=minor   # v1.1.0
+gh workflow run release.yaml -R credova/platform-workflows -f bump=major   # v2.0.0
+```
+
+Breaking changes require a major bump. Consumers must opt in by updating to `@v2`.
 
 ## Docs
 

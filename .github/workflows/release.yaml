@@ -1,8 +1,6 @@
 name: Release
 
 on:
-  push:
-    branches: [master]
   workflow_dispatch:
     inputs:
       bump:
@@ -14,6 +12,9 @@ on:
           - patch
           - minor
           - major
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
 
 permissions:
   contents: write
@@ -27,16 +28,36 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Compute next version
+      - name: Resolve tag
         id: tag
+        shell: bash
+        run: |
+          if [[ "${GITHUB_EVENT_NAME}" == "push" ]]; then
+            # Triggered by a manually pushed tag - use it directly
+            echo "tag=${GITHUB_REF_NAME}" >> "${GITHUB_OUTPUT}"
+          else
+            # Triggered by workflow_dispatch - compute next version
+            echo "tag=" >> "${GITHUB_OUTPUT}"
+          fi
+
+      - name: Compute next version
+        id: increment
+        if: steps.tag.outputs.tag == ''
         uses: ./actions/increment-tag
         with:
           bump: ${{ github.event.inputs.bump || 'patch' }}
 
-      - name: Create and push tag
+      - name: Set final tag
+        id: final
+        shell: bash
+        run: |
+          TAG="${{ steps.tag.outputs.tag || steps.increment.outputs.tag }}"
+          echo "tag=${TAG}" >> "${GITHUB_OUTPUT}"
+
+      - name: Rewrite refs and push tag
         shell: bash
         env:
-          TAG: ${{ steps.tag.outputs.tag }}
+          TAG: ${{ steps.final.outputs.tag }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -49,16 +70,24 @@ jobs:
           git commit -am "chore: pin internal action refs to ${TAG}"
           RELEASE_SHA=$(git rev-parse HEAD)
           echo "RELEASE_SHA=${RELEASE_SHA}" >> "${GITHUB_ENV}"
-          git tag "${TAG}"
-          git push origin "${TAG}"
+
+          # For dispatch-triggered releases the tag doesn't exist yet; for tag-push
+          # it already exists, so we move it to the pinned-refs commit.
+          if [[ "${GITHUB_EVENT_NAME}" == "push" ]]; then
+            git tag -f "${TAG}"
+            git push origin "${TAG}" --force
+          else
+            git tag "${TAG}"
+            git push origin "${TAG}"
+          fi
+
           git reset --hard HEAD~1
 
-      - name: Update major version branch
+      - name: Update major version tag
         shell: bash
         env:
-          TAG: ${{ steps.tag.outputs.tag }}
+          TAG: ${{ steps.final.outputs.tag }}
         run: |
-          # Extract major version (e.g., v1 from v1.2.3)
           MAJOR=$(echo "${TAG}" | grep -oP 'v\d+')
           git tag -f "${MAJOR}" "${RELEASE_SHA}"
           git push origin "${MAJOR}" --force
@@ -67,7 +96,7 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ steps.tag.outputs.tag }}
+          TAG: ${{ steps.final.outputs.tag }}
         run: |
           gh release create "${TAG}" \
             --title "${TAG}" \
