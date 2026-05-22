@@ -1,0 +1,297 @@
+name: Go
+
+on:
+  workflow_call:
+    inputs:
+      # Mise tasks
+      lint:
+        description: Run mise lint
+        type: boolean
+        required: false
+        default: true
+      security:
+        description: Run mise security
+        type: boolean
+        required: false
+        default: true
+      test:
+        description: Run tests
+        type: boolean
+        required: false
+        default: true
+      test-command:
+        description: "Custom test command (default: go test -v -race -coverprofile=coverage.out ./...)"
+        type: string
+        required: false
+        default: ""
+
+      # GoReleaser
+      goreleaser:
+        description: Run GoReleaser (snapshot on branch push, full release on tag)
+        type: boolean
+        required: false
+        default: true
+      goreleaser-args:
+        description: Additional GoReleaser args
+        type: string
+        required: false
+        default: ""
+
+      # Auth (for Docker push on tag releases)
+      project-id:
+        description: GCP project ID
+        type: string
+        required: false
+        default: ""
+      workload-identity-provider:
+        description: Workload Identity Provider resource name
+        type: string
+        required: false
+        default: ""
+      service-account:
+        description: Service account email to impersonate via WIF
+        type: string
+        required: false
+        default: ""
+
+      # Runner
+      runner:
+        description: GitHub Actions runner label
+        type: string
+        required: false
+        default: warp-ubuntu-latest-arm64-4x
+
+    secrets:
+      RELEASE_DOWNLOADER_APP_ID:
+        required: false
+      RELEASE_DOWNLOADER_APP_PRIVATE_KEY:
+        required: false
+      HOMEBREW_PUBLISHER_APP_ID:
+        required: false
+      HOMEBREW_PUBLISHER_APP_PRIVATE_KEY:
+        required: false
+
+jobs:
+  lint:
+    if: inputs.lint
+    name: Lint
+    runs-on: ${{ inputs.runner }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Generate cross-repo token
+        id: cross-repo-token
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ secrets.RELEASE_DOWNLOADER_APP_ID }}
+          private-key: ${{ secrets.RELEASE_DOWNLOADER_APP_PRIVATE_KEY }}
+          owner: credova
+          repositories: shared-configs
+
+      - name: Setup mise
+        uses: jdx/mise-action@v4
+        with:
+          install: true
+          cache: true
+        env:
+          MISE_GITHUB_TOKEN: ${{ steps.cross-repo-token.outputs.token || github.token }}
+          GIT_CONFIG_COUNT: 1
+          GIT_CONFIG_KEY_0: "url.https://x-access-token:${{ steps.cross-repo-token.outputs.token || github.token }}@github.com/.insteadOf"
+          GIT_CONFIG_VALUE_0: "ssh://git@github.com/"
+
+      - name: Run lint
+        id: lint
+        continue-on-error: true
+        run: mise run lint 2>&1 | tee lint-output.txt
+        env:
+          GIT_CONFIG_COUNT: 1
+          GIT_CONFIG_KEY_0: "url.https://x-access-token:${{ steps.cross-repo-token.outputs.token || github.token }}@github.com/.insteadOf"
+          GIT_CONFIG_VALUE_0: "ssh://git@github.com/"
+
+      - name: Post Go comment
+        if: always() && github.event_name == 'pull_request'
+        uses: credova/platform-workflows/actions/go-report@master
+        with:
+          job: lint
+          outcome: ${{ steps.lint.outcome }}
+          output-file: lint-output.txt
+
+      - name: Fail on lint errors
+        if: steps.lint.outcome == 'failure'
+        shell: bash
+        run: exit 1
+
+  security:
+    if: inputs.security
+    name: Security
+    runs-on: ${{ inputs.runner }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Generate cross-repo token
+        id: cross-repo-token
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ secrets.RELEASE_DOWNLOADER_APP_ID }}
+          private-key: ${{ secrets.RELEASE_DOWNLOADER_APP_PRIVATE_KEY }}
+          owner: credova
+          repositories: shared-configs
+
+      - name: Setup mise
+        uses: jdx/mise-action@v4
+        with:
+          install: true
+          cache: true
+        env:
+          MISE_GITHUB_TOKEN: ${{ steps.cross-repo-token.outputs.token || github.token }}
+          GIT_CONFIG_COUNT: 1
+          GIT_CONFIG_KEY_0: "url.https://x-access-token:${{ steps.cross-repo-token.outputs.token || github.token }}@github.com/.insteadOf"
+          GIT_CONFIG_VALUE_0: "ssh://git@github.com/"
+
+      - name: Run security
+        id: security
+        continue-on-error: true
+        run: mise run security 2>&1 | tee security-output.txt
+        env:
+          GIT_CONFIG_COUNT: 1
+          GIT_CONFIG_KEY_0: "url.https://x-access-token:${{ steps.cross-repo-token.outputs.token || github.token }}@github.com/.insteadOf"
+          GIT_CONFIG_VALUE_0: "ssh://git@github.com/"
+
+      - name: Post Go comment
+        if: always() && github.event_name == 'pull_request'
+        uses: credova/platform-workflows/actions/go-report@master
+        with:
+          job: security
+          outcome: ${{ steps.security.outcome }}
+          output-file: security-output.txt
+
+      - name: Fail on security errors
+        if: steps.security.outcome == 'failure'
+        shell: bash
+        run: exit 1
+
+  test:
+    if: inputs.test
+    name: Test
+    runs-on: ${{ inputs.runner }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Generate cross-repo token
+        id: cross-repo-token
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ secrets.RELEASE_DOWNLOADER_APP_ID }}
+          private-key: ${{ secrets.RELEASE_DOWNLOADER_APP_PRIVATE_KEY }}
+          owner: credova
+          repositories: shared-configs
+
+      - name: Setup mise
+        uses: jdx/mise-action@v4
+        with:
+          install: true
+          cache: true
+        env:
+          MISE_GITHUB_TOKEN: ${{ steps.cross-repo-token.outputs.token || github.token }}
+          GIT_CONFIG_COUNT: 1
+          GIT_CONFIG_KEY_0: "url.https://x-access-token:${{ steps.cross-repo-token.outputs.token || github.token }}@github.com/.insteadOf"
+          GIT_CONFIG_VALUE_0: "ssh://git@github.com/"
+
+      - name: Run tests
+        id: test
+        continue-on-error: true
+        shell: bash
+        env:
+          TEST_COMMAND: ${{ inputs.test-command }}
+          GIT_CONFIG_COUNT: 1
+          GIT_CONFIG_KEY_0: "url.https://x-access-token:${{ steps.cross-repo-token.outputs.token || github.token }}@github.com/.insteadOf"
+          GIT_CONFIG_VALUE_0: "ssh://git@github.com/"
+        run: |
+          if [ -n "${TEST_COMMAND}" ]; then
+            echo "Running: ${TEST_COMMAND}"
+            eval "${TEST_COMMAND}" 2>&1 | tee test-output.txt
+          else
+            mise run test 2>&1 | tee test-output.txt
+          fi
+
+      - name: Post Go comment
+        if: always() && github.event_name == 'pull_request'
+        uses: credova/platform-workflows/actions/go-report@master
+        with:
+          job: test
+          outcome: ${{ steps.test.outcome }}
+          output-file: test-output.txt
+
+      - name: Fail on test errors
+        if: steps.test.outcome == 'failure'
+        shell: bash
+        run: exit 1
+
+  goreleaser:
+    name: GoReleaser
+    needs: [lint, security, test]
+    if: inputs.goreleaser && !failure() && !cancelled()
+    runs-on: ${{ inputs.runner }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Generate cross-repo token
+        id: cross-repo-token
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ secrets.RELEASE_DOWNLOADER_APP_ID }}
+          private-key: ${{ secrets.RELEASE_DOWNLOADER_APP_PRIVATE_KEY }}
+          owner: credova
+          repositories: shared-configs
+
+      - name: Setup mise
+        uses: jdx/mise-action@v4
+        with:
+          install: true
+          cache: true
+        env:
+          MISE_GITHUB_TOKEN: ${{ steps.cross-repo-token.outputs.token || github.token }}
+          GIT_CONFIG_COUNT: 1
+          GIT_CONFIG_KEY_0: "url.https://x-access-token:${{ steps.cross-repo-token.outputs.token || github.token }}@github.com/.insteadOf"
+          GIT_CONFIG_VALUE_0: "ssh://git@github.com/"
+
+      - name: Configure git for private modules
+        env:
+          TOKEN: ${{ steps.cross-repo-token.outputs.token || github.token }}
+        run: |
+          git config --global url."https://x-access-token:${TOKEN}@github.com/".insteadOf "https://github.com/"
+          echo "GOPRIVATE=github.com/credova/*" >> $GITHUB_ENV
+
+      - name: Set snapshot flag for non-tag builds
+        if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+        run: echo "GORELEASER_FLAGS=--snapshot" >> $GITHUB_ENV
+
+      - name: Authenticate to GCP
+        if: startsWith(github.ref, 'refs/tags/v') && inputs.workload-identity-provider != ''
+        uses: credova/platform-workflows/actions/auth-gcp@master
+        with:
+          project-id: ${{ inputs.project-id }}
+          workload-identity-provider: ${{ inputs.workload-identity-provider }}
+          service-account: ${{ inputs.service-account }}
+
+      - name: Generate Homebrew token
+        if: startsWith(github.ref, 'refs/tags/v')
+        id: homebrew-token
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ secrets.HOMEBREW_PUBLISHER_APP_ID }}
+          private-key: ${{ secrets.HOMEBREW_PUBLISHER_APP_PRIVATE_KEY }}
+          owner: credova
+          repositories: homebrew-tap
+
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v7
+        with:
+          distribution: goreleaser
+          version: latest
+          args: release --clean ${{ env.GORELEASER_FLAGS }} ${{ inputs.goreleaser-args }}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          HOMEBREW_GITHUB_API_TOKEN: ${{ steps.homebrew-token.outputs.token }}

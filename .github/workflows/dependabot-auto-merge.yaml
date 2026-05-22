@@ -1,0 +1,62 @@
+name: "Shared: Dependabot Auto-Merge"
+
+on:
+  workflow_call:
+    inputs:
+      merge-strategy:
+        description: "Merge strategy: squash, merge, rebase"
+        type: string
+        required: false
+        default: squash
+      allow-major:
+        description: Auto-merge major version updates too
+        type: boolean
+        required: false
+        default: false
+
+jobs:
+  auto-merge:
+    if: github.actor == 'dependabot[bot]'
+    runs-on: warp-ubuntu-2204-x64-2x
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Fetch dependabot metadata
+        id: metadata
+        uses: dependabot/fetch-metadata@v2
+        with:
+          github-token: ${{ github.token }}
+
+      - name: Auto-merge patch updates
+        if: steps.metadata.outputs.update-type == 'version-update:semver-patch'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          STRATEGY: ${{ inputs.merge-strategy }}
+        run: |
+          gh pr review "${PR_URL}" --approve
+          gh pr merge "${PR_URL}" --auto --"${STRATEGY}"
+
+      - name: Auto-merge minor updates
+        if: steps.metadata.outputs.update-type == 'version-update:semver-minor'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          STRATEGY: ${{ inputs.merge-strategy }}
+        run: |
+          gh pr review "${PR_URL}" --approve
+          gh pr merge "${PR_URL}" --auto --"${STRATEGY}"
+
+      - name: Auto-merge major updates (if allowed)
+        if: inputs.allow-major && steps.metadata.outputs.update-type == 'version-update:semver-major'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          STRATEGY: ${{ inputs.merge-strategy }}
+        run: |
+          gh pr review "${PR_URL}" --approve
+          gh pr merge "${PR_URL}" --auto --"${STRATEGY}"

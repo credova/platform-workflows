@@ -1,0 +1,271 @@
+name: container
+description: >
+  Full container lifecycle - build, scan, push, tag, reuse, retag.
+  Self-contained: calls auth-gcp internally. Calls security (container scan) automatically after build.
+
+inputs:
+  name:
+    description: Image name (used for registry path)
+    required: true
+  dockerfile:
+    description: Path to Dockerfile
+    required: false
+    default: ./Dockerfile
+  context:
+    description: Docker build context
+    required: false
+    default: ./
+  target:
+    description: Docker build stage target (--target)
+    required: false
+    default: ""
+  build:
+    description: Build the image
+    required: false
+    default: "true"
+  push:
+    description: Push to Artifact Registry after scan
+    required: false
+    default: "false"
+  reuse:
+    description: Check if image exists first, skip build if so
+    required: false
+    default: "true"
+  tag:
+    description: Image tag
+    required: false
+    default: ${{ github.sha }}
+  extra-tags:
+    description: Additional tags to apply
+    required: false
+    default: ""
+  retag:
+    description: Retag an existing image (skip build + scan)
+    required: false
+    default: "false"
+  source-tag:
+    description: Source tag for retag operation
+    required: false
+    default: ""
+  build-args:
+    description: Docker build args
+    required: false
+    default: ""
+  platform:
+    description: "Target platform (e.g. linux/amd64, linux/arm64)"
+    required: false
+    default: linux/amd64
+  # Auth inputs (passed through to auth-gcp)
+  project-id:
+    description: GCP project ID
+    required: false
+    default: ""
+  workload-identity-provider:
+    description: Workload Identity Provider resource name
+    required: false
+    default: ""
+  service-account:
+    description: Service account email to impersonate via WIF
+    required: false
+    default: ""
+  registry:
+    description: Artifact Registry hostname
+    required: false
+    default: us-docker.pkg.dev
+  scan:
+    description: Run security scan on the built image (syft + grype)
+    required: false
+    default: "true"
+  severity:
+    description: Minimum severity to fail container scan on
+    required: false
+    default: HIGH
+  # WarpBuild (opt-in)
+  warpbuild-profile:
+    description: "WarpBuild Docker Builder profile name (enables WarpBuild remote builds)"
+    required: false
+    default: ""
+  warpbuild-api-key:
+    description: "WarpBuild API key (only needed when NOT running on WarpBuild runners)"
+    required: false
+    default: ""
+
+outputs:
+  image:
+    description: Full image reference (registry/project/repo/name:tag)
+    value: ${{ steps.meta.outputs.image }}
+  digest:
+    description: Image digest
+    value: ${{ steps.push-image.outputs.digest }}
+  reused:
+    description: Whether the image was reused from a previous build
+    value: ${{ steps.reuse-check.outputs.exists }}
+
+runs:
+  using: composite
+  steps:
+    - name: Compute image metadata
+      id: meta
+      shell: bash
+      env:
+        REGISTRY: ${{ inputs.registry }}
+        PROJECT_ID: ${{ inputs.project-id }}
+        IMAGE_NAME: ${{ inputs.name }}
+        IMAGE_TAG: ${{ inputs.tag }}
+      run: |
+        IMAGE="${REGISTRY}/${PROJECT_ID}/${IMAGE_NAME}:${IMAGE_TAG}"
+        echo "image=${IMAGE}" >> "$GITHUB_OUTPUT"
+        echo "Image: ${IMAGE}"
+
+    - name: Validate inputs
+      if: inputs.build == 'true' || inputs.retag == 'true'
+      shell: bash
+      env:
+        PROJECT_ID: ${{ inputs.project-id }}
+        RETAG: ${{ inputs.retag }}
+        SOURCE_TAG: ${{ inputs.source-tag }}
+      run: |
+        if [ -z "${PROJECT_ID}" ]; then
+          echo "::error::project-id is required for container operations"
+          exit 1
+        fi
+        if [ "${RETAG}" = "true" ] && [ -z "${SOURCE_TAG}" ]; then
+          echo "::error::source-tag is required when retag is true"
+          exit 1
+        fi
+
+    - name: Authenticate to GCP
+      if: inputs.project-id != '' && inputs.workload-identity-provider != ''
+      uses: credova/platform-workflows/actions/auth-gcp@master
+      with:
+        project-id: ${{ inputs.project-id }}
+        workload-identity-provider: ${{ inputs.workload-identity-provider }}
+        service-account: ${{ inputs.service-account }}
+        registry: ${{ inputs.registry }}
+
+    # --- Retag flow ---
+    - name: Retag existing image
+      if: inputs.retag == 'true'
+      shell: bash
+      env:
+        REGISTRY: ${{ inputs.registry }}
+        PROJECT_ID: ${{ inputs.project-id }}
+        IMAGE_NAME: ${{ inputs.name }}
+        SOURCE_TAG: ${{ inputs.source-tag }}
+        TARGET_TAG: ${{ inputs.tag }}
+      run: |
+        SOURCE="${REGISTRY}/${PROJECT_ID}/${IMAGE_NAME}:${SOURCE_TAG}"
+        TARGET="${REGISTRY}/${PROJECT_ID}/${IMAGE_NAME}:${TARGET_TAG}"
+        echo "Retagging ${SOURCE} -> ${TARGET}"
+        gcloud artifacts docker tags add "${SOURCE}" "${TARGET}"
+
+    # --- Build flow ---
+    - name: Check for existing image (reuse)
+      id: reuse-check
+      if: inputs.build == 'true' && inputs.reuse == 'true' && inputs.retag != 'true'
+      shell: bash
+      env:
+        IMAGE: ${{ steps.meta.outputs.image }}
+      run: |
+        if docker manifest inspect "${IMAGE}" > /dev/null 2>&1; then
+          echo "Image already exists, skipping build."
+          echo "exists=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "Image not found, will build."
+          echo "exists=false" >> "$GITHUB_OUTPUT"
+        fi
+
+    # --- WarpBuild build path (opt-in via warpbuild-profile) ---
+    - name: Configure WarpBuild Docker Builder
+      if: >
+        inputs.warpbuild-profile != '' &&
+        inputs.build == 'true' &&
+        inputs.retag != 'true' &&
+        steps.reuse-check.outputs.exists != 'true'
+      uses: Warpbuilds/docker-configure@v1
+      with:
+        profile-name: ${{ inputs.warpbuild-profile }}
+        api-key: ${{ inputs.warpbuild-api-key }}
+
+    - name: Build image (WarpBuild)
+      if: >
+        inputs.warpbuild-profile != '' &&
+        inputs.build == 'true' &&
+        inputs.retag != 'true' &&
+        steps.reuse-check.outputs.exists != 'true'
+      uses: Warpbuilds/build-push-action@v6
+      with:
+        context: ${{ inputs.context }}
+        file: ${{ inputs.dockerfile }}
+        target: ${{ inputs.target }}
+        platforms: ${{ inputs.platform }}
+        tags: ${{ steps.meta.outputs.image }}
+        push: ${{ inputs.push }}
+        load: ${{ inputs.push != 'true' }}
+        build-args: ${{ inputs.build-args }}
+
+    # --- Standard build path (default - no WarpBuild) ---
+    - name: Setup Docker Buildx
+      if: >
+        inputs.warpbuild-profile == '' &&
+        inputs.build == 'true' &&
+        inputs.retag != 'true' &&
+        steps.reuse-check.outputs.exists != 'true'
+      uses: docker/setup-buildx-action@v4
+
+    - name: Setup QEMU (cross-platform)
+      if: >
+        inputs.warpbuild-profile == '' &&
+        inputs.build == 'true' &&
+        inputs.retag != 'true' &&
+        steps.reuse-check.outputs.exists != 'true' &&
+        inputs.platform != 'linux/amd64'
+      uses: docker/setup-qemu-action@v4
+
+    - name: Build image
+      if: >
+        inputs.warpbuild-profile == '' &&
+        inputs.build == 'true' &&
+        inputs.retag != 'true' &&
+        steps.reuse-check.outputs.exists != 'true'
+      shell: bash
+      env:
+        IMAGE: ${{ steps.meta.outputs.image }}
+        DOCKERFILE: ${{ inputs.dockerfile }}
+        CONTEXT: ${{ inputs.context }}
+        TARGET: ${{ inputs.target }}
+        PLATFORM: ${{ inputs.platform }}
+        BUILD_ARGS: ${{ inputs.build-args }}
+        PUSH: ${{ inputs.push }}
+      run: ${{ github.action_path }}/../../scripts/docker-build.sh
+
+    - name: Scan container image
+      if: >
+        inputs.scan == 'true' &&
+        inputs.build == 'true' &&
+        inputs.retag != 'true' &&
+        steps.reuse-check.outputs.exists != 'true'
+      uses: credova/platform-workflows/actions/security@master
+      with:
+        target: docker:${{ steps.meta.outputs.image }}
+        image-name: ${{ inputs.name }}
+        packages: "true"
+        licenses: "false"
+        code: "false"
+        severity: ${{ inputs.severity }}
+        platform: ${{ inputs.platform }}
+
+    - name: Tag and push image
+      id: push-image
+      if: >
+        inputs.push == 'true' &&
+        inputs.retag != 'true'
+      shell: bash
+      env:
+        IMAGE: ${{ steps.meta.outputs.image }}
+        EXTRA_TAGS: ${{ inputs.extra-tags }}
+        REGISTRY: ${{ inputs.registry }}
+        PROJECT_ID: ${{ inputs.project-id }}
+        IMAGE_NAME: ${{ inputs.name }}
+        BUILDX_PUSH: ${{ (inputs.warpbuild-profile != '' || inputs.platform != 'linux/amd64') && 'true' || 'false' }}
+      run: ${{ github.action_path }}/../../scripts/docker-push.sh

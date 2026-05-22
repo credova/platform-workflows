@@ -1,0 +1,103 @@
+name: deployment
+description: >
+  Deploy to Cloud Run via pctl. Handles auth, notifications, canary, promote, and rollback.
+  Self-contained: calls auth-gcp internally. Notifications handled by pctl.
+
+inputs:
+  target:
+    description: Target name from CUE config
+    required: true
+  tag:
+    description: Image tag to deploy
+    required: false
+    default: ${{ github.sha }}
+  action:
+    description: "Action to perform: deploy, promote, rollback, abort"
+    required: false
+    default: deploy
+  canary:
+    description: Canary traffic percentage (0 = full deploy)
+    required: false
+    default: "0"
+  config-path:
+    description: Path to CUE config directory
+    required: false
+    default: deployments
+  revision:
+    description: Revision name (required for promote/rollback)
+    required: false
+    default: ""
+  # Auth inputs
+  project-id:
+    description: GCP project ID
+    required: false
+    default: ""
+  workload-identity-provider:
+    description: Workload Identity Provider resource name
+    required: false
+    default: ""
+  # Slack notifications (pctl reads token from env automatically)
+  slack-token:
+    description: Slack bot token for deploy notifications (or set PCTL_SLACK_BOT_TOKEN in workflow env)
+    required: false
+    default: ""
+  # pctl
+  pctl-version:
+    description: pctl version to install
+    required: false
+    default: latest
+  # Token for private repo access (pctl download)
+  token:
+    description: GitHub token with read access to credova/pctl releases (e.g. from a GitHub App)
+    required: true
+  # Dash0 deployment annotations
+  dash0-url:
+    description: Dash0 OTLP ingest base URL (region-specific). Required for annotations.
+    required: false
+    default: ""
+  dash0-token:
+    description: Dash0 ingest token. When set with dash0-url, pctl emits a deployment.succeeded OTel log event to Dash0 on success.
+    required: false
+    default: ""
+
+outputs:
+  revision:
+    description: Deployed Cloud Run revision name
+    value: ${{ steps.deploy.outputs.revision }}
+  traffic:
+    description: JSON traffic allocation
+    value: ${{ steps.deploy.outputs.traffic }}
+
+runs:
+  using: composite
+  steps:
+    - name: Authenticate to GCP
+      if: inputs.project-id != '' && inputs.workload-identity-provider != ''
+      uses: credova/platform-workflows/actions/auth-gcp@master
+      with:
+        project-id: ${{ inputs.project-id }}
+        workload-identity-provider: ${{ inputs.workload-identity-provider }}
+
+    - name: Install pctl
+      uses: credova/platform-workflows/actions/install-pctl@master
+      with:
+        version: ${{ inputs.pctl-version }}
+        token: ${{ inputs.token }}
+
+    - name: Execute deployment
+      id: deploy
+      shell: bash
+      env:
+        TARGET: ${{ inputs.target }}
+        TAG: ${{ inputs.tag }}
+        ACTION: ${{ inputs.action }}
+        CANARY: ${{ inputs.canary }}
+        CONFIG_PATH: ${{ inputs.config-path }}
+        REVISION: ${{ inputs.revision }}
+        PCTL_SLACK_BOT_TOKEN: ${{ inputs.slack-token }}
+        # Dash0 annotation env: only set when both URL and token are provided
+        # so pctl's telemetry resolver treats it as disabled in repos that
+        # haven't wired the variable/secret yet.
+        OTEL_EXPORTER_OTLP_ENDPOINT: ${{ inputs.dash0-url != '' && inputs.dash0-token != '' && inputs.dash0-url || '' }}
+        OTEL_EXPORTER_OTLP_HEADERS: ${{ inputs.dash0-url != '' && inputs.dash0-token != '' && format('Authorization=Bearer {0}', inputs.dash0-token) || '' }}
+      run: ${{ github.action_path }}/../../scripts/deploy.sh

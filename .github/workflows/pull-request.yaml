@@ -1,0 +1,231 @@
+name: Pull Request
+
+on:
+  workflow_call:
+    inputs:
+      # Language (optional - for repos that need tests outside a Dockerfile)
+      language:
+        description: "Language runtime to setup: go, node, kotlin, python, ruby, dotnet"
+        type: string
+        required: false
+        default: ""
+      language-version:
+        description: Language/runtime version (required if language is set)
+        type: string
+        required: false
+        default: ""
+      test-command:
+        description: Custom test command (defaults per language if empty)
+        type: string
+        required: false
+        default: ""
+
+      # Container (on by default - disable for non-container repos)
+      container:
+        description: Build and scan a container image
+        type: boolean
+        required: false
+        default: true
+      image:
+        description: "Single image - name:dockerfile or just name (defaults to ./Dockerfile)"
+        type: string
+        required: false
+        default: ""
+      images:
+        description: "Multi-image YAML list with name, dockerfile, optional target, context, platform"
+        type: string
+        required: false
+        default: ""
+      platform:
+        description: "Target platform for single-image builds (e.g. linux/amd64, linux/arm64)"
+        type: string
+        required: false
+        default: linux/amd64
+
+      # WarpBuild (opt-in)
+      warpbuild-profile:
+        description: "WarpBuild Docker Builder profile name (enables WarpBuild remote builds)"
+        type: string
+        required: false
+        default: ""
+
+      # Caching
+      cache:
+        description: "Enable dependency caching via WarpBuild cache (requires WarpBuild runners)"
+        type: boolean
+        required: false
+        default: false
+
+      # Runner
+      runner:
+        description: "GitHub Actions runner label"
+        type: string
+        required: false
+        default: warp-ubuntu-2204-x64-2x
+
+      # Security
+      security-packages:
+        description: Run package vulnerability scan (source + image)
+        type: boolean
+        required: false
+        default: true
+      security-licenses:
+        description: Run license compliance scan (informational only)
+        type: boolean
+        required: false
+        default: true
+      security-code:
+        description: Run code static analysis
+        type: boolean
+        required: false
+        default: true
+      security-severity:
+        description: Minimum severity to fail on
+        type: string
+        required: false
+        default: HIGH
+
+      # Compliance
+      compliance-ticket:
+        description: Require ticket reference
+        type: boolean
+        required: false
+        default: true
+
+    secrets:
+      WARPBUILD_API_KEY:
+        required: false
+
+jobs:
+  # --- Input validation and image parsing ---
+  validate-inputs:
+    runs-on: ${{ inputs.runner }}
+    outputs:
+      image-matrix: ${{ steps.parse.outputs.image-matrix }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Validate inputs
+        shell: bash
+        env:
+          IMAGE: ${{ inputs.image }}
+          IMAGES: ${{ inputs.images }}
+          LANGUAGE: ${{ inputs.language }}
+          LANGUAGE_VERSION: ${{ inputs.language-version }}
+        run: |
+          if [ -n "${IMAGE}" ] && [ -n "${IMAGES}" ]; then
+            echo "::error::Cannot specify both 'image' and 'images'. Use one or the other."
+            exit 1
+          fi
+          if [ -n "${LANGUAGE}" ] && [ -z "${LANGUAGE_VERSION}" ]; then
+            echo "::error::language-version is required when language is set."
+            exit 1
+          fi
+
+      - name: Parse image inputs
+        id: parse
+        uses: credova/platform-workflows/actions/parse-images@master
+        with:
+          image: ${{ inputs.image }}
+          images: ${{ inputs.images }}
+          container: ${{ inputs.container && 'true' || 'false' }}
+          platform: ${{ inputs.platform }}
+          repo-name: ${{ github.event.repository.name }}
+
+  # --- Security scanning (always runs) ---
+  security:
+    runs-on: ${{ inputs.runner }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup language
+        if: inputs.language != ''
+        uses: credova/platform-workflows/actions/setup-language@master
+        with:
+          language: ${{ inputs.language }}
+          version: ${{ inputs.language-version }}
+          cache: ${{ inputs.cache && 'true' || 'false' }}
+
+      - name: Security scan
+        uses: credova/platform-workflows/actions/security@master
+        with:
+          packages: ${{ inputs.security-packages && 'true' || 'false' }}
+          licenses: ${{ inputs.security-licenses && 'true' || 'false' }}
+          code: ${{ inputs.security-code && 'true' || 'false' }}
+          severity: ${{ inputs.security-severity }}
+
+  # --- Tests (only when language is set) ---
+  test:
+    if: inputs.language != ''
+    needs: [security]
+    runs-on: ${{ inputs.runner }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup language
+        uses: credova/platform-workflows/actions/setup-language@master
+        with:
+          language: ${{ inputs.language }}
+          version: ${{ inputs.language-version }}
+          cache: ${{ inputs.cache && 'true' || 'false' }}
+
+      - name: Run tests
+        shell: bash
+        env:
+          LANGUAGE: ${{ inputs.language }}
+          TEST_COMMAND: ${{ inputs.test-command }}
+        run: |
+          # Use custom test command if provided
+          if [ -n "${TEST_COMMAND}" ]; then
+            echo "Running: ${TEST_COMMAND}"
+            eval "${TEST_COMMAND}"
+            exit $?
+          fi
+
+          # Default test commands per language
+          case "${LANGUAGE}" in
+            go)     go test ./... ;;
+            node)   npm ci && npm test ;;
+            kotlin) ./gradlew test ;;
+            python) pip install -e ".[test]" 2>/dev/null || pip install -e . && pytest ;;
+            ruby)   bundle install && bundle exec rake test ;;
+            dotnet) dotnet test ;;
+          esac
+
+  # --- Container build + scan (only when container is enabled) ---
+  build:
+    if: inputs.container
+    needs: [validate-inputs, security]
+    runs-on: ${{ inputs.runner }}
+    strategy:
+      fail-fast: true
+      matrix:
+        include: ${{ fromJson(needs.validate-inputs.outputs.image-matrix) }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Build container image (${{ matrix.name }})
+        uses: credova/platform-workflows/actions/container@master
+        with:
+          name: ${{ matrix.name }}
+          dockerfile: ${{ matrix.dockerfile }}
+          context: ${{ matrix.context }}
+          target: ${{ matrix.target }}
+          platform: ${{ matrix.platform }}
+          build: "true"
+          push: "false"
+          warpbuild-profile: ${{ inputs.warpbuild-profile }}
+          warpbuild-api-key: ${{ secrets.WARPBUILD_API_KEY }}
+
+  # --- Compliance (runs after tests and/or build) ---
+  compliance:
+    needs: [test, build]
+    if: always() && !failure() && !cancelled()
+    runs-on: ${{ inputs.runner }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Compliance checks
+        uses: credova/platform-workflows/actions/compliance@master
+        with:
+          ticket: ${{ inputs.compliance-ticket && 'true' || 'false' }}

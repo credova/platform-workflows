@@ -1,0 +1,494 @@
+name: "PHP: Pull Request"
+
+on:
+  workflow_call:
+    inputs:
+      php-version:
+        description: PHP version
+        type: string
+        required: false
+        default: "8.2"
+      test-command:
+        description: "Override test command (default: mise run test)"
+        type: string
+        required: false
+        default: ""
+      lint-command:
+        description: "Override lint command (default: mise run lint)"
+        type: string
+        required: false
+        default: ""
+
+      # Container
+      container:
+        description: Build and scan a container image on PR (no push)
+        type: boolean
+        required: false
+        default: true
+      image:
+        description: "Single image - name:dockerfile or just name (defaults to ./Dockerfile)"
+        type: string
+        required: false
+        default: ""
+      images:
+        description: "Multi-image YAML list with name, dockerfile, optional target, context, platform"
+        type: string
+        required: false
+        default: ""
+      platform:
+        description: "Target platform (e.g. linux/amd64, linux/arm64)"
+        type: string
+        required: false
+        default: linux/amd64
+
+      # Run ordering
+      run-order:
+        description: "Job execution order: linear (default), parallel, checks-first"
+        type: string
+        required: false
+        default: linear
+
+      # Security overrides (shared security action - grype/grant/opengrep)
+      security-packages:
+        description: Run package vulnerability scan
+        type: boolean
+        required: false
+        default: true
+      security-licenses:
+        description: Run license compliance scan
+        type: boolean
+        required: false
+        default: true
+      security-code:
+        description: Run code static analysis
+        type: boolean
+        required: false
+        default: true
+      security-severity:
+        description: Minimum severity to fail on
+        type: string
+        required: false
+        default: HIGH
+
+      # Compliance
+      compliance-ticket:
+        description: Require Shortcut ticket reference
+        type: boolean
+        required: false
+        default: true
+
+      # WarpBuild
+      warpbuild-profile:
+        description: "WarpBuild Docker Builder profile name"
+        type: string
+        required: false
+        default: ""
+      cache:
+        description: "Enable WarpBuild dependency caching"
+        type: boolean
+        required: false
+        default: false
+
+      # Runner
+      runner:
+        description: "GitHub Actions runner label"
+        type: string
+        required: false
+        default: warp-ubuntu-2204-x64-2x
+
+    secrets:
+      WARPBUILD_API_KEY:
+        required: false
+
+jobs:
+  # --- Input validation and image parsing ---
+  validate:
+    runs-on: ${{ inputs.runner }}
+    outputs:
+      image-matrix: ${{ steps.parse.outputs.image-matrix }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Validate inputs
+        shell: bash
+        env:
+          IMAGE: ${{ inputs.image }}
+          IMAGES: ${{ inputs.images }}
+        run: |
+          if [ -n "${IMAGE}" ] && [ -n "${IMAGES}" ]; then
+            echo "::error::Cannot specify both 'image' and 'images'. Use one or the other."
+            exit 1
+          fi
+
+      - name: Parse image inputs
+        id: parse
+        uses: credova/platform-workflows/actions/parse-images@master
+        with:
+          image: ${{ inputs.image }}
+          images: ${{ inputs.images }}
+          container: ${{ inputs.container && 'true' || 'false' }}
+          platform: ${{ inputs.platform }}
+          repo-name: ${{ github.event.repository.name }}
+
+  # ============================================================
+  # LINEAR mode: Lint -> Security -> Test -> Container
+  # ============================================================
+
+  lint-linear:
+    if: inputs.run-order == 'linear'
+    runs-on: ${{ inputs.runner }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: credova/platform-workflows/actions/setup-language@master
+        with:
+          language: php
+          version: ${{ inputs.php-version }}
+          cache: ${{ inputs.cache && 'true' || 'false' }}
+      - name: Setup mise
+        uses: jdx/mise-action@v4
+        with:
+          install: true
+          cache: true
+      - name: Lint
+        shell: bash
+        env:
+          LINT_COMMAND: ${{ inputs.lint-command }}
+        run: |
+          if [ -n "${LINT_COMMAND}" ]; then
+            eval "${LINT_COMMAND}"
+          elif mise task ls 2>/dev/null | grep -q '^lint '; then
+            mise run lint
+          else
+            echo "No lint task found in mise.toml and no lint-command override provided. Skipping."
+          fi
+
+  security-linear:
+    if: inputs.run-order == 'linear' && always() && !failure() && !cancelled()
+    needs: [lint-linear]
+    runs-on: ${{ inputs.runner }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: credova/platform-workflows/actions/setup-language@master
+        with:
+          language: php
+          version: ${{ inputs.php-version }}
+          cache: ${{ inputs.cache && 'true' || 'false' }}
+      - name: Setup mise
+        uses: jdx/mise-action@v4
+        with:
+          install: true
+          cache: true
+      - name: Security (mise)
+        shell: bash
+        run: |
+          if mise task ls 2>/dev/null | grep -q '^security '; then
+            mise run security
+          fi
+      - uses: credova/platform-workflows/actions/security@master
+        with:
+          packages: ${{ inputs.security-packages && 'true' || 'false' }}
+          licenses: ${{ inputs.security-licenses && 'true' || 'false' }}
+          code: ${{ inputs.security-code && 'true' || 'false' }}
+          severity: ${{ inputs.security-severity }}
+
+  test-linear:
+    if: inputs.run-order == 'linear'
+    needs: [security-linear]
+    runs-on: ${{ inputs.runner }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: credova/platform-workflows/actions/setup-language@master
+        with:
+          language: php
+          version: ${{ inputs.php-version }}
+          cache: ${{ inputs.cache && 'true' || 'false' }}
+      - name: Setup mise
+        uses: jdx/mise-action@v4
+        with:
+          install: true
+          cache: true
+      - name: Test
+        shell: bash
+        env:
+          TEST_COMMAND: ${{ inputs.test-command }}
+        run: |
+          if [ -n "${TEST_COMMAND}" ]; then
+            eval "${TEST_COMMAND}"
+          elif mise task ls 2>/dev/null | grep -q '^test '; then
+            mise run test
+          else
+            echo "No test task found in mise.toml and no test-command override provided. Skipping."
+          fi
+
+  build-linear:
+    if: inputs.run-order == 'linear' && inputs.container
+    needs: [validate, test-linear]
+    runs-on: ${{ inputs.runner }}
+    strategy:
+      fail-fast: true
+      matrix:
+        include: ${{ fromJson(needs.validate.outputs.image-matrix) }}
+    steps:
+      - uses: actions/checkout@v6
+      - name: Build container (${{ matrix.name }})
+        uses: credova/platform-workflows/actions/container@master
+        with:
+          name: ${{ matrix.name }}
+          dockerfile: ${{ matrix.dockerfile }}
+          context: ${{ matrix.context }}
+          target: ${{ matrix.target }}
+          platform: ${{ matrix.platform }}
+          build: "true"
+          push: "false"
+          warpbuild-profile: ${{ inputs.warpbuild-profile }}
+          warpbuild-api-key: ${{ secrets.WARPBUILD_API_KEY }}
+
+  # ============================================================
+  # PARALLEL mode: All jobs at once, cancel on first failure
+  # ============================================================
+
+  lint-parallel:
+    if: inputs.run-order == 'parallel'
+    runs-on: ${{ inputs.runner }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: credova/platform-workflows/actions/setup-language@master
+        with:
+          language: php
+          version: ${{ inputs.php-version }}
+          cache: ${{ inputs.cache && 'true' || 'false' }}
+      - name: Setup mise
+        uses: jdx/mise-action@v4
+        with:
+          install: true
+          cache: true
+      - name: Lint
+        shell: bash
+        env:
+          LINT_COMMAND: ${{ inputs.lint-command }}
+        run: |
+          if [ -n "${LINT_COMMAND}" ]; then
+            eval "${LINT_COMMAND}"
+          elif mise task ls 2>/dev/null | grep -q '^lint '; then
+            mise run lint
+          else
+            echo "No lint task found in mise.toml and no lint-command override provided. Skipping."
+          fi
+
+  security-parallel:
+    if: inputs.run-order == 'parallel'
+    runs-on: ${{ inputs.runner }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: credova/platform-workflows/actions/setup-language@master
+        with:
+          language: php
+          version: ${{ inputs.php-version }}
+          cache: ${{ inputs.cache && 'true' || 'false' }}
+      - name: Setup mise
+        uses: jdx/mise-action@v4
+        with:
+          install: true
+          cache: true
+      - name: Security (mise)
+        shell: bash
+        run: |
+          if mise task ls 2>/dev/null | grep -q '^security '; then
+            mise run security
+          fi
+      - uses: credova/platform-workflows/actions/security@master
+        with:
+          packages: ${{ inputs.security-packages && 'true' || 'false' }}
+          licenses: ${{ inputs.security-licenses && 'true' || 'false' }}
+          code: ${{ inputs.security-code && 'true' || 'false' }}
+          severity: ${{ inputs.security-severity }}
+
+  test-parallel:
+    if: inputs.run-order == 'parallel'
+    runs-on: ${{ inputs.runner }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: credova/platform-workflows/actions/setup-language@master
+        with:
+          language: php
+          version: ${{ inputs.php-version }}
+          cache: ${{ inputs.cache && 'true' || 'false' }}
+      - name: Setup mise
+        uses: jdx/mise-action@v4
+        with:
+          install: true
+          cache: true
+      - name: Test
+        shell: bash
+        env:
+          TEST_COMMAND: ${{ inputs.test-command }}
+        run: |
+          if [ -n "${TEST_COMMAND}" ]; then
+            eval "${TEST_COMMAND}"
+          elif mise task ls 2>/dev/null | grep -q '^test '; then
+            mise run test
+          else
+            echo "No test task found in mise.toml and no test-command override provided. Skipping."
+          fi
+
+  build-parallel:
+    if: inputs.run-order == 'parallel' && inputs.container
+    needs: [validate]
+    runs-on: ${{ inputs.runner }}
+    strategy:
+      fail-fast: true
+      matrix:
+        include: ${{ fromJson(needs.validate.outputs.image-matrix) }}
+    steps:
+      - uses: actions/checkout@v6
+      - name: Build container (${{ matrix.name }})
+        uses: credova/platform-workflows/actions/container@master
+        with:
+          name: ${{ matrix.name }}
+          dockerfile: ${{ matrix.dockerfile }}
+          context: ${{ matrix.context }}
+          target: ${{ matrix.target }}
+          platform: ${{ matrix.platform }}
+          build: "true"
+          push: "false"
+          warpbuild-profile: ${{ inputs.warpbuild-profile }}
+          warpbuild-api-key: ${{ secrets.WARPBUILD_API_KEY }}
+
+  # ============================================================
+  # CHECKS-FIRST mode: Security -> Lint+Test parallel -> Container
+  # ============================================================
+
+  security-checks-first:
+    if: inputs.run-order == 'checks-first'
+    runs-on: ${{ inputs.runner }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: credova/platform-workflows/actions/setup-language@master
+        with:
+          language: php
+          version: ${{ inputs.php-version }}
+          cache: ${{ inputs.cache && 'true' || 'false' }}
+      - name: Setup mise
+        uses: jdx/mise-action@v4
+        with:
+          install: true
+          cache: true
+      - name: Security (mise)
+        shell: bash
+        run: |
+          if mise task ls 2>/dev/null | grep -q '^security '; then
+            mise run security
+          fi
+      - uses: credova/platform-workflows/actions/security@master
+        with:
+          packages: ${{ inputs.security-packages && 'true' || 'false' }}
+          licenses: ${{ inputs.security-licenses && 'true' || 'false' }}
+          code: ${{ inputs.security-code && 'true' || 'false' }}
+          severity: ${{ inputs.security-severity }}
+
+  lint-checks-first:
+    if: inputs.run-order == 'checks-first'
+    needs: [security-checks-first]
+    runs-on: ${{ inputs.runner }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: credova/platform-workflows/actions/setup-language@master
+        with:
+          language: php
+          version: ${{ inputs.php-version }}
+          cache: ${{ inputs.cache && 'true' || 'false' }}
+      - name: Setup mise
+        uses: jdx/mise-action@v4
+        with:
+          install: true
+          cache: true
+      - name: Lint
+        shell: bash
+        env:
+          LINT_COMMAND: ${{ inputs.lint-command }}
+        run: |
+          if [ -n "${LINT_COMMAND}" ]; then
+            eval "${LINT_COMMAND}"
+          elif mise task ls 2>/dev/null | grep -q '^lint '; then
+            mise run lint
+          else
+            echo "No lint task found in mise.toml and no lint-command override provided. Skipping."
+          fi
+
+  test-checks-first:
+    if: inputs.run-order == 'checks-first'
+    needs: [security-checks-first]
+    runs-on: ${{ inputs.runner }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: credova/platform-workflows/actions/setup-language@master
+        with:
+          language: php
+          version: ${{ inputs.php-version }}
+          cache: ${{ inputs.cache && 'true' || 'false' }}
+      - name: Setup mise
+        uses: jdx/mise-action@v4
+        with:
+          install: true
+          cache: true
+      - name: Test
+        shell: bash
+        env:
+          TEST_COMMAND: ${{ inputs.test-command }}
+        run: |
+          if [ -n "${TEST_COMMAND}" ]; then
+            eval "${TEST_COMMAND}"
+          elif mise task ls 2>/dev/null | grep -q '^test '; then
+            mise run test
+          else
+            echo "No test task found in mise.toml and no test-command override provided. Skipping."
+          fi
+
+  build-checks-first:
+    if: inputs.run-order == 'checks-first' && inputs.container && always() && !failure() && !cancelled()
+    needs: [validate, lint-checks-first, test-checks-first]
+    runs-on: ${{ inputs.runner }}
+    strategy:
+      fail-fast: true
+      matrix:
+        include: ${{ fromJson(needs.validate.outputs.image-matrix) }}
+    steps:
+      - uses: actions/checkout@v6
+      - name: Build container (${{ matrix.name }})
+        uses: credova/platform-workflows/actions/container@master
+        with:
+          name: ${{ matrix.name }}
+          dockerfile: ${{ matrix.dockerfile }}
+          context: ${{ matrix.context }}
+          target: ${{ matrix.target }}
+          platform: ${{ matrix.platform }}
+          build: "true"
+          push: "false"
+          warpbuild-profile: ${{ inputs.warpbuild-profile }}
+          warpbuild-api-key: ${{ secrets.WARPBUILD_API_KEY }}
+
+  # ============================================================
+  # Compliance (runs after all modes complete)
+  # ============================================================
+
+  compliance:
+    needs:
+      - lint-linear
+      - security-linear
+      - test-linear
+      - build-linear
+      - lint-parallel
+      - security-parallel
+      - test-parallel
+      - build-parallel
+      - security-checks-first
+      - lint-checks-first
+      - test-checks-first
+      - build-checks-first
+    if: always() && !failure() && !cancelled()
+    runs-on: ${{ inputs.runner }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: credova/platform-workflows/actions/compliance@master
+        with:
+          ticket: ${{ inputs.compliance-ticket && 'true' || 'false' }}

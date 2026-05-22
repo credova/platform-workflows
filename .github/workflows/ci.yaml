@@ -1,0 +1,92 @@
+name: CI - Validate Actions
+
+on:
+  pull_request:
+    branches: [master]
+  push:
+    branches: [master]
+
+jobs:
+  validate:
+    runs-on: warp-ubuntu-2204-x64-2x
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Validate YAML syntax
+        shell: bash
+        run: |
+          echo "Validating YAML syntax with yamllint..."
+          ERRORS=0
+
+          for yaml_file in actions/*/action.yaml .github/workflows/*.yaml; do
+            if ! yamllint -d relaxed "${yaml_file}" > /dev/null 2>&1; then
+              echo "::error file=${yaml_file}::yamllint failed"
+              yamllint -d relaxed "${yaml_file}" || true
+              ERRORS=$((ERRORS + 1))
+            fi
+          done
+
+          if [ "${ERRORS}" -gt 0 ]; then
+            echo "::error::${ERRORS} YAML file(s) failed lint"
+            exit 1
+          fi
+
+          echo "All YAML files pass lint."
+
+      - name: Validate action.yaml files
+        shell: bash
+        run: |
+          echo "Validating composite action definitions..."
+          ERRORS=0
+
+          for action_file in actions/*/action.yaml; do
+            echo "Checking ${action_file}..."
+
+            # Verify required fields exist using grep (no yq dependency)
+            if ! grep -q '^name:' "${action_file}"; then
+              echo "::error file=${action_file}::Missing 'name' field"
+              ERRORS=$((ERRORS + 1))
+            fi
+
+            if ! grep -q 'using: composite' "${action_file}"; then
+              echo "::error file=${action_file}::Expected runs.using=composite"
+              ERRORS=$((ERRORS + 1))
+            fi
+
+            echo "  OK ${action_file}"
+          done
+
+          if [ "${ERRORS}" -gt 0 ]; then
+            echo "::error::${ERRORS} validation error(s) found"
+            exit 1
+          fi
+
+          echo "All actions validated successfully."
+
+      - name: Validate workflow files
+        shell: bash
+        run: |
+          echo "Validating reusable workflow definitions..."
+          ERRORS=0
+
+          for workflow_file in .github/workflows/*.yaml; do
+            # Skip self and release
+            [ "$(basename "${workflow_file}")" = "ci.yaml" ] && continue
+            [ "$(basename "${workflow_file}")" = "release.yaml" ] && continue
+
+            echo "Checking ${workflow_file}..."
+
+            # Verify it's a reusable workflow (has workflow_call trigger)
+            if ! grep -q 'workflow_call' "${workflow_file}"; then
+              echo "::warning file=${workflow_file}::No workflow_call trigger (not a reusable workflow)"
+            fi
+
+            echo "  OK $(basename "${workflow_file}")"
+          done
+
+          if [ "${ERRORS}" -gt 0 ]; then
+            echo "::error::${ERRORS} validation error(s) found"
+            exit 1
+          fi
+
+          echo "All workflows validated successfully."

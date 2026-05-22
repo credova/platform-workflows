@@ -1,0 +1,26 @@
+name: compliance
+description: >
+  Process and policy gates. Ensures teams follow required procedures.
+  Default behavior: opt-out. All checks run unless explicitly disabled.
+
+inputs:
+  ticket:
+    description: PR/commit must reference a Shortcut ticket (sc-NNNNN or Shortcut link)
+    required: false
+    default: "true"
+
+runs:
+  using: composite
+  steps:
+    - name: Check ticket reference
+      if: inputs.ticket == 'true'
+      shell: bash
+      env:
+        PR_TITLE: ${{ github.event.pull_request.title || '' }}
+        PR_BODY: ${{ github.event.pull_request.body || '' }}
+        PR_BRANCH: ${{ github.head_ref || github.ref_name }}
+        HEAD_COMMIT_MSG: ${{ github.event.head_commit.message || '' }}
+        PR_NUMBER: ${{ github.event.pull_request.number || '' }}
+        REPO: ${{ github.repository }}
+        GH_TOKEN: ${{ github.token }}
+      run: ${{ github.action_path }}/../../scripts/check-shortcut-ticket.sh

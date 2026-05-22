@@ -1,0 +1,24 @@
+# Pulumi state and stack files
+.pulumi/
+
+# Go build output
+bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# IDE/editor settings
+.idea/
+.vscode/
+*.swp
+.DS_Store
+
+# Local environment files
+.env
+.env.*
+
+.local
+.vscode
+.claude

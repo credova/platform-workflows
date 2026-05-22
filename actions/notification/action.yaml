@@ -1,0 +1,130 @@
+name: notification
+description: >
+  Standalone Slack notifications for any use case.
+  Wraps pctl slack notify with Block Kit formatted messages and threading support.
+
+inputs:
+  channel:
+    description: Slack channel ID or name
+    required: true
+  status:
+    description: "Notification status: started, success, failed, cancelled"
+    required: true
+  service:
+    description: Service name
+    required: true
+  host:
+    description: Service host/URL
+    required: false
+    default: ""
+  project:
+    description: GCP project ID
+    required: false
+    default: ""
+  author:
+    description: Commit author / who triggered
+    required: false
+    default: ${{ github.actor }}
+  approver:
+    description: Who approved the release
+    required: false
+    default: ""
+  revision:
+    description: Deployed revision name
+    required: false
+    default: ""
+  message:
+    description: Commit message or custom text
+    required: false
+    default: ""
+  thread-ts:
+    description: "Thread timestamp - without reply: updates in-place; with reply: posts thread reply"
+    required: false
+    default: ""
+  reply:
+    description: Post as thread reply instead of updating in-place (requires thread-ts)
+    required: false
+    default: "false"
+  template:
+    description: "Template name (deploy, general, security) or path to .json.tmpl file"
+    required: false
+    default: ""
+  # Link inputs
+  run-url:
+    description: GitHub Actions run URL
+    required: false
+    default: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+  story-url:
+    description: Shortcut story URL
+    required: false
+    default: ""
+  gcp-logs-url:
+    description: GCP Cloud Run logs URL
+    required: false
+    default: ""
+  dashboard-url:
+    description: Observability dashboard URL
+    required: false
+    default: ""
+  rollback-url:
+    description: GCP console rollback URL
+    required: false
+    default: ""
+  rollback-revision:
+    description: Revision number for rollback label
+    required: false
+    default: ""
+  # Auth
+  slack-token:
+    description: Slack bot token
+    required: true
+  # pctl
+  pctl-version:
+    description: pctl version to install
+    required: false
+    default: latest
+  token:
+    description: GitHub token with read access to credova/pctl releases (e.g. from a GitHub App)
+    required: true
+
+outputs:
+  message-ts:
+    description: Slack message timestamp (for threading)
+    value: ${{ steps.notify.outputs.message-ts }}
+  channel-id:
+    description: Slack channel ID
+    value: ${{ steps.notify.outputs.channel-id }}
+
+runs:
+  using: composite
+  steps:
+    - name: Install pctl
+      uses: credova/platform-workflows/actions/install-pctl@master
+      with:
+        version: ${{ inputs.pctl-version }}
+        token: ${{ inputs.token }}
+
+    - name: Send Slack notification
+      id: notify
+      shell: bash
+      env:
+        PCTL_SLACK_BOT_TOKEN: ${{ inputs.slack-token }}
+        CHANNEL: ${{ inputs.channel }}
+        STATUS: ${{ inputs.status }}
+        SERVICE: ${{ inputs.service }}
+        HOST: ${{ inputs.host }}
+        PROJECT: ${{ inputs.project }}
+        AUTHOR: ${{ inputs.author }}
+        APPROVER: ${{ inputs.approver }}
+        REVISION: ${{ inputs.revision }}
+        MESSAGE: ${{ inputs.message }}
+        THREAD_TS: ${{ inputs.thread-ts }}
+        REPLY: ${{ inputs.reply }}
+        TEMPLATE: ${{ inputs.template }}
+        RUN_URL: ${{ inputs.run-url }}
+        STORY_URL: ${{ inputs.story-url }}
+        GCP_LOGS_URL: ${{ inputs.gcp-logs-url }}
+        DASHBOARD_URL: ${{ inputs.dashboard-url }}
+        ROLLBACK_URL: ${{ inputs.rollback-url }}
+        ROLLBACK_REVISION: ${{ inputs.rollback-revision }}
+      run: ${{ github.action_path }}/../../scripts/notify-slack.sh

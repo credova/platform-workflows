@@ -1,0 +1,14 @@
+# Example: PHP plugin (WordPress/WooCommerce)
+name: Pull Request
+on:
+  pull_request:
+    branches: [master]
+permissions:
+  contents: read
+  pull-requests: write
+jobs:
+  ci:
+    uses: credova/platform-workflows/.github/workflows/php-pull-request.yaml@master
+    secrets: inherit
+    with:
+      container: false

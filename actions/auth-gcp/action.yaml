@@ -1,0 +1,36 @@
+name: auth-gcp
+description: >
+  Internal: Workload Identity Federation login + docker registry configuration.
+  Consumed by container, deployment, and secrets-setup. Teams never call this directly.
+
+inputs:
+  project-id:
+    description: GCP project ID
+    required: true
+  workload-identity-provider:
+    description: Workload Identity Provider resource name
+    required: true
+  service-account:
+    description: Service account email to impersonate via WIF
+    required: true
+  registry:
+    description: Artifact Registry hostname
+    required: false
+    default: us-docker.pkg.dev
+
+runs:
+  using: composite
+  steps:
+    - name: Authenticate to Google Cloud
+      uses: google-github-actions/auth@v3
+      with:
+        project_id: ${{ inputs.project-id }}
+        workload_identity_provider: ${{ inputs.workload-identity-provider }}
+        service_account: ${{ inputs.service-account }}
+
+    - name: Setup gcloud CLI
+      uses: google-github-actions/setup-gcloud@v3
+
+    - name: Configure Docker for Artifact Registry
+      shell: bash
+      run: gcloud auth configure-docker ${{ inputs.registry }} --quiet

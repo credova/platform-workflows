@@ -1,0 +1,73 @@
+name: Release
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "Version bump type: major, minor, patch"
+        required: false
+        default: patch
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: warp-ubuntu-2204-x64-2x
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Compute next version
+        id: tag
+        uses: ./actions/increment-tag
+        with:
+          bump: ${{ github.event.inputs.bump || 'patch' }}
+
+      - name: Create and push tag
+        shell: bash
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Rewrite @master refs in a release commit, tag it, then reset master back.
+          # master stays clean with @master refs; the tag snapshot has pinned refs.
+          find . -not -path './.git/*' \( -name '*.yaml' -o -name '*.yml' \) \
+            -exec grep -lF 'credova/platform-workflows/' {} \; \
+            | xargs sed -i "s|credova/platform-workflows/\(.\+\)@master|credova/platform-workflows/\1@${TAG}|g"
+          git commit -am "chore: pin internal action refs to ${TAG}"
+          RELEASE_SHA=$(git rev-parse HEAD)
+          echo "RELEASE_SHA=${RELEASE_SHA}" >> "${GITHUB_ENV}"
+          git tag "${TAG}"
+          git push origin "${TAG}"
+          git reset --hard HEAD~1
+
+      - name: Update major version branch
+        shell: bash
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          # Extract major version (e.g., v1 from v1.2.3)
+          MAJOR=$(echo "${TAG}" | grep -oP 'v\d+')
+          git tag -f "${MAJOR}" "${RELEASE_SHA}"
+          git push origin "${MAJOR}" --force
+
+      - name: Create GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          gh release create "${TAG}" \
+            --title "${TAG}" \
+            --generate-notes

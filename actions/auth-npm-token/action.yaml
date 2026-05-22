@@ -1,0 +1,33 @@
+name: auth-npm-token
+description: >
+  Internal: Generate a short-lived GitHub token for npm package publishing.
+  Uses the org-level GitHub App credentials. Single source of truth for npm auth.
+
+inputs:
+  client-id:
+    description: GitHub App client ID (from org secret)
+    required: true
+  private-key:
+    description: GitHub App private key PEM (from org secret)
+    required: true
+  repositories:
+    description: Comma-separated list of repositories to scope the token to
+    required: false
+    default: ""
+
+outputs:
+  token:
+    description: Short-lived GitHub token with package write access
+    value: ${{ steps.generate.outputs.token }}
+
+runs:
+  using: composite
+  steps:
+    - name: Generate npm publish token
+      id: generate
+      uses: actions/create-github-app-token@v3
+      with:
+        client-id: ${{ inputs.client-id }}
+        private-key: ${{ inputs.private-key }}
+        owner: credova
+        repositories: ${{ inputs.repositories }}

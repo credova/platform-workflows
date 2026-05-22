@@ -1,0 +1,146 @@
+name: setup-language
+description: >
+  Setup language runtime for the current job.
+  Supports Go, Node.js, Kotlin/JDK, Python, Ruby, .NET, and PHP.
+
+inputs:
+  language:
+    description: "Language to setup: go, node, kotlin, python, ruby, dotnet, php"
+    required: true
+  version:
+    description: Language/runtime version
+    required: true
+  cache:
+    description: "Enable dependency caching via WarpBuild cache (requires WarpBuild runners)"
+    required: false
+    default: "false"
+
+runs:
+  using: composite
+  steps:
+    # Go
+    - name: Setup Go
+      if: inputs.language == 'go'
+      uses: actions/setup-go@v6
+      with:
+        go-version: ${{ inputs.version }}
+        cache: ${{ inputs.cache != 'true' }}
+
+    - name: Cache Go modules
+      if: inputs.language == 'go' && inputs.cache == 'true'
+      uses: WarpBuilds/cache@v1
+      with:
+        path: ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        restore-keys: ${{ runner.os }}-go-
+
+    # Node.js
+    - name: Setup Node.js
+      if: inputs.language == 'node'
+      uses: actions/setup-node@v6
+      with:
+        node-version: ${{ inputs.version }}
+        package-manager-cache: ${{ inputs.cache != 'true' }}
+
+    - name: Cache npm
+      if: inputs.language == 'node' && inputs.cache == 'true'
+      uses: WarpBuilds/cache@v1
+      with:
+        path: ~/.npm
+        key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json', '**/yarn.lock') }}
+        restore-keys: ${{ runner.os }}-node-
+
+    # Kotlin / JDK + Gradle
+    - name: Setup JDK (Kotlin)
+      if: inputs.language == 'kotlin'
+      uses: actions/setup-java@v5
+      with:
+        distribution: temurin
+        java-version: ${{ inputs.version }}
+
+    - name: Setup Gradle
+      if: inputs.language == 'kotlin'
+      uses: gradle/actions/setup-gradle@v4
+      with:
+        cache-disabled: ${{ inputs.cache == 'true' }}
+
+    - name: Cache Gradle (WarpBuild)
+      if: inputs.language == 'kotlin' && inputs.cache == 'true'
+      uses: WarpBuilds/cache@v1
+      with:
+        path: |
+          ~/.gradle/caches
+          ~/.gradle/wrapper
+        key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+        restore-keys: ${{ runner.os }}-gradle-
+
+    # Python
+    - name: Setup Python
+      if: inputs.language == 'python'
+      uses: actions/setup-python@v6
+      with:
+        python-version: ${{ inputs.version }}
+
+    - name: Cache pip
+      if: inputs.language == 'python' && inputs.cache == 'true'
+      uses: WarpBuilds/cache@v1
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements*.txt', '**/pyproject.toml', '**/setup.py') }}
+        restore-keys: ${{ runner.os }}-pip-
+
+    # Ruby
+    - name: Setup Ruby
+      if: inputs.language == 'ruby'
+      uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: ${{ inputs.version }}
+
+    - name: Cache Bundler
+      if: inputs.language == 'ruby' && inputs.cache == 'true'
+      uses: WarpBuilds/cache@v1
+      with:
+        path: vendor/bundle
+        key: ${{ runner.os }}-bundler-${{ hashFiles('**/Gemfile.lock') }}
+        restore-keys: ${{ runner.os }}-bundler-
+
+    # .NET
+    - name: Setup .NET
+      if: inputs.language == 'dotnet'
+      uses: actions/setup-dotnet@v5
+      with:
+        dotnet-version: ${{ inputs.version }}
+
+    - name: Cache NuGet
+      if: inputs.language == 'dotnet' && inputs.cache == 'true'
+      uses: WarpBuilds/cache@v1
+      with:
+        path: ~/.nuget/packages
+        key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', '**/packages.lock.json') }}
+        restore-keys: ${{ runner.os }}-nuget-
+
+    # PHP
+    - name: Setup PHP
+      if: inputs.language == 'php'
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: ${{ inputs.version }}
+
+    - name: Cache Composer
+      if: inputs.language == 'php' && inputs.cache == 'true'
+      uses: WarpBuilds/cache@v1
+      with:
+        path: ~/.composer/cache
+        key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
+        restore-keys: ${{ runner.os }}-composer-
+
+    # Unknown
+    - name: Validate language
+      shell: bash
+      env:
+        LANGUAGE: ${{ inputs.language }}
+      run: |
+        case "${LANGUAGE}" in
+          go|node|kotlin|python|ruby|dotnet|php) ;;
+          *) echo "::error::Unsupported language: ${LANGUAGE}. Supported: go, node, kotlin, python, ruby, dotnet, php"; exit 1 ;;
+        esac

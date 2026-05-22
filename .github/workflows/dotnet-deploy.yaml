@@ -1,0 +1,450 @@
+name: ".NET: Deploy"
+
+on:
+  workflow_call:
+    inputs:
+      dotnet-version:
+        description: .NET version
+        type: string
+        required: false
+        default: "8.0"
+      test-command:
+        description: "Override test command (default: mise run test)"
+        type: string
+        required: false
+        default: ""
+
+      # Container
+      container:
+        description: Build, scan, and push a container image
+        type: boolean
+        required: false
+        default: true
+      image:
+        description: "Single image - name:dockerfile or just name (defaults to ./Dockerfile)"
+        type: string
+        required: false
+        default: ""
+      images:
+        description: "Multi-image YAML list with name, dockerfile, optional target, context, platform"
+        type: string
+        required: false
+        default: ""
+      platform:
+        description: "Target platform (e.g. linux/amd64, linux/arm64)"
+        type: string
+        required: false
+        default: linux/amd64
+      container-reuse:
+        description: Check for existing image before building
+        type: boolean
+        required: false
+        default: true
+
+      # Deployment
+      deploy:
+        description: Deploy to Cloud Run via pctl
+        type: boolean
+        required: false
+        default: true
+      config-path:
+        description: Path to CUE config directory
+        type: string
+        required: false
+        default: deployments/
+      canary:
+        description: Canary traffic percentage (0 = full deploy)
+        type: number
+        required: false
+        default: 0
+      require-approval:
+        description: Require manual approval for production
+        type: boolean
+        required: false
+        default: true
+      hotfix:
+        description: "Hotfix mode: skip staging and tests, deploy straight to production"
+        type: boolean
+        required: false
+        default: false
+      dash0-annotations:
+        description: Emit a deployment.succeeded annotation to Dash0 after each successful deploy. Requires DASH0_URL and DASH0_TOKEN org-level vars/secrets.
+        type: boolean
+        required: false
+        default: false
+
+      # Release
+      release:
+        description: Create a GitHub Release after successful production deploy
+        type: boolean
+        required: false
+        default: false
+
+      # Security
+      security-severity:
+        description: Minimum severity to fail container scan on
+        type: string
+        required: false
+        default: HIGH
+
+      # Notifications
+      notifications:
+        description: Send Slack notifications during deployment
+        type: boolean
+        required: false
+        default: true
+
+      # WarpBuild
+      warpbuild-profile:
+        description: "WarpBuild Docker Builder profile name"
+        type: string
+        required: false
+        default: ""
+      cache:
+        description: "Enable WarpBuild dependency caching"
+        type: boolean
+        required: false
+        default: false
+
+      # Auth
+      project-id:
+        description: GCP project ID
+        type: string
+        required: false
+        default: ""
+      workload-identity-provider:
+        description: Workload Identity Provider resource name
+        type: string
+        required: false
+        default: ""
+      service-account:
+        description: Service account email to impersonate via WIF
+        type: string
+        required: false
+        default: ""
+
+      # Runner
+      runner:
+        description: "GitHub Actions runner label"
+        type: string
+        required: false
+        default: warp-ubuntu-2204-x64-2x
+
+    secrets:
+      RELEASE_DOWNLOADER_APP_ID:
+        required: false
+      RELEASE_DOWNLOADER_APP_PRIVATE_KEY:
+        required: false
+      WARPBUILD_API_KEY:
+        required: false
+      PCTL_SLACK_BOT_TOKEN:
+        required: false
+      DASH0_TOKEN:
+        required: false
+
+jobs:
+  # --- Input validation and image parsing ---
+  validate:
+    runs-on: ${{ inputs.runner }}
+    outputs:
+      image-matrix: ${{ steps.parse.outputs.image-matrix }}
+      deploy-tag: ${{ steps.tag.outputs.deploy-tag }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Validate inputs
+        shell: bash
+        env:
+          IMAGE: ${{ inputs.image }}
+          IMAGES: ${{ inputs.images }}
+        run: |
+          if [ -n "${IMAGE}" ] && [ -n "${IMAGES}" ]; then
+            echo "::error::Cannot specify both 'image' and 'images'. Use one or the other."
+            exit 1
+          fi
+
+      - name: Parse image inputs
+        id: parse
+        uses: credova/platform-workflows/actions/parse-images@master
+        with:
+          image: ${{ inputs.image }}
+          images: ${{ inputs.images }}
+          container: ${{ inputs.container && 'true' || 'false' }}
+          platform: ${{ inputs.platform }}
+          repo-name: ${{ github.event.repository.name }}
+
+      - name: Compute deploy tag
+        id: tag
+        shell: bash
+        env:
+          HOTFIX: ${{ inputs.hotfix }}
+          REF_NAME: ${{ github.ref_name }}
+          SHA: ${{ github.sha }}
+        run: |
+          if [ "${HOTFIX}" = "true" ]; then
+            echo "deploy-tag=${REF_NAME}" >> "$GITHUB_OUTPUT"
+          else
+            echo "deploy-tag=${SHA}" >> "$GITHUB_OUTPUT"
+          fi
+
+  # --- Generate release download token (for pctl) ---
+  auth:
+    if: inputs.deploy
+    runs-on: ${{ inputs.runner }}
+    outputs:
+      token: ${{ steps.token.outputs.token }}
+    steps:
+      - uses: actions/checkout@v6
+      - name: Generate release download token
+        id: token
+        uses: credova/platform-workflows/actions/auth-release-token@master
+        with:
+          client-id: ${{ secrets.RELEASE_DOWNLOADER_APP_ID }}
+          private-key: ${{ secrets.RELEASE_DOWNLOADER_APP_PRIVATE_KEY }}
+
+  # --- Tests (skipped for hotfix) ---
+  test:
+    if: ${{ !inputs.hotfix }}
+    runs-on: ${{ inputs.runner }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: credova/platform-workflows/actions/setup-language@master
+        with:
+          language: dotnet
+          version: ${{ inputs.dotnet-version }}
+          cache: ${{ inputs.cache && 'true' || 'false' }}
+      - name: Setup mise
+        uses: jdx/mise-action@v4
+        with:
+          install: true
+          cache: true
+      - name: Test
+        shell: bash
+        env:
+          TEST_COMMAND: ${{ inputs.test-command }}
+        run: |
+          if [ -n "${TEST_COMMAND}" ]; then
+            eval "${TEST_COMMAND}"
+          elif mise task ls 2>/dev/null | grep -q '^test '; then
+            mise run test
+          else
+            echo "No test task found in mise.toml and no test-command override provided. Skipping."
+          fi
+
+  # --- Container build, scan, push ---
+  build-scan-push:
+    if: inputs.container && always() && !failure() && !cancelled()
+    needs: [validate, test]
+    runs-on: ${{ inputs.runner }}
+    strategy:
+      fail-fast: true
+      matrix:
+        include: ${{ fromJson(needs.validate.outputs.image-matrix) }}
+    steps:
+      - uses: actions/checkout@v6
+      - name: Build, scan, and push (${{ matrix.name }})
+        uses: credova/platform-workflows/actions/container@master
+        with:
+          name: ${{ matrix.name }}
+          dockerfile: ${{ matrix.dockerfile }}
+          context: ${{ matrix.context }}
+          target: ${{ matrix.target }}
+          platform: ${{ matrix.platform }}
+          build: "true"
+          push: "true"
+          reuse: ${{ !inputs.hotfix && inputs.container-reuse && 'true' || 'false' }}
+          tag: ${{ needs.validate.outputs.deploy-tag }}
+          project-id: ${{ inputs.project-id }}
+          workload-identity-provider: ${{ inputs.workload-identity-provider }}
+          service-account: ${{ inputs.service-account }}
+          severity: ${{ inputs.security-severity }}
+          warpbuild-profile: ${{ inputs.warpbuild-profile }}
+          warpbuild-api-key: ${{ secrets.WARPBUILD_API_KEY }}
+
+  # --- Deploy staging (skipped for hotfix) ---
+  deploy-staging:
+    if: inputs.deploy && !inputs.hotfix && always() && !failure() && !cancelled()
+    needs: [auth, build-scan-push, test, validate]
+    runs-on: ${{ inputs.runner }}
+    environment: staging
+    steps:
+      - uses: actions/checkout@v6
+      - name: Deploy to staging
+        uses: credova/platform-workflows/actions/deployment@master
+        with:
+          target: ${{ inputs.config-path }}
+          tag: ${{ needs.validate.outputs.deploy-tag }}
+          config-path: ${{ inputs.config-path }}
+          project-id: ${{ inputs.project-id }}
+          workload-identity-provider: ${{ inputs.workload-identity-provider }}
+          slack-token: ${{ secrets.PCTL_SLACK_BOT_TOKEN }}
+          dash0-url: ${{ inputs.dash0-annotations && vars.DASH0_URL || '' }}
+          dash0-token: ${{ inputs.dash0-annotations && secrets.DASH0_TOKEN || '' }}
+          token: ${{ needs.auth.outputs.token }}
+
+  # --- Canary flow ---
+  approve-canary:
+    if: inputs.deploy && inputs.canary > 0 && always() && !failure() && !cancelled()
+    needs: [deploy-staging, build-scan-push]
+    runs-on: ${{ inputs.runner }}
+    environment: production-canary
+    steps:
+      - run: echo "Canary deployment approved"
+
+  deploy-canary:
+    if: inputs.deploy && inputs.canary > 0
+    needs: [auth, approve-canary, validate]
+    runs-on: ${{ inputs.runner }}
+    steps:
+      - uses: actions/checkout@v6
+      - name: Deploy canary
+        uses: credova/platform-workflows/actions/deployment@master
+        with:
+          target: ${{ inputs.config-path }}
+          tag: ${{ needs.validate.outputs.deploy-tag }}
+          canary: ${{ inputs.canary }}
+          config-path: ${{ inputs.config-path }}
+          project-id: ${{ inputs.project-id }}
+          workload-identity-provider: ${{ inputs.workload-identity-provider }}
+          slack-token: ${{ secrets.PCTL_SLACK_BOT_TOKEN }}
+          dash0-url: ${{ inputs.dash0-annotations && vars.DASH0_URL || '' }}
+          dash0-token: ${{ inputs.dash0-annotations && secrets.DASH0_TOKEN || '' }}
+          token: ${{ needs.auth.outputs.token }}
+
+  # --- Production approval ---
+  approve-production:
+    if: inputs.deploy && inputs.require-approval && always() && !failure() && !cancelled()
+    needs: [build-scan-push, deploy-staging, deploy-canary]
+    runs-on: ${{ inputs.runner }}
+    environment: production
+    steps:
+      - run: echo "Production deployment approved"
+
+  # --- Retag images for production ---
+  retag-production:
+    if: inputs.container && inputs.deploy && always() && !failure() && !cancelled()
+    needs: [approve-production, validate]
+    runs-on: ${{ inputs.runner }}
+    strategy:
+      fail-fast: true
+      matrix:
+        include: ${{ fromJson(needs.validate.outputs.image-matrix) }}
+    steps:
+      - uses: actions/checkout@v6
+      - name: Retag for production (${{ matrix.name }})
+        uses: credova/platform-workflows/actions/container@master
+        with:
+          name: ${{ matrix.name }}
+          retag: "true"
+          source-tag: ${{ needs.validate.outputs.deploy-tag }}
+          tag: ${{ needs.validate.outputs.deploy-tag }}-prd
+          project-id: ${{ inputs.project-id }}
+          workload-identity-provider: ${{ inputs.workload-identity-provider }}
+          service-account: ${{ inputs.service-account }}
+
+  # --- Deploy production ---
+  deploy-production:
+    if: inputs.deploy && always() && !failure() && !cancelled()
+    needs: [auth, approve-production, retag-production, validate]
+    runs-on: ${{ inputs.runner }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Require Slack token for production
+        if: inputs.notifications
+        shell: bash
+        env:
+          PCTL_SLACK_BOT_TOKEN: ${{ secrets.PCTL_SLACK_BOT_TOKEN }}
+        run: |
+          if [ -z "${PCTL_SLACK_BOT_TOKEN}" ]; then
+            echo "::error::PCTL_SLACK_BOT_TOKEN secret is required for production deploys when notifications are enabled"
+            exit 1
+          fi
+
+      - name: Promote canary to production
+        if: inputs.canary > 0
+        uses: credova/platform-workflows/actions/deployment@master
+        with:
+          target: ${{ inputs.config-path }}
+          action: promote
+          config-path: ${{ inputs.config-path }}
+          project-id: ${{ inputs.project-id }}
+          workload-identity-provider: ${{ inputs.workload-identity-provider }}
+          slack-token: ${{ secrets.PCTL_SLACK_BOT_TOKEN }}
+          dash0-url: ${{ inputs.dash0-annotations && vars.DASH0_URL || '' }}
+          dash0-token: ${{ inputs.dash0-annotations && secrets.DASH0_TOKEN || '' }}
+          token: ${{ needs.auth.outputs.token }}
+
+      - name: Deploy to production (full)
+        if: inputs.canary == 0
+        uses: credova/platform-workflows/actions/deployment@master
+        with:
+          target: ${{ inputs.config-path }}
+          tag: ${{ needs.validate.outputs.deploy-tag }}-prd
+          config-path: ${{ inputs.config-path }}
+          project-id: ${{ inputs.project-id }}
+          workload-identity-provider: ${{ inputs.workload-identity-provider }}
+          slack-token: ${{ secrets.PCTL_SLACK_BOT_TOKEN }}
+          dash0-url: ${{ inputs.dash0-annotations && vars.DASH0_URL || '' }}
+          dash0-token: ${{ inputs.dash0-annotations && secrets.DASH0_TOKEN || '' }}
+          token: ${{ needs.auth.outputs.token }}
+
+  # --- Release ---
+  release:
+    if: inputs.release && always() && !failure() && !cancelled()
+    needs: [deploy-production, validate]
+    runs-on: ${{ inputs.runner }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Create release tag
+        if: ${{ !inputs.hotfix }}
+        id: tag
+        uses: credova/platform-workflows/actions/increment-tag@master
+
+      - name: Create GitHub Release
+        if: ${{ !inputs.hotfix }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          gh release create "${TAG}" \
+            --title "${TAG}" \
+            --generate-notes
+
+      - name: Create GitHub Release (hotfix)
+        if: ${{ inputs.hotfix }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.validate.outputs.deploy-tag }}
+        run: |
+          gh release create "${TAG}" \
+            --title "${TAG} (hotfix)" \
+            --generate-notes \
+            --notes-start-tag "$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo '')" \
+            2>/dev/null || echo "Release ${TAG} already exists, skipping"
+
+  # --- Cancel superseded pending deploys ---
+  cancel-superseded:
+    if: inputs.deploy && !inputs.hotfix
+    needs: [deploy-production]
+    runs-on: ${{ inputs.runner }}
+    steps:
+      - name: Cancel superseded pending deploys
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          CURRENT_SHA: ${{ github.sha }}
+        run: |
+          echo "Checking for superseded pending deploys..."
+          WAITING_RUNS=$(gh api "repos/${REPO}/actions/runs?status=waiting" \
+            --jq '.workflow_runs[] | select(.head_sha != env.CURRENT_SHA) | .id')
+          for run_id in ${WAITING_RUNS}; do
+            echo "Cancelling superseded run #${run_id}"
+            gh api "repos/${REPO}/actions/runs/${run_id}/cancel" -X POST || true
+          done
