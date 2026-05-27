@@ -29,8 +29,12 @@ if [ -n "${BUILD_ARGS}" ]; then
   done <<< "${BUILD_ARGS}"
 fi
 
-# When pushing cross-platform images, buildx needs --push (can't docker push after)
-if [ "${PUSH}" = "true" ]; then
+# For single-arch linux/amd64 we --load into the local Docker daemon and let
+# docker-push.sh push via plain `docker push`. Buildx's own --push path uses an
+# upload protocol that Artifact Registry rejects with HTTP 400 on the blob PUT,
+# while `docker push` from a loaded image works against the same registry.
+# Multi-arch builds must use --push because --load cannot load multi-arch images.
+if [ "${PUSH}" = "true" ] && [ "${PLATFORM}" != "linux/amd64" ]; then
   BUILD_CMD="${BUILD_CMD} --push"
 else
   BUILD_CMD="${BUILD_CMD} --load"
