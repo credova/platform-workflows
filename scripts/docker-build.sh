@@ -17,7 +17,7 @@ set -e
 
 PLATFORM="${PLATFORM:-linux/amd64}"
 
-BUILD_CMD="docker buildx build --platform ${PLATFORM} -t ${IMAGE} -f ${DOCKERFILE}"
+BUILD_CMD="docker buildx build --platform ${PLATFORM} --provenance=false --sbom=false -t ${IMAGE} -f ${DOCKERFILE}"
 
 if [ -n "${TARGET}" ]; then
   BUILD_CMD="${BUILD_CMD} --target ${TARGET}"
