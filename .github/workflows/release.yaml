@@ -18,12 +18,18 @@ on:
 
 permissions:
   contents: write
-  workflows: write
 
 jobs:
   release:
     runs-on: warp-ubuntu-2204-x64-2x
     steps:
+      - name: Generate workflow editor token
+        id: workflow-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ vars.WORKFLOW_EDITOR_APP_ID }}
+          private-key: ${{ secrets.WORKFLOW_EDITOR_APP_PRIVATE_KEY }}
+
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
@@ -58,9 +64,11 @@ jobs:
         shell: bash
         env:
           TAG: ${{ steps.final.outputs.tag }}
+          GIT_TOKEN: ${{ steps.workflow-token.outputs.token }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          git remote set-url origin "https://x-access-token:${GIT_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
 
           # Rewrite @master refs in a release commit, tag it, then reset master back.
           # master stays clean with @master refs; the tag snapshot has pinned refs.
