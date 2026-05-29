@@ -18,7 +18,7 @@ runs:
   using: composite
   steps:
     - name: Authenticate to GCP
-      uses: credova/platform-workflows/actions/auth-gcp@master
+      uses: credova/platform-workflows/actions/auth-gcp@fix/load-then-push-single-arch
       with:
         project-id: ${{ inputs.project-id }}
         workload-identity-provider: ${{ inputs.workload-identity-provider }}
