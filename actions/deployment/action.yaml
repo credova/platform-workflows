@@ -95,6 +95,12 @@ runs:
         CONFIG_PATH: ${{ inputs.config-path }}
         REVISION: ${{ inputs.revision }}
         PCTL_SLACK_BOT_TOKEN: ${{ inputs.slack-token }}
+        # Opt in to Slack deploy notifications. pctl gates the notifier on
+        # PCTL_SLACK_NOTIFY=true so a developer running `pctl deploy execute`
+        # locally with a token exported from prior testing doesn't post to
+        # the team channel. CI deploys via this action are the canonical
+        # place to opt in.
+        PCTL_SLACK_NOTIFY: "true"
         # Dash0 annotation env: only set when both URL and token are provided
         # so pctl's telemetry resolver treats it as disabled in repos that
         # haven't wired the variable/secret yet.
