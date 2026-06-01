@@ -52,6 +52,16 @@ on:
         type: string
         required: false
         default: deployments/
+      staging-target:
+        description: CUE target name to deploy to in the staging step. Falls back to `production-target` when empty.
+        type: string
+        required: false
+        default: ""
+      production-target:
+        description: CUE target name to deploy to in the canary/production steps. Required when `deploy: true`.
+        type: string
+        required: false
+        default: ""
       canary:
         description: Canary traffic percentage (0 = full deploy)
         type: number
@@ -263,7 +273,7 @@ jobs:
       - name: Deploy to staging
         uses: credova/platform-workflows/actions/deployment@fix/load-then-push-single-arch
         with:
-          target: ${{ inputs.config-path }}
+          target: ${{ inputs.staging-target != '' && inputs.staging-target || inputs.production-target }}
           tag: ${{ needs.validate.outputs.deploy-tag }}
           config-path: ${{ inputs.config-path }}
           project-id: ${{ inputs.project-id }}
@@ -297,7 +307,7 @@ jobs:
       - name: Deploy canary
         uses: credova/platform-workflows/actions/deployment@fix/load-then-push-single-arch
         with:
-          target: ${{ inputs.config-path }}
+          target: ${{ inputs.production-target }}
           tag: ${{ needs.validate.outputs.deploy-tag }}
           canary: ${{ inputs.canary }}
           config-path: ${{ inputs.config-path }}
@@ -369,7 +379,7 @@ jobs:
         if: inputs.canary > 0
         uses: credova/platform-workflows/actions/deployment@fix/load-then-push-single-arch
         with:
-          target: ${{ inputs.config-path }}
+          target: ${{ inputs.production-target }}
           action: promote
           config-path: ${{ inputs.config-path }}
           project-id: ${{ inputs.project-id }}
@@ -383,7 +393,7 @@ jobs:
         if: inputs.canary == 0
         uses: credova/platform-workflows/actions/deployment@fix/load-then-push-single-arch
         with:
-          target: ${{ inputs.config-path }}
+          target: ${{ inputs.production-target }}
           tag: ${{ needs.validate.outputs.deploy-tag }}-prd
           config-path: ${{ inputs.config-path }}
           project-id: ${{ inputs.project-id }}
