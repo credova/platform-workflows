@@ -73,13 +73,13 @@ runs:
   steps:
     - name: Authenticate to GCP
       if: inputs.project-id != '' && inputs.workload-identity-provider != ''
-      uses: credova/platform-workflows/actions/auth-gcp@fix/load-then-push-single-arch
+      uses: credova/platform-workflows/actions/auth-gcp@master
       with:
         project-id: ${{ inputs.project-id }}
         workload-identity-provider: ${{ inputs.workload-identity-provider }}
 
     - name: Install pctl
-      uses: credova/platform-workflows/actions/install-pctl@fix/load-then-push-single-arch
+      uses: credova/platform-workflows/actions/install-pctl@master
       with:
         version: ${{ inputs.pctl-version }}
         token: ${{ inputs.token }}
