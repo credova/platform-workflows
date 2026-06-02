@@ -58,7 +58,7 @@ on:
         required: false
         default: ""
       production-target:
-        description: CUE target name to deploy to in the canary/production steps. Required when `deploy: true`.
+        description: "CUE target name for canary/production steps. Required when deploy is true."
         type: string
         required: false
         default: ""
