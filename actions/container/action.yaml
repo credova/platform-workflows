@@ -259,7 +259,8 @@ runs:
       id: push-image
       if: >
         inputs.push == 'true' &&
-        inputs.retag != 'true'
+        inputs.retag != 'true' &&
+        steps.reuse-check.outputs.exists != 'true'
       shell: bash
       env:
         IMAGE: ${{ steps.meta.outputs.image }}
