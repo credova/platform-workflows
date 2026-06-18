@@ -77,7 +77,7 @@ jobs:
     name: Lint
     runs-on: ${{ inputs.runner }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Generate cross-repo token
         id: cross-repo-token
@@ -126,7 +126,7 @@ jobs:
     name: Security
     runs-on: ${{ inputs.runner }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Generate cross-repo token
         id: cross-repo-token
@@ -175,7 +175,7 @@ jobs:
     name: Test
     runs-on: ${{ inputs.runner }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Generate cross-repo token
         id: cross-repo-token
@@ -233,7 +233,7 @@ jobs:
     if: inputs.goreleaser && !failure() && !cancelled()
     runs-on: ${{ inputs.runner }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 

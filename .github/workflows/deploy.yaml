@@ -147,7 +147,7 @@ jobs:
       image-matrix: ${{ steps.parse.outputs.image-matrix }}
       deploy-tag: ${{ steps.tag.outputs.deploy-tag }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Validate inputs
         shell: bash
@@ -197,7 +197,7 @@ jobs:
     outputs:
       token: ${{ steps.token.outputs.token }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Generate release download token
         id: token
@@ -212,7 +212,7 @@ jobs:
     needs: [validate-inputs]
     runs-on: ${{ inputs.runner }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Setup language
         uses: credova/platform-workflows/actions/setup-language@master
@@ -252,7 +252,7 @@ jobs:
       matrix:
         include: ${{ fromJson(needs.validate-inputs.outputs.image-matrix) }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Build, scan, and push image (${{ matrix.name }})
         uses: credova/platform-workflows/actions/container@master
@@ -280,7 +280,7 @@ jobs:
     runs-on: ${{ inputs.runner }}
     environment: staging
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Deploy to staging
         uses: credova/platform-workflows/actions/deployment@master
@@ -307,7 +307,7 @@ jobs:
     needs: [auth, approve-canary, validate-inputs]
     runs-on: ${{ inputs.runner }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Deploy canary
         id: canary
         uses: credova/platform-workflows/actions/deployment@master
@@ -340,7 +340,7 @@ jobs:
       matrix:
         include: ${{ fromJson(needs.validate-inputs.outputs.image-matrix) }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Retag image for production (${{ matrix.name }})
         uses: credova/platform-workflows/actions/container@master
@@ -359,7 +359,7 @@ jobs:
     needs: [auth, approve-production, retag-production, validate-inputs]
     runs-on: ${{ inputs.runner }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Require Slack token for production
         if: inputs.notifications
@@ -402,7 +402,7 @@ jobs:
     if: always() && !failure() && !cancelled()
     runs-on: ${{ inputs.runner }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 

@@ -107,7 +107,7 @@ jobs:
     outputs:
       image-matrix: ${{ steps.parse.outputs.image-matrix }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Validate inputs
         shell: bash
@@ -138,7 +138,7 @@ jobs:
     if: inputs.run-order == 'linear'
     runs-on: ${{ inputs.runner }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: credova/platform-workflows/actions/setup-language@master
         with:
           language: node
@@ -167,7 +167,7 @@ jobs:
     needs: [lint-linear]
     runs-on: ${{ inputs.runner }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: credova/platform-workflows/actions/setup-language@master
         with:
           language: node
@@ -196,7 +196,7 @@ jobs:
     needs: [security-linear]
     runs-on: ${{ inputs.runner }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: credova/platform-workflows/actions/setup-language@master
         with:
           language: node
@@ -229,7 +229,7 @@ jobs:
       matrix:
         include: ${{ fromJson(needs.validate.outputs.image-matrix) }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Build container (${{ matrix.name }})
         uses: credova/platform-workflows/actions/container@master
         with:
@@ -251,7 +251,7 @@ jobs:
     if: inputs.run-order == 'parallel'
     runs-on: ${{ inputs.runner }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: credova/platform-workflows/actions/setup-language@master
         with:
           language: node
@@ -279,7 +279,7 @@ jobs:
     if: inputs.run-order == 'parallel'
     runs-on: ${{ inputs.runner }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: credova/platform-workflows/actions/setup-language@master
         with:
           language: node
@@ -307,7 +307,7 @@ jobs:
     if: inputs.run-order == 'parallel'
     runs-on: ${{ inputs.runner }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: credova/platform-workflows/actions/setup-language@master
         with:
           language: node
@@ -340,7 +340,7 @@ jobs:
       matrix:
         include: ${{ fromJson(needs.validate.outputs.image-matrix) }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Build container (${{ matrix.name }})
         uses: credova/platform-workflows/actions/container@master
         with:
@@ -362,7 +362,7 @@ jobs:
     if: inputs.run-order == 'checks-first'
     runs-on: ${{ inputs.runner }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: credova/platform-workflows/actions/setup-language@master
         with:
           language: node
@@ -391,7 +391,7 @@ jobs:
     needs: [security-checks-first]
     runs-on: ${{ inputs.runner }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: credova/platform-workflows/actions/setup-language@master
         with:
           language: node
@@ -420,7 +420,7 @@ jobs:
     needs: [security-checks-first]
     runs-on: ${{ inputs.runner }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: credova/platform-workflows/actions/setup-language@master
         with:
           language: node
@@ -453,7 +453,7 @@ jobs:
       matrix:
         include: ${{ fromJson(needs.validate.outputs.image-matrix) }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Build container (${{ matrix.name }})
         uses: credova/platform-workflows/actions/container@master
         with:
@@ -488,7 +488,7 @@ jobs:
     if: always() && !failure() && !cancelled()
     runs-on: ${{ inputs.runner }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: credova/platform-workflows/actions/compliance@master
         with:
           ticket: ${{ inputs.compliance-ticket && 'true' || 'false' }}

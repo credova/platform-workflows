@@ -25,12 +25,14 @@ jobs:
     steps:
       - name: Generate workflow editor token
         id: workflow-token
-        uses: actions/create-github-app-token@v1
+        uses: actions/create-github-app-token@v3
         with:
-          app-id: ${{ vars.WORKFLOW_EDITOR_APP_ID }}
+          client-id: ${{ vars.WORKFLOW_EDITOR_APP_CLIENT_ID }}
           private-key: ${{ secrets.WORKFLOW_EDITOR_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-workflows: write
 
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 

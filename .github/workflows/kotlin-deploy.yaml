@@ -150,7 +150,7 @@ jobs:
       image-matrix: ${{ steps.parse.outputs.image-matrix }}
       deploy-tag: ${{ steps.tag.outputs.deploy-tag }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Validate inputs
         shell: bash
@@ -194,7 +194,7 @@ jobs:
     outputs:
       token: ${{ steps.token.outputs.token }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Generate release download token
         id: token
         uses: credova/platform-workflows/actions/auth-release-token@master
@@ -207,7 +207,7 @@ jobs:
     if: ${{ !inputs.hotfix }}
     runs-on: ${{ inputs.runner }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: credova/platform-workflows/actions/setup-language@master
         with:
           language: kotlin
@@ -241,7 +241,7 @@ jobs:
       matrix:
         include: ${{ fromJson(needs.validate.outputs.image-matrix) }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Build, scan, and push (${{ matrix.name }})
         uses: credova/platform-workflows/actions/container@master
         with:
@@ -268,7 +268,7 @@ jobs:
     runs-on: ${{ inputs.runner }}
     environment: staging
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Deploy to staging
         uses: credova/platform-workflows/actions/deployment@master
         with:
@@ -296,7 +296,7 @@ jobs:
     needs: [auth, approve-canary, validate]
     runs-on: ${{ inputs.runner }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Deploy canary
         uses: credova/platform-workflows/actions/deployment@master
         with:
@@ -330,7 +330,7 @@ jobs:
       matrix:
         include: ${{ fromJson(needs.validate.outputs.image-matrix) }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Retag for production (${{ matrix.name }})
         uses: credova/platform-workflows/actions/container@master
         with:
@@ -348,7 +348,7 @@ jobs:
     needs: [auth, approve-production, retag-production, validate]
     runs-on: ${{ inputs.runner }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Require Slack token for production
         if: inputs.notifications
@@ -395,7 +395,7 @@ jobs:
     needs: [deploy-production, validate]
     runs-on: ${{ inputs.runner }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
