@@ -1,22 +1,24 @@
 # deployment
 
-Deploy to Cloud Run via pctl. Handles auth, notifications, canary, promote, and rollback. Self-contained: calls `auth-gcp` internally. Notifications are handled by pctl as part of the deploy process.
+Deploy to Cloud Run via pctl. Handles auth, notifications, canary, promote, and rollback. Calls `auth-gcp` internally. Notifications are handled by pctl during deploy.
 
 ## Inputs
 
-| Input                        | Required | Default       | Description                                      |
-| ---------------------------- | -------- | ------------- | ------------------------------------------------ |
-| `target`                     | Yes      | -             | Target name from CUE config                      |
-| `tag`                        | No       | `github.sha`  | Image tag to deploy                              |
-| `action`                     | No       | `deploy`      | Action: `deploy`, `promote`, `rollback`, `abort` |
-| `canary`                     | No       | `0`           | Canary traffic percentage (0 = full deploy)      |
-| `config-path`                | No       | `deployments` | Path to CUE config directory                     |
-| `revision`                   | No       | -             | Revision name (for `promote`/`rollback`)         |
-| `project-id`                 | No       | -             | GCP project ID                                   |
-| `workload-identity-provider` | No       | -             | WIF provider resource name                       |
-| `slack-token`                | No       | -             | Slack bot token for deploy notifications         |
-| `token`                      | Yes      | -             | GitHub token for pctl download                   |
-| `pctl-version`               | No       | `latest`      | pctl version to install                          |
+| Input                        | Required | Default       | Description                                        |
+| ---------------------------- | -------- | ------------- | -------------------------------------------------- |
+| `target`                     | Yes      | -             | Target name from CUE config                        |
+| `tag`                        | No       | `github.sha`  | Image tag to deploy                                |
+| `action`                     | No       | `deploy`      | Action: `deploy`, `promote`, `rollback`, `abort`   |
+| `canary`                     | No       | `0`           | Canary traffic percentage (0 = full deploy)        |
+| `config-path`                | No       | `deployments` | Path to CUE config directory                       |
+| `revision`                   | No       | -             | Revision name (for `promote`/`rollback`)           |
+| `project-id`                 | No       | -             | GCP project ID                                     |
+| `workload-identity-provider` | No       | -             | WIF provider resource name                         |
+| `slack-token`                | No       | -             | Slack bot token for deploy notifications           |
+| `token`                      | Yes      | -             | GitHub token for pctl download                     |
+| `pctl-version`               | No       | `latest`      | pctl version to install                            |
+| `dash0-url`                  | No       | -             | Dash0 OTLP ingest base URL (region-specific)       |
+| `dash0-token`                | No       | -             | Dash0 ingest token (emits deploy event on success) |
 
 ## Outputs
 
@@ -27,20 +29,20 @@ Deploy to Cloud Run via pctl. Handles auth, notifications, canary, promote, and 
 
 ## Slack Notifications
 
-When `notifications.enabled` is `true` in the CUE deployment config, pctl automatically sends Slack notifications throughout the deploy lifecycle:
+When `notifications.enabled` is `true` in the CUE deployment config, pctl sends Slack notifications throughout the deploy lifecycle:
 
-1. **Deploy start** - posts initial "started" notification to the channel
-2. **PR changelog** - thread reply listing PRs between the currently deployed revision and the new one
-3. **Target started** - timeline thread reply when the target begins deploying
-4. **Target completed/failed** - timeline thread reply with status and error message
-5. **Main message update** - updates the original message to `success` or `failed`
+1. **Deploy start:** posts initial "started" notification to the channel.
+2. **PR changelog:** thread reply listing PRs between the currently deployed revision and the new one.
+3. **Target started:** timeline thread reply when the target begins deploying.
+4. **Target completed/failed:** timeline thread reply with status and error message.
+5. **Main message update:** updates the original message to `success` or `failed`.
 
 To enable, either:
 
-- Pass `slack-token` input to the action
-- Set `PCTL_SLACK_BOT_TOKEN` as a workflow-level environment variable
+- Pass `slack-token` input to the action.
+- Set `PCTL_SLACK_BOT_TOKEN` as a workflow-level environment variable.
 
-The token is passed to pctl via `PCTL_SLACK_BOT_TOKEN`. The channel and template are configured in the CUE deployment config's `notifications` block.
+The token is passed to pctl via `PCTL_SLACK_BOT_TOKEN`. The channel and template are set in the CUE deployment config's `notifications` block.
 
 ## Examples
 
@@ -106,6 +108,6 @@ The token is passed to pctl via `PCTL_SLACK_BOT_TOKEN`. The channel and template
 
 ## Notes
 
-- Canary is only supported for Cloud Run Services, not Jobs. Jobs deploy to 100% immediately.
-- Wraps `pctl deploy execute` - CUE-based, type-safe deployment with native Go Cloud Run API calls.
-- Notification channel and template are configured in the CUE config `notifications` block, not in the action inputs.
+- Canary is supported for Cloud Run Services only, not Jobs. Jobs deploy to 100% immediately.
+- Wraps `pctl deploy execute`: CUE-based, type-safe deployment with native Go Cloud Run API calls.
+- Notification channel and template are set in the CUE config `notifications` block, not in action inputs.

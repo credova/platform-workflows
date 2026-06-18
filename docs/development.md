@@ -16,9 +16,12 @@ platform-workflows/
 │   ├── compliance/             # Shortcut ticket check + policy gates
 │   ├── container/              # Build, scan, push, retag (standard + WarpBuild)
 │   ├── deployment/             # Cloud Run deploy via pctl
+│   ├── go-report/              # INTERNAL - post Go job results on a PR comment
 │   ├── increment-tag/          # Semver tag incrementor
 │   ├── install-pctl/           # INTERNAL - pctl binary installer
 │   ├── notification/           # Slack notifications via pctl
+│   ├── parse-images/           # INTERNAL - image inputs → JSON build matrix
+│   ├── run-job/                # Deploy and execute a Cloud Run Job
 │   ├── secrets-setup/          # GCP Secret Manager via fnox
 │   ├── security/               # syft + grype + grant + opengrep scanning
 │   └── setup-language/         # Runtime setup + WarpBuild dep caching
@@ -42,11 +45,11 @@ platform-workflows/
 
 ## Making Changes
 
-1. Create a feature branch
-2. Modify the composite action or reusable workflow
-3. CI runs automatically to validate YAML syntax and structure
-4. Get Platform team approval (required via CODEOWNERS)
-5. Merge to master
+1. Create a feature branch.
+2. Modify the composite action or reusable workflow.
+3. CI runs automatically to validate YAML syntax and structure.
+4. Get Platform team approval (required via CODEOWNERS).
+5. Merge to master.
 
 ## Releasing
 
@@ -64,12 +67,12 @@ gh workflow run release.yaml -R credova/platform-workflows -f bump=major
 ## Versioning
 
 - Tags follow semantic versioning: `v1.0.0`, `v1.1.0`, etc.
-- Major version tags (`v1`) are updated on each release for consumers using `@v1`
-- Breaking changes require a major version bump - consumers must opt in by updating to `@v2`
+- Major version tags (`v1`) are updated on each release for consumers using `@v1`.
+- Breaking changes require a major version bump. Consumers must opt in by updating to `@v2`.
 
 ## Testing Changes
 
-Test changes by pointing a consuming repo at your branch:
+Point a consuming repo at your branch:
 
 ```yaml
 uses: credova/platform-workflows/.github/workflows/pull-request.yaml@your-branch

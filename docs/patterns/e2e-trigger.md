@@ -1,6 +1,6 @@
 # Cross-Repo E2E Test Trigger
 
-Pattern for triggering E2E tests in another repo after a deploy. Not a shared action -- inline where needed.
+Trigger E2E tests in another repo after a deploy. Not a shared action. Inline where needed.
 
 ## Fire and forget
 
@@ -63,8 +63,8 @@ Trigger and poll until complete:
 
 The token needs `actions:write` permission on the target repo. Options:
 
-1. **GitHub App token** via `auth-release-token` with the E2E repo in scope
-2. **Fine-grained PAT** scoped to the E2E repo with actions write permission
+1. **GitHub App token** via `auth-release-token` with the E2E repo in scope.
+2. **Fine-grained PAT** scoped to the E2E repo with actions write permission.
 
 ## E2E repo setup
 
@@ -90,8 +90,8 @@ on:
 
 jobs:
   e2e:
-    runs-on: warp-ubuntu-2204-x64-2x
+    runs-on: warp-ubuntu-2404-x64-2x
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       # ... your E2E test steps
 ```

@@ -1,14 +1,33 @@
 # setup-language
 
-Setup a language runtime for the current job. Single action that handles Go, Node.js, Kotlin, Python, Ruby, .NET, and PHP.
+Set up a language runtime for the current job. Handles Go, Node.js, Kotlin, Python, Ruby, .NET, and PHP.
 
 ## Inputs
 
-| Input      | Required | Description                                                                                       |
-| ---------- | -------- | ------------------------------------------------------------------------------------------------- |
-| `language` | Yes      | `go`, `node`, `kotlin`, `python`, `ruby`, `dotnet`, or `php`                                      |
-| `version`  | Yes      | Language/runtime version (e.g. `1.24`, `20`, `21`, `3.12`, `8.2`)                                 |
-| `cache`    | No       | `false` - enable WarpBuild dependency caching. Auto-disables built-in Go/Node caches when `true`. |
+| Input      | Required | Description                                                                                      |
+| ---------- | -------- | ------------------------------------------------------------------------------------------------ |
+| `language` | Yes      | `go`, `node`, `kotlin`, `python`, `ruby`, `dotnet`, or `php`                                     |
+| `version`  | Yes      | Language/runtime version (e.g. `1.24`, `20`, `21`, `3.12`, `8.2`)                                |
+| `cache`    | No       | `false`. Enable WarpBuild dependency caching. Auto-disables built-in Go/Node caches when `true`. |
+
+## Caching
+
+When `cache: true`:
+
+- Go's `actions/setup-go` cache and Node's `actions/setup-node` cache are disabled to avoid double-caching.
+- For Kotlin, Gradle's built-in cache is disabled in favor of WarpBuild cache.
+
+## Internal Mapping
+
+| Language | Action Used                 | Version Input            | Notes                              |
+| -------- | --------------------------- | ------------------------ | ---------------------------------- |
+| `go`     | `actions/setup-go@v6`       | `go-version`             |                                    |
+| `node`   | `actions/setup-node@v6`     | `node-version`           |                                    |
+| `kotlin` | `actions/setup-java@v5`     | `java-version` (Temurin) | + `gradle/actions/setup-gradle@v4` |
+| `python` | `actions/setup-python@v6`   | `python-version`         |                                    |
+| `ruby`   | `ruby/setup-ruby@v1`        | `ruby-version`           |                                    |
+| `dotnet` | `actions/setup-dotnet@v5`   | `dotnet-version`         |                                    |
+| `php`    | `shivammathur/setup-php@v2` | `php-version`            |                                    |
 
 ## Examples
 
@@ -86,17 +105,3 @@ Sets up JDK via Temurin and Gradle via `gradle/actions/setup-gradle`. Gradle wra
     version: "1.24"
     cache: true
 ```
-
-When `cache: true`, Go's built-in `actions/setup-go` cache and Node's `actions/setup-node` cache are automatically disabled to avoid double-caching. For Kotlin, Gradle's built-in cache is disabled in favor of WarpBuild cache.
-
-## Internal Mapping
-
-| Language | Action Used                        | Version Input            | Notes                        |
-| -------- | ---------------------------------- | ------------------------ | ---------------------------- |
-| `go`     | `actions/setup-go@v6`              | `go-version`             |                              |
-| `node`   | `actions/setup-node@v6`            | `node-version`           |                              |
-| `kotlin` | `actions/setup-java@v5`            | `java-version` (Temurin) | + `gradle/actions/setup-gradle@v4` |
-| `python` | `actions/setup-python@v6`          | `python-version`         |                              |
-| `ruby`   | `ruby/setup-ruby@v1`              | `ruby-version`           |                              |
-| `dotnet` | `actions/setup-dotnet@v5`          | `dotnet-version`         |                              |
-| `php`    | `shivammathur/setup-php@v2`        | `php-version`            |                              |

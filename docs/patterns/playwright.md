@@ -1,8 +1,8 @@
 # Playwright Browser Testing
 
-Pattern for setting up Playwright in your workflow. Not a shared action -- inline these steps where needed.
+Set up Playwright in your workflow. Not a shared action. Inline these steps where needed.
 
-## Setup Steps
+## Setup steps
 
 Add after your `setup-language` step for Node:
 
@@ -28,7 +28,7 @@ Cache browser binaries to speed up subsequent runs:
 
 - name: Cache Playwright browsers
   id: pw-cache
-  uses: actions/cache@v4
+  uses: actions/cache@v5
   with:
     path: ~/.cache/ms-playwright
     key: playwright-${{ steps.pw-version.outputs.version }}
@@ -52,7 +52,7 @@ If your project uses pnpm:
 
 ## Multiple browsers
 
-Replace `chromium` with specific browsers or `--with-deps` alone for all:
+Replace `chromium` with specific browsers, or use `--with-deps` alone for all:
 
 ```yaml
 # Specific browsers

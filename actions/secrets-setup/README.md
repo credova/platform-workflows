@@ -1,6 +1,6 @@
 # secrets-setup
 
-Load secrets from GCP Secret Manager into the workflow environment via mise + fnox. Self-contained: calls `auth-gcp` internally.
+Load secrets from GCP Secret Manager into the workflow environment via mise + fnox. Calls `auth-gcp` internally.
 
 ## Inputs
 
@@ -9,6 +9,13 @@ Load secrets from GCP Secret Manager into the workflow environment via mise + fn
 | `profile`                    | Yes      | fnox profile (maps to secret paths in `fnox.toml`) |
 | `project-id`                 | Yes      | GCP project ID for Secret Manager access           |
 | `workload-identity-provider` | Yes      | Workload Identity Provider resource name           |
+
+## How It Works
+
+1. `auth-gcp` authenticates to GCP via Workload Identity Federation.
+2. Sets up mise + fnox.
+3. Reads `fnox.toml` in the repo to determine which secrets to load for the profile.
+4. Exports secrets as environment variables for all subsequent steps.
 
 ## Examples
 
@@ -31,10 +38,3 @@ Load secrets from GCP Secret Manager into the workflow environment via mise + fn
     project-id: <gcp-project-id>
     workload-identity-provider: projects/<project-number>/locations/global/...
 ```
-
-## How It Works
-
-1. `auth-gcp` - authenticates to GCP via Workload Identity Federation
-2. Sets up mise + fnox
-3. Reads `fnox.toml` in the repo to determine which secrets to load for the given profile
-4. Secrets are exported as environment variables for all subsequent steps

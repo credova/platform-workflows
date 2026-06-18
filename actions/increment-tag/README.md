@@ -61,7 +61,7 @@ Auto-increment semantic version tags. Supports suffix-based sequences for enviro
 
 ## How It Works
 
-1. Fetches all git tags
-2. Finds the latest tag matching `{prefix}X.Y.Z[-{suffix}]`
-3. Increments the specified component
-4. Outputs the new tag (does **not** create or push the tag - that's the caller's job)
+1. Fetches all git tags.
+2. Finds the latest tag matching `{prefix}X.Y.Z[-{suffix}]`.
+3. Increments the specified component.
+4. Outputs the new tag. Does **not** create or push the tag; that is the caller's job.
