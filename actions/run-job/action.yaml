@@ -47,7 +47,7 @@ runs:
   using: composite
   steps:
     - name: Deploy job container
-      uses: credova/platform-workflows/actions/deployment@master
+      uses: credova/platform-workflows/actions/deployment@v1.0.0
       with:
         target: ${{ inputs.target }}
         tag: ${{ inputs.tag }}
