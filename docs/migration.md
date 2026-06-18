@@ -11,18 +11,18 @@
 | `increment-tag@v11`                    | `actions/increment-tag@v1`                  | Same concept, clean interface       |
 | `slack-deployment-notification@master` | `actions/notification@v1`                   | Also available via pctl             |
 | `configure-gcp-docker@v1`              | `actions/auth-gcp@v1` (internal)            | Now internal, auto-called           |
-| `check-pr-shortcut-ticket`             | `actions/compliance@v1`                     | New - ticket check + policy gates   |
-| N/A                                    | `actions/secrets-setup@v1`                  | New - fnox + GCP Secret Manager     |
+| `check-pr-shortcut-ticket`             | `actions/compliance@v1`                     | New: ticket check + policy gates    |
+| N/A                                    | `actions/secrets-setup@v1`                  | New: fnox + GCP Secret Manager      |
 
 ## Migration Steps
 
-1. Create `platform-workflows` repo via github-meta Pulumi
-2. Build composite actions (port + restructure from ops-actions)
-3. Build reusable workflows that call composites
-4. Tag `v1.0.0`
-5. Migrate repos one at a time - replace ops-actions references with platform-workflows
-6. Validate each migration thoroughly
-7. Deprecate `ops-actions` - add deprecation notice, archive after migration complete
+1. Create `platform-workflows` repo via github-meta Pulumi.
+2. Build composite actions (port + restructure from ops-actions).
+3. Build reusable workflows that call composites.
+4. Tag `v1.0.0`.
+5. Migrate repos one at a time. Replace ops-actions references with platform-workflows.
+6. Validate each migration.
+7. Deprecate `ops-actions`: add deprecation notice, archive after migration complete.
 
 ---
 
@@ -32,10 +32,10 @@
 
 The language-specific workflows (`go-pull-request.yaml`, `node-deploy.yaml`, etc.) are the recommended interface going forward. Benefits over the generic `pull-request.yaml` and `deploy.yaml`:
 
-- **Opinionated structure** - lint, security, and test jobs are built in with sensible defaults per language
-- **Fail-fast ordering** - configurable run-order (linear, parallel, checks-first) so failures surface quickly
-- **mise integration** - if your repo has a `mise.toml` with `lint`, `security`, and/or `test` tasks, they are picked up automatically with zero configuration
-- **Fewer inputs** - no need to specify `language` or `language-version`; the workflow already knows
+- **Opinionated structure**: lint, security, and test jobs are built in with per-language defaults.
+- **Fail-fast ordering**: configurable run-order (linear, parallel, checks-first) so failures surface quickly.
+- **mise integration**: if your repo has a `mise.toml` with `lint`, `security`, and/or `test` tasks, they are picked up automatically with no configuration.
+- **Fewer inputs**: no need to specify `language` or `language-version`. The workflow already knows.
 
 ### How to migrate
 
@@ -110,7 +110,7 @@ jobs:
       config-path: deployments/
 ```
 
-No `language`, no `language-version`, no `test-command` (mise picks it up from `mise.toml`).
+No `language`, no `language-version`, no `test-command`. mise picks it up from `mise.toml`.
 
 ### Example: .NET service
 
@@ -182,7 +182,7 @@ jobs:
 
 ### Example: migrating directly from psq-ops-actions
 
-If your repo still uses psq-ops-actions, you can skip the generic workflows entirely and go straight to language-specific. Replace all your ops-actions references with a single workflow call per file.
+If your repo still uses psq-ops-actions, skip the generic workflows and go straight to language-specific. Replace all ops-actions references with a single workflow call per file.
 
 **Before** (psq-ops-actions):
 
@@ -197,8 +197,8 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
         with:
           node-version: "20"
       - run: npm ci && npm test
@@ -206,13 +206,13 @@ jobs:
   scan:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: psq-ops-actions/scanner@v11
 
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: psq-ops-actions/tag-and-push-docker-image@v11
 ```
 
@@ -231,17 +231,17 @@ jobs:
     secrets: inherit
 ```
 
-All the test, security scanning, and container build logic is handled by the workflow.
+The test, security scanning, and container build logic is handled by the workflow.
 
 ### mise integration
 
 The language-specific workflows look for mise tasks automatically:
 
-- **`mise run lint`** - runs if a `lint` task exists in `mise.toml`
-- **`mise run security`** - runs if a `security` task exists in `mise.toml`
-- **`mise run test`** - runs if a `test` task exists in `mise.toml`
+- **`mise run lint`**: runs if a `lint` task exists in `mise.toml`
+- **`mise run security`**: runs if a `security` task exists in `mise.toml`
+- **`mise run test`**: runs if a `test` task exists in `mise.toml`
 
-If your repo does not have a `mise.toml` yet, or your tasks use different names, use the override inputs:
+If your repo has no `mise.toml` yet, or your tasks use different names, use the override inputs:
 
 ```yaml
 jobs:

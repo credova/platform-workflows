@@ -1,6 +1,6 @@
 # GitHub Actions Cache Cleanup
 
-Pattern for cleaning up old GitHub Actions caches. Not a shared workflow -- add this directly to repos that need it.
+Clean up old GitHub Actions caches. Not a shared workflow. Add it directly to repos that need it.
 
 ## Scheduled cleanup
 
@@ -15,7 +15,7 @@ on:
 
 jobs:
   cleanup:
-    runs-on: warp-ubuntu-2204-x64-2x
+    runs-on: warp-ubuntu-2404-x64-2x
     permissions:
       actions: write
     steps:
@@ -56,6 +56,6 @@ Delete only caches older than 7 days:
 
 ## Notes
 
-- GitHub auto-evicts caches after 7 days of no access
-- The 10GB per-repo cache limit means old caches get evicted by new ones
-- This is mainly useful for repos with many cache keys that hit the limit
+- GitHub auto-evicts caches after 7 days of no access.
+- The 10GB per-repo cache limit evicts old caches as new ones are added.
+- Use this for repos with many cache keys that hit the limit.

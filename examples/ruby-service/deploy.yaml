@@ -1,0 +1,17 @@
+# Example: Ruby service with Cloud Run deploy
+name: Deploy
+on:
+  push:
+    branches: [master]
+    tags: ["v*"]
+permissions:
+  contents: write
+  id-token: write
+jobs:
+  deploy:
+    uses: credova/platform-workflows/.github/workflows/ruby-deploy.yaml@master
+    secrets: inherit
+    with:
+      container: true
+      release: true
+      # ruby-version: "3.3"  # optional, defaults to 3.3

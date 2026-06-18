@@ -1,8 +1,8 @@
 # compliance
 
-Process and policy gates. Ensures teams follow required procedures. All checks run by default - opt out explicitly.
+Process and policy gates. All checks run by default; opt out explicitly.
 
-**Distinction from security:** Security asks "is this artifact safe?" Compliance asks "did the team follow the process?"
+Security asks "is this artifact safe?" Compliance asks "did the team follow the process?"
 
 ## Check Types
 
@@ -18,7 +18,7 @@ Process and policy gates. Ensures teams follow required procedures. All checks r
 
 ## Examples
 
-### Default - ticket check enabled
+### Default: ticket check enabled
 
 ```yaml
 - uses: credova/platform-workflows/actions/compliance@master
@@ -39,6 +39,4 @@ The check searches the PR title, body, branch name, commit message, and PR comme
 - **Tag:** `sc-12345` or `SC-12345`
 - **Link:** `https://app.shortcut.com/<org>/story/12345`
 
-### Automated PRs
-
-Dependabot and Renovate PRs (branch prefix `dependabot/` or `renovate/`) are automatically skipped.
+Dependabot and Renovate PRs (branch prefix `dependabot/` or `renovate/`) are skipped.

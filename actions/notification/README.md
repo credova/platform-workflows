@@ -1,12 +1,12 @@
 # notification
 
-Standalone Slack notifications for any use case. Wraps `pctl slack notify` with Block Kit formatted messages and threading support.
+Standalone Slack notifications. Wraps `pctl slack notify` with Block Kit messages and threading.
 
-> **Note:** The `deployment` action handles notifications automatically via pctl. This action exists for custom workflows or non-deploy use cases.
+> **Note:** The `deployment` action handles notifications automatically via pctl. Use this action for custom or non-deploy workflows.
 
 ## Inputs
 
-### Required Notification Inputs
+### Required
 
 | Input         | Required | Default | Description                                 |
 | ------------- | -------- | ------- | ------------------------------------------- |
@@ -16,7 +16,7 @@ Standalone Slack notifications for any use case. Wraps `pctl slack notify` with 
 | `slack-token` | Yes      | -       | Slack bot token                             |
 | `token`       | Yes      | -       | GitHub token for pctl download              |
 
-### Optional Notification Inputs
+### Optional
 
 | Input          | Required | Default        | Description                                                   |
 | -------------- | -------- | -------------- | ------------------------------------------------------------- |
@@ -31,9 +31,9 @@ Standalone Slack notifications for any use case. Wraps `pctl slack notify` with 
 | `template`     | No       | -              | Template name (`deploy`, `general`, `security`) or file path  |
 | `pctl-version` | No       | `latest`       | pctl version to install                                       |
 
-### Link Inputs
+### Links
 
-These only appear in the notification if a value is provided:
+Each appears in the notification only when a value is provided.
 
 | Input               | Required | Default              | Description                        |
 | ------------------- | -------- | -------------------- | ---------------------------------- |
@@ -53,9 +53,9 @@ These only appear in the notification if a value is provided:
 
 ## Message Modes
 
-1. **New message** - no `thread-ts`: posts a new message to the channel
-2. **Update in-place** - `thread-ts` without `reply`: updates the existing message (e.g., started -> completed)
-3. **Thread reply** - `thread-ts` with `reply: "true"`: posts a lightweight timeline event under the parent
+1. **New message:** no `thread-ts`. Posts a new message to the channel.
+2. **Update in-place:** `thread-ts` without `reply`. Updates the existing message (e.g. started to completed).
+3. **Thread reply:** `thread-ts` with `reply: "true"`. Posts a timeline event under the parent.
 
 ## Examples
 

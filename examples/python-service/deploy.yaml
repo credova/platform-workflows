@@ -1,0 +1,17 @@
+# Example: Python service with Cloud Run deploy
+name: Deploy
+on:
+  push:
+    branches: [master]
+    tags: ["v*"]
+permissions:
+  contents: write
+  id-token: write
+jobs:
+  deploy:
+    uses: credova/platform-workflows/.github/workflows/python-deploy.yaml@master
+    secrets: inherit
+    with:
+      container: true
+      release: true
+      # python-version: "3.12"  # optional, defaults to 3.12

@@ -63,7 +63,7 @@ on:
         description: "GitHub Actions runner label"
         type: string
         required: false
-        default: warp-ubuntu-2204-x64-2x
+        default: warp-ubuntu-2404-x64-2x
 
 jobs:
   # ============================================================

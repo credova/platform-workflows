@@ -1,6 +1,6 @@
 # container
 
-Full container lifecycle - build, scan, push, tag, reuse, retag. Self-contained: calls `auth-gcp` internally. Runs a security scan automatically after every build via the `security` action.
+Container lifecycle: build, scan, push, tag, reuse, retag. Calls `auth-gcp` internally. Runs a security scan after every build via the `security` action.
 
 ## Inputs
 
@@ -21,6 +21,7 @@ Full container lifecycle - build, scan, push, tag, reuse, retag. Self-contained:
 | `platform`                   | No       | `linux/amd64`       | Target platform (e.g. `linux/amd64`, `linux/arm64`)      |
 | `project-id`                 | No       | -                   | GCP project ID                                           |
 | `workload-identity-provider` | No       | -                   | WIF provider resource name                               |
+| `service-account`            | No       | -                   | Service account email to impersonate via WIF             |
 | `registry`                   | No       | `us-docker.pkg.dev` | Artifact Registry hostname                               |
 | `scan`                       | No       | `true`              | Run security scan on the built image (syft + grype)      |
 | `severity`                   | No       | `HIGH`              | Minimum severity to fail image scan on                   |
@@ -37,7 +38,7 @@ Full container lifecycle - build, scan, push, tag, reuse, retag. Self-contained:
 
 ## Examples
 
-### PR workflow - build and scan only, no push
+### PR workflow: build and scan only, no push
 
 ```yaml
 - uses: credova/platform-workflows/actions/container@master
@@ -48,7 +49,7 @@ Full container lifecycle - build, scan, push, tag, reuse, retag. Self-contained:
     push: false
 ```
 
-### Deploy workflow - full build, scan, tag, push
+### Deploy workflow: build, scan, tag, push
 
 ```yaml
 - uses: credova/platform-workflows/actions/container@master
@@ -76,7 +77,7 @@ Full container lifecycle - build, scan, push, tag, reuse, retag. Self-contained:
     push: true
 ```
 
-### Retag for production (no build, no scan - already scanned at staging)
+### Retag for production (no build, no scan: already scanned at staging)
 
 ```yaml
 - uses: credova/platform-workflows/actions/container@master
@@ -89,7 +90,7 @@ Full container lifecycle - build, scan, push, tag, reuse, retag. Self-contained:
     workload-identity-provider: projects/<project-number>/locations/global/...
 ```
 
-### Opt out of image scan (intentional - must be explicit)
+### Opt out of image scan (must be explicit)
 
 ```yaml
 - uses: credova/platform-workflows/actions/container@master
@@ -114,9 +115,9 @@ Full container lifecycle - build, scan, push, tag, reuse, retag. Self-contained:
 
 ## Internal Flow (`build: true`)
 
-1. Compute image metadata
-2. `auth-gcp` - authenticate to GCP + configure Docker for Artifact Registry
-3. Reuse check - skip build if image already exists for this SHA (when `reuse: true`)
-4. Build image via buildx or WarpBuild
-5. **Image scan** - syft generates SBOM, grype scans for vulns, results posted to PR comment. Blocks on `severity` threshold. Skipped on `retag`, reuse, or `scan: false`
-6. Tag + push - only if `push: true`
+1. Compute image metadata.
+2. `auth-gcp`: authenticate to GCP and configure Docker for Artifact Registry.
+3. Reuse check: skip build if image already exists for this SHA (when `reuse: true`).
+4. Build image via buildx or WarpBuild.
+5. **Image scan:** syft generates SBOM, grype scans for vulns, results posted to PR comment. Blocks on `severity` threshold. Skipped on `retag`, reuse, or `scan: false`.
+6. Tag and push: only if `push: true`.

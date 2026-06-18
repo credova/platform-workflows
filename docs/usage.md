@@ -10,39 +10,53 @@ any-repo/
     └── deploy-hotfix.yaml   # tag push → straight to production (hotfix)
 ```
 
+## Contents
+
+- [Language-Specific Workflows (Recommended)](#language-specific-workflows-recommended)
+- [Generic Pull Request Workflow](#generic-pull-request-workflow)
+- [Go Workflow](#go-workflow)
+- [Generic Deploy Workflow](#generic-deploy-workflow)
+- [Hotfix Deploy](#hotfix-deploy)
+- [Opting Out of Defaults](#opting-out-of-defaults)
+- [WarpBuild](#warpbuild)
+- [Input Reference](#input-reference)
+- [Architecture Overview](#architecture-overview)
+- [Pipeline Flow](#pipeline-flow)
+- [Composite Action Internals](#composite-action-internals)
+
 ---
 
 ## Language-Specific Workflows (Recommended)
 
-The primary interface to platform-workflows. Each language has a matched pair of reusable workflows: one for PR validation and one for deploy. Pick your language, wire up both files, and you are done.
+The primary interface to platform-workflows. Each language has a matched pair of reusable workflows: one for PR validation, one for deploy. Pick your language and wire up both files.
 
 ### Available workflows
 
-| Language | PR Workflow                | Deploy Workflow          | Default version |
-| -------- | -------------------------- | ------------------------ | --------------- |
-| Go       | `go-pull-request.yaml`     | `go-deploy.yaml`         | (from mise)     |
-| Node.js  | `node-pull-request.yaml`   | `node-deploy.yaml`       | `20`            |
-| .NET     | `dotnet-pull-request.yaml` | `dotnet-deploy.yaml`     | `8.0`           |
-| Kotlin   | `kotlin-pull-request.yaml` | `kotlin-deploy.yaml`     | `21`            |
-| PHP      | `php-pull-request.yaml`    | `php-deploy.yaml`        | `8.2`           |
-| Python   | `python-pull-request.yaml` | `python-deploy.yaml`     | `3.12`          |
-| Ruby     | `ruby-pull-request.yaml`   | `ruby-deploy.yaml`       | `3.3`           |
+| Language | PR Workflow                | Deploy Workflow      | Default version |
+| -------- | -------------------------- | -------------------- | --------------- |
+| Go       | `go-pull-request.yaml`     | `go-deploy.yaml`     | (from mise)     |
+| Node.js  | `node-pull-request.yaml`   | `node-deploy.yaml`   | `20`            |
+| .NET     | `dotnet-pull-request.yaml` | `dotnet-deploy.yaml` | `8.0`           |
+| Kotlin   | `kotlin-pull-request.yaml` | `kotlin-deploy.yaml` | `21`            |
+| PHP      | `php-pull-request.yaml`    | `php-deploy.yaml`    | `8.2`           |
+| Python   | `python-pull-request.yaml` | `python-deploy.yaml` | `3.12`          |
+| Ruby     | `ruby-pull-request.yaml`   | `ruby-deploy.yaml`   | `3.3`           |
 
 ### How it works
 
-Each language workflow uses [mise](https://mise.jdx.dev/) as the default task runner. If your repo has a `mise.toml` with `lint`, `security`, and/or `test` tasks, the workflow picks them up automatically. No extra configuration needed.
-
-For repos not yet on mise, override inputs are available: `lint-command`, `test-command` (all languages except Go, which always uses mise).
+- Each language workflow uses [mise](https://mise.jdx.dev/) as the default task runner.
+- A repo with a `mise.toml` defining `lint`, `security`, and/or `test` tasks has them picked up automatically. No extra configuration.
+- For repos not yet on mise, override inputs are available: `lint-command`, `test-command` (all languages except Go, which always uses mise).
 
 ### Run-order options
 
-Every language workflow supports a `run-order` input that controls how lint, security, test, and container-build jobs execute:
+Every language workflow supports a `run-order` input that controls how lint, security, test, and container-build jobs execute.
 
-| Mode | Description |
-| ---- | ----------- |
-| `linear` | Lint -> Security -> Test -> Container build. Fail-fast: the first failure stops the pipeline. Default for most languages. |
-| `parallel` | All jobs run simultaneously. Fastest wall-clock time. Default for Go. |
-| `checks-first` | Security runs first, then lint and test run in parallel, then container build. Good for repos where security is the cheapest gate. |
+| Mode           | Description                                                                                                                   |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `linear`       | Lint -> Security -> Test -> Container build. Fail-fast: the first failure stops the pipeline. Default for most languages.     |
+| `parallel`     | All jobs run simultaneously. Fastest wall-clock time. Default for Go.                                                         |
+| `checks-first` | Security runs first, then lint and test run in parallel, then container build. For repos where security is the cheapest gate. |
 
 ### Examples
 
@@ -146,7 +160,7 @@ jobs:
 
 ### Shared Release workflow
 
-For SDK and package repos that publish artifacts (npm, NuGet, etc.), use `shared-release.yaml` instead of (or alongside) a deploy workflow. It supports edge and semantic release modes with built-in publishing to npm and NuGet registries.
+For SDK and package repos that publish artifacts (npm, NuGet, etc.), use `shared-release.yaml` instead of (or alongside) a deploy workflow. It supports edge and semantic release modes with publishing to npm and NuGet registries.
 
 ```yaml
 name: Release
@@ -165,7 +179,7 @@ jobs:
 
 ### Dependabot auto-merge
 
-For repos using Dependabot, wire up `dependabot-auto-merge.yaml` to automatically merge patch and minor version updates after CI passes.
+For repos using Dependabot, wire up `dependabot-auto-merge.yaml` to merge patch and minor version updates after CI passes.
 
 ```yaml
 name: Dependabot Auto-Merge
@@ -181,15 +195,13 @@ jobs:
 
 ## Generic Pull Request Workflow
 
-> **Note:** The following generic workflows are available as escape hatches for repos that don't fit a language-specific workflow. For most repos, use the language-specific workflows above.
+> **Note:** The generic workflows below are escape hatches for repos that don't fit a language-specific workflow. For most repos, use the language-specific workflows above.
 
-## Pull Request Workflow
+One workflow handles everything. Toggle features with flags.
 
-One workflow handles everything. Toggle what you need with flags.
+### Service (container build, the default)
 
-### Service (container build - the default)
-
-The simplest case. Builds a Dockerfile, scans it, runs compliance checks. No language setup needed - the Dockerfile handles everything.
+Builds a Dockerfile, scans it, runs compliance checks. No language setup needed: the Dockerfile handles everything.
 
 ```yaml
 # .github/workflows/pull-request.yaml
@@ -229,7 +241,7 @@ jobs:
 
 ### Service with tests outside the Dockerfile
 
-Some repos need to run language-specific tests in CI in addition to the container build.
+Run language-specific tests in CI in addition to the container build.
 
 ```yaml
 jobs:
@@ -308,7 +320,7 @@ jobs:
 
 ### Push / tag (with GoReleaser)
 
-GoReleaser needs write permissions for releases, packages, and OIDC signing. Callers **must** declare these - GitHub does not allow reusable workflows to escalate beyond what the caller grants.
+GoReleaser needs write permissions for releases, packages, and OIDC signing. Callers **must** declare these. GitHub does not allow reusable workflows to escalate beyond what the caller grants.
 
 ```yaml
 name: Build and Release
@@ -330,30 +342,33 @@ jobs:
 
 ### go.yaml inputs
 
-| Input             | Type    | Default                       | Description                 |
-| ----------------- | ------- | ----------------------------- | --------------------------- |
-| `lint`            | boolean | `true`                        | Run `mise run lint`         |
-| `security`        | boolean | `true`                        | Run `mise run security`     |
-| `test`            | boolean | `true`                        | Run tests                   |
-| `test-command`    | string  | `""`                          | Custom test command         |
-| `goreleaser`      | boolean | `true`                        | Run GoReleaser              |
-| `goreleaser-args` | string  | `""`                          | Additional GoReleaser args  |
-| `runner`          | string  | `warp-ubuntu-latest-arm64-4x` | GitHub Actions runner label |
+| Input                        | Type    | Default                       | Description                        |
+| ---------------------------- | ------- | ----------------------------- | ---------------------------------- |
+| `lint`                       | boolean | `true`                        | Run `mise run lint`                |
+| `security`                   | boolean | `true`                        | Run `mise run security`            |
+| `test`                       | boolean | `true`                        | Run tests                          |
+| `test-command`               | string  | `""`                          | Custom test command                |
+| `goreleaser`                 | boolean | `true`                        | Run GoReleaser                     |
+| `goreleaser-args`            | string  | `""`                          | Additional GoReleaser args         |
+| `project-id`                 | string  | `""`                          | GCP project ID                     |
+| `workload-identity-provider` | string  | `""`                          | WIF provider resource name         |
+| `service-account`            | string  | `""`                          | GCP service account to impersonate |
+| `runner`                     | string  | `warp-ubuntu-latest-arm64-4x` | GitHub Actions runner label        |
 
 ### go.yaml secrets
 
-`secrets: inherit` is required. The workflow uses a GitHub App token to fetch mise task includes from `credova/shared-configs`. Without it, `mise run lint` and `mise run security` will fail with 404 errors.
+`secrets: inherit` is required. The workflow uses a GitHub App token to fetch mise task includes from `credova/shared-configs`. Without it, `mise run lint` and `mise run security` fail with 404 errors.
 
-| Secret                              | Required       | Description                                          |
-| ----------------------------------- | -------------- | ---------------------------------------------------- |
-| `RELEASE_DOWNLOADER_APP_ID`         | Yes            | GitHub App ID - grants read access to shared-configs |
-| `RELEASE_DOWNLOADER_APP_PRIVATE_KEY`| Yes            | GitHub App private key                               |
-| `HOMEBREW_PUBLISHER_APP_ID`         | Tag builds only| GitHub App ID - publishes to homebrew-tap            |
-| `HOMEBREW_PUBLISHER_APP_PRIVATE_KEY`| Tag builds only| GitHub App private key                               |
+| Secret                               | Required        | Description                                         |
+| ------------------------------------ | --------------- | --------------------------------------------------- |
+| `RELEASE_DOWNLOADER_APP_ID`          | Yes             | GitHub App ID. Grants read access to shared-configs |
+| `RELEASE_DOWNLOADER_APP_PRIVATE_KEY` | Yes             | GitHub App private key                              |
+| `HOMEBREW_PUBLISHER_APP_ID`          | Tag builds only | GitHub App ID. Publishes to homebrew-tap            |
+| `HOMEBREW_PUBLISHER_APP_PRIVATE_KEY` | Tag builds only | GitHub App private key                              |
 
 ### GoReleaser Docker (dockers_v2)
 
-GoReleaser v2 replaces `dockers` + `docker_manifests` with a single `dockers_v2` section. This uses `docker buildx build` under the hood, building multi-platform manifests in one step.
+GoReleaser v2 replaces `dockers` + `docker_manifests` with a single `dockers_v2` section. It uses `docker buildx build` under the hood, building multi-platform manifests in one step.
 
 **.goreleaser.yaml:**
 
@@ -366,7 +381,7 @@ dockers_v2:
       - "{{ if not .IsNightly }}latest{{ end }}"
 ```
 
-**Dockerfile** - use `$TARGETPLATFORM` to copy the correct binary:
+**Dockerfile.** Use `$TARGETPLATFORM` to copy the correct binary:
 
 ```dockerfile
 FROM scratch
@@ -406,9 +421,7 @@ mise run docker-test
 
 ## Generic Deploy Workflow
 
-> **Note:** The following generic deploy workflow is available as an escape hatch for repos that don't fit a language-specific workflow. For most repos, use the language-specific deploy workflows above (e.g. `node-deploy.yaml`, `dotnet-deploy.yaml`).
-
-## Deploy Workflow
+> **Note:** The generic deploy workflow below is an escape hatch for repos that don't fit a language-specific workflow. For most repos, use the language-specific deploy workflows above (e.g. `node-deploy.yaml`, `dotnet-deploy.yaml`).
 
 One workflow handles everything. Same flags as pull-request plus deployment options.
 
@@ -447,7 +460,7 @@ jobs:
       RELEASE_DOWNLOADER_APP_PRIVATE_KEY: ${{ secrets.RELEASE_DOWNLOADER_APP_PRIVATE_KEY }}
 ```
 
-### Non-container repo (release only - no deploy)
+### Non-container repo (release only, no deploy)
 
 Runs tests, creates a tag and GitHub Release. No container, no Cloud Run.
 
@@ -502,7 +515,7 @@ jobs:
 
 ## Hotfix Deploy
 
-Same `deploy.yaml` with `hotfix: true`. Skips tests and staging - goes straight to build → [canary] → approve → production. Canary still works if `canary > 0`.
+Same `deploy.yaml` with `hotfix: true`. Skips tests and staging: goes straight to build → [canary] → approve → production. Canary still works if `canary > 0`.
 
 ```yaml
 # .github/workflows/deploy-hotfix.yaml
@@ -526,7 +539,7 @@ jobs:
 
 ## Opting Out of Defaults
 
-Security scanning and compliance checks are on by default. Opt out explicitly - visible in the workflow file, reviewable in PRs.
+Security scanning and compliance checks are on by default. Opt out explicitly: visible in the workflow file, reviewable in PRs.
 
 ```yaml
 jobs:
@@ -539,20 +552,20 @@ jobs:
 
 ### What you cannot disable
 
-- **Container scanning after build** - if you build and push, it gets scanned
-- **Auth via WIF** - no PATs, no service account keys
+- **Container scanning after build.** If you build and push, it gets scanned.
+- **Auth via WIF.** No PATs, no service account keys.
 
 ---
 
 ## WarpBuild
 
-All workflows run on [WarpBuild](https://warpbuild.com) runners by default (`warp-ubuntu-2204-x64-2x`). WarpBuild also provides remote Docker Builders for faster container builds with built-in layer caching.
+All workflows run on [WarpBuild](https://warpbuild.com) runners by default (`warp-ubuntu-2404-x64-2x`). WarpBuild also provides remote Docker Builders for container builds with layer caching.
 
 ### Prerequisites
 
-1. **WarpBuild runners** must be configured in your GitHub organization. All workflows default to `warp-ubuntu-2204-x64-2x`. Override with the `runner` input if needed.
-2. **WarpBuild Docker Builder** (optional) - to use remote Docker builds, you must first create a Docker Builder profile in the [WarpBuild dashboard](https://app.warpbuild.com). The profile name is passed via the `warpbuild-profile` input.
-3. **`WARPBUILD_API_KEY` secret** (optional) - only required if running on non-WarpBuild runners. Not needed when using WarpBuild runners.
+- **WarpBuild runners** must be configured in your GitHub organization. All workflows default to `warp-ubuntu-2404-x64-2x`. Override with the `runner` input.
+- **WarpBuild Docker Builder** (optional). To use remote Docker builds, first create a Docker Builder profile in the [WarpBuild dashboard](https://app.warpbuild.com). Pass the profile name via the `warpbuild-profile` input.
+- **`WARPBUILD_API_KEY` secret** (optional). Required only when running on non-WarpBuild runners. Not needed on WarpBuild runners.
 
 ### Using WarpBuild Docker Builders
 
@@ -566,46 +579,61 @@ jobs:
       warpbuild-profile: my-docker-builder
 ```
 
-Benefits over standard buildx:
+Compared to standard buildx:
 
-- **Built-in layer caching** - no `cache-to`/`cache-from` configuration needed
-- **Native arm64 support** - no QEMU emulation, builds run on real hardware
-- **Faster builds** - dedicated remote build infrastructure
+- **Built-in layer caching.** No `cache-to`/`cache-from` configuration needed.
+- **Native arm64 support.** No QEMU emulation; builds run on real hardware.
+- **Dedicated remote build infrastructure.**
 
-### Overriding the runner
+## Runners
 
-To use a different runner (e.g. for repos not yet on WarpBuild):
+- Default: `warp-ubuntu-2404-x64-2x`.
+- Override per workflow with the `runner` input.
+
+### Override
 
 ```yaml
 jobs:
   ci:
     uses: credova/platform-workflows/.github/workflows/pull-request.yaml@master
     with:
+      runner: warp-ubuntu-2404-x64-8x
+```
+
+Use any GitHub-hosted runner instead (for repos not on WarpBuild):
+
+```yaml
+    with:
       runner: ubuntu-latest
 ```
 
-### Available WarpBuild runners
+### Naming pattern
 
-| Runner | vCPU | RAM | Arch |
-| ------ | ---- | --- | ---- |
-| `warp-ubuntu-2204-x64-2x` | 2 | 8 GB | x64 |
-| `warp-ubuntu-2204-x64-4x` | 4 | 16 GB | x64 |
-| `warp-ubuntu-2204-x64-8x` | 8 | 32 GB | x64 |
-| `warp-ubuntu-2204-arm64-2x` | 2 | 8 GB | arm64 |
-| `warp-ubuntu-2204-arm64-4x` | 4 | 16 GB | arm64 |
-| `warp-ubuntu-2204-arm64-8x` | 8 | 32 GB | arm64 |
-| `warp-ubuntu-2404-x64-2x` | 2 | 8 GB | x64 |
-| `warp-ubuntu-2404-x64-4x` | 4 | 16 GB | x64 |
-| `warp-ubuntu-2404-x64-8x` | 8 | 32 GB | x64 |
-| `warp-ubuntu-2404-arm64-2x` | 2 | 8 GB | arm64 |
-| `warp-ubuntu-2404-arm64-4x` | 4 | 16 GB | arm64 |
-| `warp-ubuntu-2404-arm64-8x` | 8 | 32 GB | arm64 |
+```
+warp-ubuntu-<os>-<arch>-<size>
+```
 
-Default: `warp-ubuntu-2204-x64-2x`. Use 4x/8x for resource-intensive builds only.
+- `os`: `2404` (Ubuntu 24.04)
+- `arch`: `x64` or `arm64`
+- `size`: `2x`, `4x`, `8x`, `16x`, `32x`
+
+### Sizes
+
+| Size           | vCPU | RAM    |
+| -------------- | ---- | ------ |
+| `2x` (default) | 2    | 8 GB   |
+| `4x`           | 4    | 16 GB  |
+| `8x`           | 8    | 32 GB  |
+| `16x`          | 16   | 64 GB  |
+| `32x`          | 32   | 128 GB |
+
+Available for both `x64` and `arm64`. Use larger sizes for resource-intensive builds only.
+
+Confirm latest images and specs: https://www.warpbuild.com/docs/ci/cloud-runners
 
 ### Dependency caching (WarpCache)
 
-Enable `WarpBuilds/cache@v1` for dependency caching. This is a drop-in replacement for `actions/cache` with unlimited storage and better performance on WarpBuild runners.
+Enable `WarpBuilds/cache@v1` for dependency caching. It is a drop-in replacement for `actions/cache` with unlimited storage on WarpBuild runners.
 
 ```yaml
 jobs:
@@ -619,16 +647,16 @@ jobs:
 
 Cached paths per language:
 
-| Language | Cache path          | Key based on                              |
-| -------- | ------------------- | ----------------------------------------- |
-| Go       | `~/go/pkg/mod`      | `go.sum`                                  |
-| Node.js  | `~/.npm`            | `package-lock.json`, `yarn.lock`          |
-| Kotlin   | `~/.gradle/caches`  | `*.gradle*`, `gradle-wrapper.properties`  |
-| Python   | `~/.cache/pip`      | `requirements*.txt`, `pyproject.toml`     |
-| Ruby     | `vendor/bundle`     | `Gemfile.lock`                            |
-| .NET     | `~/.nuget/packages` | `*.csproj`, `packages.lock.json`          |
+| Language | Cache path          | Key based on                             |
+| -------- | ------------------- | ---------------------------------------- |
+| Go       | `~/go/pkg/mod`      | `go.sum`                                 |
+| Node.js  | `~/.npm`            | `package-lock.json`, `yarn.lock`         |
+| Kotlin   | `~/.gradle/caches`  | `*.gradle*`, `gradle-wrapper.properties` |
+| Python   | `~/.cache/pip`      | `requirements*.txt`, `pyproject.toml`    |
+| Ruby     | `vendor/bundle`     | `Gemfile.lock`                           |
+| .NET     | `~/.nuget/packages` | `*.csproj`, `packages.lock.json`         |
 
-When `cache: true`, built-in caches from `actions/setup-go` and `actions/setup-node` are automatically disabled to avoid double-caching.
+When `cache: true`, built-in caches from `actions/setup-go` and `actions/setup-node` are disabled to avoid double-caching.
 
 ---
 
@@ -636,47 +664,49 @@ When `cache: true`, built-in caches from `actions/setup-go` and `actions/setup-n
 
 ### pull-request.yaml
 
-| Input               | Type    | Default                    | Description                          |
-| ------------------- | ------- | -------------------------- | ------------------------------------ |
-| `language`          | string  | `""`                       | Language runtime (see table above)   |
-| `language-version`  | string  | `""`                       | Runtime version (required w/ lang)   |
-| `test-command`      | string  | `""`                       | Custom test command                  |
-| `container`         | boolean | `true`                     | Build and scan a container image     |
-| `image`             | string  | `""`                       | Single image `name:dockerfile`       |
-| `images`            | string  | `""`                       | Multi-image YAML list                |
-| `platform`          | string  | `linux/amd64`              | Target platform for builds           |
-| `warpbuild-profile` | string  | `""`                       | WarpBuild Docker Builder profile     |
-| `cache`             | boolean | `false`                    | WarpBuild dependency caching         |
-| `runner`            | string  | see WarpBuild section      | GitHub Actions runner label          |
-| `security-packages` | boolean | `true`                     | Package vulnerability scan           |
-| `security-code`     | boolean | `true`                     | Code static analysis                 |
-| `security-severity` | string  | `HIGH`                     | Minimum severity to fail on          |
-| `compliance-ticket` | boolean | `true`                     | Require ticket reference             |
+| Input               | Type    | Default               | Description                        |
+| ------------------- | ------- | --------------------- | ---------------------------------- |
+| `language`          | string  | `""`                  | Language runtime (see table above) |
+| `language-version`  | string  | `""`                  | Runtime version (required w/ lang) |
+| `test-command`      | string  | `""`                  | Custom test command                |
+| `container`         | boolean | `true`                | Build and scan a container image   |
+| `image`             | string  | `""`                  | Single image `name:dockerfile`     |
+| `images`            | string  | `""`                  | Multi-image YAML list              |
+| `platform`          | string  | `linux/amd64`         | Target platform for builds         |
+| `warpbuild-profile` | string  | `""`                  | WarpBuild Docker Builder profile   |
+| `cache`             | boolean | `false`               | WarpBuild dependency caching       |
+| `runner`            | string  | see WarpBuild section | GitHub Actions runner label        |
+| `security-packages` | boolean | `true`                | Package vulnerability scan         |
+| `security-licenses` | boolean | `true`                | License compliance scan            |
+| `security-code`     | boolean | `true`                | Code static analysis               |
+| `security-severity` | string  | `HIGH`                | Minimum severity to fail on        |
+| `compliance-ticket` | boolean | `true`                | Require ticket reference           |
 
 ### deploy.yaml
 
-All inputs from pull-request.yaml plus:
+Shares the build/runtime inputs from pull-request.yaml (`language`, `language-version`, `test-command`, `container`, `image`, `images`, `platform`, `warpbuild-profile`, `cache`, `runner`, `security-severity`) plus:
 
-| Input                        | Type    | Default        | Description                                                       |
-| ---------------------------- | ------- | -------------- | ----------------------------------------------------------------- |
-| `deploy`                     | boolean | `true`         | Deploy to Cloud Run via pctl                                      |
-| `config-path`                | string  | `deployments/` | Path to CUE config directory                                      |
-| `canary`                     | number  | `0`            | Canary traffic percentage                                         |
-| `require-approval`           | boolean | `true`         | Require manual approval for production                            |
-| `container-reuse`            | boolean | `true`         | Skip build if image exists for this SHA                           |
-| `hotfix`                     | boolean | `false`        | Hotfix mode: skip tests, staging, canary - straight to production |
-| `notifications`              | boolean | `true`         | Send Slack notifications                                          |
-| `project-id`                 | string  | `""`           | GCP project ID                                                    |
-| `workload-identity-provider` | string  | `""`           | WIF provider resource name                                        |
+| Input                        | Type    | Default        | Description                                                      |
+| ---------------------------- | ------- | -------------- | ---------------------------------------------------------------- |
+| `deploy`                     | boolean | `true`         | Deploy to Cloud Run via pctl                                     |
+| `config-path`                | string  | `deployments/` | Path to CUE config directory                                     |
+| `canary`                     | number  | `0`            | Canary traffic percentage                                        |
+| `require-approval`           | boolean | `true`         | Require manual approval for production                           |
+| `container-reuse`            | boolean | `true`         | Skip build if image exists for this SHA                          |
+| `hotfix`                     | boolean | `false`        | Hotfix mode: skip tests, staging, canary, straight to production |
+| `notifications`              | boolean | `true`         | Send Slack notifications                                         |
+| `project-id`                 | string  | `""`           | GCP project ID                                                   |
+| `workload-identity-provider` | string  | `""`           | WIF provider resource name                                       |
+| `service-account`            | string  | `""`           | GCP service account to impersonate                               |
 
-**Secrets** (both workflows): `WARPBUILD_API_KEY` (optional - only needed on non-WarpBuild runners).
+**Secrets** (both workflows): `WARPBUILD_API_KEY` (optional, needed only on non-WarpBuild runners).
 Deploy also requires: `RELEASE_DOWNLOADER_APP_ID`, `RELEASE_DOWNLOADER_APP_PRIVATE_KEY`.
 
 ---
 
 ## Architecture Overview
 
-How the two layers connect: reusable workflows are the public interface, composite actions are internal building blocks.
+Two layers: reusable workflows are the public interface, composite actions are internal building blocks.
 
 ```mermaid
 ---
@@ -760,16 +790,16 @@ flowchart TD
     style BUILD stroke-dasharray: 5 5
 ```
 
-**Toggle map** - what each input controls:
+**Toggle map.** What each input controls:
 
-| Input | What it gates |
-| ----- | ------------- |
-| `language` + `language-version` | **test** job runs |
-| `container` (default: `true`) | **build** job runs |
-| `security-packages` | package vulnerability scan inside **security** |
-| `security-licenses` | license compliance scan inside **security** |
-| `security-code` | static code analysis inside **security** |
-| `compliance-ticket` (default: `true`) | ticket reference check inside **compliance** |
+| Input                                 | What it gates                                  |
+| ------------------------------------- | ---------------------------------------------- |
+| `language` + `language-version`       | **test** job runs                              |
+| `container` (default: `true`)         | **build** job runs                             |
+| `security-packages`                   | package vulnerability scan inside **security** |
+| `security-licenses`                   | license compliance scan inside **security**    |
+| `security-code`                       | static code analysis inside **security**       |
+| `compliance-ticket` (default: `true`) | ticket reference check inside **compliance**   |
 
 ### Deploy (standard)
 
@@ -828,19 +858,19 @@ flowchart TD
 
 **Toggle map:**
 
-| Input | What it gates |
-| ----- | ------------- |
-| `language` + `language-version` | **test** job runs |
-| `container` (default: `true`) | **build-scan-push** and **retag-production** jobs run |
-| `deploy` (default: `true`) | **staging**, **approval**, **canary**, and **production** jobs run |
-| `canary` (default: `0`) | **approve-canary** and **deploy-canary** jobs run (set > 0 to enable) |
-| `require-approval` (default: `true`) | **approve-production** gate runs |
-| `notifications` (default: `true`) | Slack notifications in **deploy-production** |
-| `container-reuse` (default: `true`) | **build-scan-push** skips build if image already exists for this SHA |
+| Input                                | What it gates                                                         |
+| ------------------------------------ | --------------------------------------------------------------------- |
+| `language` + `language-version`      | **test** job runs                                                     |
+| `container` (default: `true`)        | **build-scan-push** and **retag-production** jobs run                 |
+| `deploy` (default: `true`)           | **staging**, **approval**, **canary**, and **production** jobs run    |
+| `canary` (default: `0`)              | **approve-canary** and **deploy-canary** jobs run (set > 0 to enable) |
+| `require-approval` (default: `true`) | **approve-production** gate runs                                      |
+| `notifications` (default: `true`)    | Slack notifications in **deploy-production**                          |
+| `container-reuse` (default: `true`)  | **build-scan-push** skips build if image already exists for this SHA  |
 
 ### Deploy (hotfix)
 
-Tag push with `hotfix: true`. Skips tests and staging - straight to build → production.
+Tag push with `hotfix: true`. Skips tests and staging: straight to build → production.
 
 ```mermaid
 ---
@@ -917,11 +947,11 @@ flowchart TD
 
 **Toggle map:**
 
-| Input | What it gates |
-| ----- | ------------- |
-| `lint` (default: `true`) | **lint** job |
-| `security` (default: `true`) | **security** job |
-| `test` (default: `true`) | **test** job |
+| Input                          | What it gates                                            |
+| ------------------------------ | -------------------------------------------------------- |
+| `lint` (default: `true`)       | **lint** job                                             |
+| `security` (default: `true`)   | **security** job                                         |
+| `test` (default: `true`)       | **test** job                                             |
 | `goreleaser` (default: `true`) | **goreleaser** job (runs `--snapshot` on non-tag builds) |
 
 All four jobs are independently toggleable. GoReleaser waits for the other three.
@@ -932,7 +962,7 @@ All four jobs are independently toggleable. GoReleaser waits for the other three
 
 ### container action
 
-The most complex action - handles the full image lifecycle with multiple modes.
+Handles the full image lifecycle with multiple modes.
 
 ```mermaid
 ---
@@ -1043,7 +1073,7 @@ flowchart TD
 
 ### deployment action
 
-Deploys to Cloud Run via pctl. Self-contained - handles its own auth.
+Deploys to Cloud Run via pctl. Self-contained: handles its own auth.
 
 ```mermaid
 ---
@@ -1064,6 +1094,7 @@ flowchart TD
 ```
 
 `deploy.sh` supports four actions via the `action` input:
+
 - **deploy** - full deploy (or canary if `canary > 0`)
 - **promote** - promote canary to full traffic
 - **rollback** - rollback to a previous revision
