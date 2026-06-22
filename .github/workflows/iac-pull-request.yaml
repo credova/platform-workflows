@@ -1,0 +1,233 @@
+name: "IaC: Pull Request"
+
+# Shared pull-request workflow for Pulumi/IaC repos (platform-iac, github-meta,
+# product-iac): lint (mise) + reeve (preview/apply) + compliance (Shortcut
+# ticket). Reeve is event + comment driven; callers carry the
+# pull_request / pull_request_review / issue_comment triggers (and any path
+# filters) and pass these inputs.
+on:
+  workflow_call:
+    inputs:
+      lint:
+        description: Run mise lint (go vet + golangci-lint)
+        type: boolean
+        required: false
+        default: true
+      reeve:
+        description: Run reeve (preview/apply)
+        type: boolean
+        required: false
+        default: true
+
+      # reeve auth
+      gcp-workload-identity-provider:
+        description: WIF provider resource name for reeve
+        type: string
+        required: true
+      gcp-service-account:
+        description: Service account email reeve impersonates
+        type: string
+        required: true
+
+      # Pre-warm (repos with a heavy Go Pulumi program, e.g. platform-iac edge)
+      prewarm:
+        description: Pre-warm Go build + a pulumi plugin before reeve (avoids the 10m preview cap)
+        type: boolean
+        required: false
+        default: false
+      prewarm-dir:
+        description: Directory to `go build` during pre-warm (relative to repo root)
+        type: string
+        required: false
+        default: "."
+      prewarm-plugins:
+        description: >
+          Newline-separated list of pulumi resource plugin NAMES to pre-install
+          (e.g. "cloudflare\ngcp"). Set per-repo downstream. Versions are read
+          from the caller's go.mod, never hardcoded here. Empty = none.
+        type: string
+        required: false
+        default: ""
+
+      reeve-log-level:
+        description: reeve log level (info, debug)
+        type: string
+        required: false
+        default: info
+
+      compliance-ticket:
+        description: Require Shortcut ticket reference
+        type: boolean
+        required: false
+        default: true
+
+      runner:
+        description: GitHub Actions runner label
+        type: string
+        required: false
+        default: warp-ubuntu-latest-x64-8x
+
+    # No `secrets:` block: every secret used here (IAC_TOKEN_APP_*,
+    # RELEASE_DOWNLOADER_APP_*, PCTL_SLACK_BOT_TOKEN, CLOUDFLARE_API_TOKEN) is
+    # org-level / org-shared with a stable name, so callers use `secrets:
+    # inherit` and this workflow reads them directly.
+
+jobs:
+  lint:
+    if: inputs.lint && github.event_name == 'pull_request'
+    runs-on: ${{ inputs.runner }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Generate cross-repo token
+        id: token
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ secrets.IAC_TOKEN_APP_ID }}
+          private-key: ${{ secrets.IAC_TOKEN_APP_PRIVATE_KEY }}
+          owner: credova
+
+      - name: Setup mise
+        uses: jdx/mise-action@v4
+        with:
+          install: true
+          cache: true
+        env:
+          MISE_GITHUB_TOKEN: ${{ steps.token.outputs.token }}
+          GIT_CONFIG_COUNT: 1
+          GIT_CONFIG_KEY_0: "url.https://x-access-token:${{ steps.token.outputs.token }}@github.com/.insteadOf"
+          GIT_CONFIG_VALUE_0: "ssh://git@github.com/"
+
+      - name: Run lint
+        id: lint
+        continue-on-error: true
+        run: mise run lint 2>&1 | tee lint-output.txt
+        env:
+          GIT_CONFIG_COUNT: 1
+          GIT_CONFIG_KEY_0: "url.https://x-access-token:${{ steps.token.outputs.token }}@github.com/.insteadOf"
+          GIT_CONFIG_VALUE_0: "ssh://git@github.com/"
+
+      - name: Post Go comment
+        if: always() && github.event_name == 'pull_request'
+        uses: credova/platform-workflows/actions/go-report@master
+        with:
+          job: lint
+          outcome: ${{ steps.lint.outcome }}
+          output-file: lint-output.txt
+
+      - name: Fail on lint errors
+        if: steps.lint.outcome == 'failure'
+        shell: bash
+        run: exit 1
+
+  reeve:
+    if: inputs.reeve && (github.event_name != 'issue_comment' || github.event.issue.pull_request != null)
+    runs-on: ${{ inputs.runner }}
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+      id-token: write
+      checks: read
+      statuses: read
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+    steps:
+      - uses: actions/checkout@v7
+
+      # Pre-warm path: mint an org-read token, fix private-module git auth, then
+      # warm Go build + a pulumi plugin so reeve's preview stays under its cap.
+      - name: Generate module download token
+        if: inputs.prewarm
+        id: modules-token
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ secrets.RELEASE_DOWNLOADER_APP_ID }}
+          private-key: ${{ secrets.RELEASE_DOWNLOADER_APP_PRIVATE_KEY }}
+          owner: credova
+
+      - name: Configure private module access
+        if: inputs.prewarm
+        run: |
+          # mise.toml [env] rewrites https://github.com/credova/ ->
+          # git@github.com:credova/ (ssh) for local dev; CI has no key. git
+          # merges file config with that env, so add a --global rewrite for the
+          # scp form -> token-auth https. GOPRIVATE keeps go off the proxy.
+          git config --global url."https://x-access-token:${TOKEN}@github.com/".insteadOf "git@github.com:"
+          git config --global --add url."https://x-access-token:${TOKEN}@github.com/".insteadOf "https://github.com/"
+          echo "GOPRIVATE=github.com/credova/*" >> "${GITHUB_ENV}"
+        env:
+          TOKEN: ${{ steps.modules-token.outputs.token }}
+
+      - name: Setup Go
+        if: inputs.prewarm
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
+      - name: Install pulumi
+        if: inputs.prewarm
+        uses: pulumi/actions@v7
+        with:
+          pulumi-version: latest
+
+      - name: Pre-warm Go build + pulumi plugins
+        if: inputs.prewarm
+        shell: bash
+        env:
+          PREWARM_DIR: ${{ inputs.prewarm-dir }}
+          PREWARM_PLUGINS: ${{ inputs.prewarm-plugins }}
+        run: |
+          cd "${GITHUB_WORKSPACE}/${PREWARM_DIR}"
+          go build -o /dev/null ./...
+          # For each plugin NAME the caller listed, derive its version from
+          # go.mod (single source of truth) and pre-install. Nothing is
+          # hardcoded here -- repos declare what they need downstream.
+          while IFS= read -r plugin; do
+            plugin="$(echo "${plugin}" | xargs)"   # trim whitespace
+            [ -z "${plugin}" ] && continue
+            ver=$(grep -E "pulumi/pulumi-${plugin}/sdk/v[0-9]+ v" "${GITHUB_WORKSPACE}/go.mod" \
+              | awk '{print $2}' | sed 's/^v//' | head -1)
+            if [ -z "${ver}" ]; then
+              echo "::error::could not find pulumi-${plugin} version in go.mod" >&2
+              exit 1
+            fi
+            echo "pre-installing ${plugin} plugin v${ver} (from go.mod)"
+            pulumi plugin install resource "${plugin}" "${ver}"
+          done <<< "${PREWARM_PLUGINS}"
+
+      # reeve needs a token with org Members: read (CODEOWNERS team expansion)
+      # plus repo scopes — the iac-token GH App.
+      - name: Generate reeve token
+        id: reeve-token
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ secrets.IAC_TOKEN_APP_ID }}
+          private-key: ${{ secrets.IAC_TOKEN_APP_PRIVATE_KEY }}
+          owner: credova
+
+      - uses: FynxLabs/reeve@master
+        with:
+          # Pass ref explicitly: reeve's inner checkout resolves github.action_ref
+          # to its own version otherwise and dies.
+          ref: master
+          # When pre-warmed we already installed pulumi; leave blank so reeve
+          # doesn't reinstall. Otherwise let reeve install latest.
+          pulumi-version: ${{ inputs.prewarm && '' || 'latest' }}
+          github-token: ${{ steps.reeve-token.outputs.token }}
+          gcp-workload-identity-provider: ${{ inputs.gcp-workload-identity-provider }}
+          gcp-service-account: ${{ inputs.gcp-service-account }}
+          slack-token: ${{ secrets.PCTL_SLACK_BOT_TOKEN }}
+          log-level: ${{ inputs.reeve-log-level }}
+
+  compliance:
+    needs: [lint, reeve]
+    if: always() && !failure() && !cancelled() && github.event_name == 'pull_request'
+    runs-on: ${{ inputs.runner }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: credova/platform-workflows/actions/compliance@master
+        with:
+          ticket: ${{ inputs.compliance-ticket && 'true' || 'false' }}
