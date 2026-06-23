@@ -22,7 +22,7 @@ CMD_ARGS=("pctl" "deploy")
 
 case "${ACTION}" in
   deploy)
-    CMD_ARGS+=("execute" "${TARGET}" "--tag" "${TAG}" "--config" "${CONFIG_PATH}")
+    CMD_ARGS+=("execute" "${TARGET}" "--tag" "${TAG}" "--deploy-config" "${CONFIG_PATH}")
     if [ "${CANARY}" != "0" ] && [ -n "${CANARY}" ]; then
       CMD_ARGS+=("--canary" "${CANARY}")
     fi
