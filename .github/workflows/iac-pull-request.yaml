@@ -114,6 +114,9 @@ jobs:
           job: lint
           outcome: ${{ steps.lint.outcome }}
           output-file: lint-output.txt
+          # IaC runs lint only; mark the others so they don't show "Pending".
+          security-enabled: "false"
+          test-enabled: "false"
 
       - name: Fail on lint errors
         if: steps.lint.outcome == 'failure'

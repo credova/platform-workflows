@@ -12,6 +12,18 @@ inputs:
     description: Path to captured command output
     required: false
     default: ""
+  lint-enabled:
+    description: Whether the lint job runs (disabled -> section shows "Not enabled")
+    required: false
+    default: "true"
+  security-enabled:
+    description: Whether the security job runs
+    required: false
+    default: "true"
+  test-enabled:
+    description: Whether the test job runs
+    required: false
+    default: "true"
 
 runs:
   using: composite
@@ -24,4 +36,7 @@ runs:
         JOB: ${{ inputs.job }}
         JOB_OUTCOME: ${{ inputs.outcome }}
         OUTPUT_FILE: ${{ inputs.output-file }}
+        LINT_ENABLED: ${{ inputs.lint-enabled }}
+        SECURITY_ENABLED: ${{ inputs.security-enabled }}
+        TEST_ENABLED: ${{ inputs.test-enabled }}
       run: bash "${{ github.action_path }}/../../scripts/post-go-comment.sh"
