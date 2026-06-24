@@ -138,9 +138,15 @@ on:
         description: "GitHub Actions runner label"
         type: string
         required: false
-        default: warp-ubuntu-2404-x64-4x
+        # test / deploy / validate observed near-idle; heavy jobs use their own below.
+        default: warp-ubuntu-2404-x64-2x
       goreleaser-runner:
-        description: Runner for the GoReleaser job (one size up by default - builds are heavier)
+        description: Runner for the GoReleaser job (builds are CPU-heavy)
+        type: string
+        required: false
+        default: warp-ubuntu-2404-x64-8x
+      build-runner:
+        description: Runner for the container build job (builds are CPU-heavy)
         type: string
         required: false
         default: warp-ubuntu-2404-x64-8x
@@ -328,7 +334,7 @@ jobs:
   build-scan-push:
     if: inputs.container && always() && !failure() && !cancelled()
     needs: [validate, test, goreleaser]
-    runs-on: ${{ inputs.runner }}
+    runs-on: ${{ inputs.build-runner }}
     strategy:
       fail-fast: true
       matrix:
