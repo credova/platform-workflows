@@ -104,7 +104,7 @@ on:
         description: "GitHub Actions runner label"
         type: string
         required: false
-        default: warp-ubuntu-latest-arm64-4x
+        default: warp-ubuntu-2404-x64-4x
 
     secrets:
       RELEASE_DOWNLOADER_APP_ID:

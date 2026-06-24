@@ -59,7 +59,12 @@ on:
         description: GitHub Actions runner label
         type: string
         required: false
-        default: warp-ubuntu-latest-arm64-4x
+        default: warp-ubuntu-2404-x64-4x
+      goreleaser-runner:
+        description: Runner for the GoReleaser job (one size up by default - builds are heavier)
+        type: string
+        required: false
+        default: warp-ubuntu-2404-x64-8x
 
     secrets:
       RELEASE_DOWNLOADER_APP_ID:
@@ -231,7 +236,7 @@ jobs:
     name: GoReleaser
     needs: [lint, security, test]
     if: inputs.goreleaser && !failure() && !cancelled()
-    runs-on: ${{ inputs.runner }}
+    runs-on: ${{ inputs.goreleaser-runner }}
     steps:
       - uses: actions/checkout@v7
         with:

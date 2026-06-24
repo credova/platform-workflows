@@ -65,7 +65,7 @@ on:
         description: GitHub Actions runner label
         type: string
         required: false
-        default: warp-ubuntu-latest-x64-8x
+        default: warp-ubuntu-2404-x64-8x
 
     # No `secrets:` block: every secret used here (IAC_TOKEN_APP_*,
     # RELEASE_DOWNLOADER_APP_*, PCTL_SLACK_BOT_TOKEN, CLOUDFLARE_API_TOKEN) is
