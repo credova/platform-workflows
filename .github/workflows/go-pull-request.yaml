@@ -104,7 +104,18 @@ on:
         description: "GitHub Actions runner label"
         type: string
         required: false
-        default: warp-ubuntu-latest-arm64-4x
+        # lint / test observed near-idle; heavy jobs use their own runners below.
+        default: warp-ubuntu-2404-x64-2x
+      security-runner:
+        description: Runner for the security jobs (scans are CPU-heavy)
+        type: string
+        required: false
+        default: warp-ubuntu-2404-x64-8x
+      build-runner:
+        description: Runner for the container build job (builds are CPU-heavy)
+        type: string
+        required: false
+        default: warp-ubuntu-2404-x64-8x
 
     secrets:
       RELEASE_DOWNLOADER_APP_ID:
@@ -199,7 +210,7 @@ jobs:
 
   security-go:
     if: inputs.security-mise
-    runs-on: ${{ inputs.runner }}
+    runs-on: ${{ inputs.security-runner }}
     steps:
       - uses: actions/checkout@v7
 
@@ -303,7 +314,7 @@ jobs:
 
   # --- Source security scan (shared action, separate from mise security) ---
   security-scan:
-    runs-on: ${{ inputs.runner }}
+    runs-on: ${{ inputs.security-runner }}
     steps:
       - uses: actions/checkout@v7
 
@@ -346,7 +357,7 @@ jobs:
   build:
     if: inputs.container && always() && !failure() && !cancelled()
     needs: [validate, lint, security-go, test, security-scan]
-    runs-on: ${{ inputs.runner }}
+    runs-on: ${{ inputs.build-runner }}
     strategy:
       fail-fast: true
       matrix:

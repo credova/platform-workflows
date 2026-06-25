@@ -9,6 +9,10 @@ set -euo pipefail
 #   JOB         - "lint" | "security" | "test"
 #   JOB_OUTCOME - "success" | "failure" | "skipped" | "cancelled"
 #   OUTPUT_FILE - path to captured command output (optional)
+#   LINT_ENABLED / SECURITY_ENABLED / TEST_ENABLED - "true"|"false" (optional,
+#               default "true"). A disabled section renders "_Not enabled._"
+#               instead of "_Pending..._" so workflows that only run some jobs
+#               (e.g. IaC lint-only) don't show perpetual Pending.
 
 MAIN_MARKER="<!-- go-report -->"
 LINT_START="<!-- go-lint-start -->"
@@ -122,9 +126,15 @@ LINT_CONTENT=$(extract_section "$LINT_START" "$LINT_END" "$EXISTING_BODY")
 SECURITY_CONTENT=$(extract_section "$SECURITY_START" "$SECURITY_END" "$EXISTING_BODY")
 TEST_CONTENT=$(extract_section "$TEST_START" "$TEST_END" "$EXISTING_BODY")
 
-[ -z "$LINT_CONTENT" ]     && LINT_CONTENT="_Pending..._"
-[ -z "$SECURITY_CONTENT" ] && SECURITY_CONTENT="_Pending..._"
-[ -z "$TEST_CONTENT" ]     && TEST_CONTENT="_Pending..._"
+# Fill empty sections: "_Not enabled._" if the job is disabled, else
+# "_Pending..._" (job enabled but hasn't reported yet).
+fill_default() {
+  local enabled="$1"
+  [ "$enabled" = "false" ] && echo "_Not enabled._" || echo "_Pending..._"
+}
+[ -z "$LINT_CONTENT" ]     && LINT_CONTENT=$(fill_default "${LINT_ENABLED:-true}")
+[ -z "$SECURITY_CONTENT" ] && SECURITY_CONTENT=$(fill_default "${SECURITY_ENABLED:-true}")
+[ -z "$TEST_CONTENT" ]     && TEST_CONTENT=$(fill_default "${TEST_ENABLED:-true}")
 
 case "$JOB" in
   lint)     LINT_CONTENT=$(build_job_section "$JOB_OUTCOME") ;;

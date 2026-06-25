@@ -59,7 +59,18 @@ on:
         description: GitHub Actions runner label
         type: string
         required: false
-        default: warp-ubuntu-latest-arm64-4x
+        # lint / test observed near-idle; heavy jobs use their own runners below.
+        default: warp-ubuntu-2404-x64-2x
+      goreleaser-runner:
+        description: Runner for the GoReleaser job (one size up by default - builds are heavier)
+        type: string
+        required: false
+        default: warp-ubuntu-2404-x64-8x
+      security-runner:
+        description: Runner for the security job (one size up by default - scans are heavier)
+        type: string
+        required: false
+        default: warp-ubuntu-2404-x64-8x
 
     secrets:
       RELEASE_DOWNLOADER_APP_ID:
@@ -124,7 +135,7 @@ jobs:
   security:
     if: inputs.security
     name: Security
-    runs-on: ${{ inputs.runner }}
+    runs-on: ${{ inputs.security-runner }}
     steps:
       - uses: actions/checkout@v7
 
@@ -231,7 +242,7 @@ jobs:
     name: GoReleaser
     needs: [lint, security, test]
     if: inputs.goreleaser && !failure() && !cancelled()
-    runs-on: ${{ inputs.runner }}
+    runs-on: ${{ inputs.goreleaser-runner }}
     steps:
       - uses: actions/checkout@v7
         with:

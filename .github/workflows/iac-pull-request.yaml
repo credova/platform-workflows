@@ -65,7 +65,13 @@ on:
         description: GitHub Actions runner label
         type: string
         required: false
-        default: warp-ubuntu-latest-x64-8x
+        # lint / compliance observed near-idle (<6% CPU); 2x is plenty.
+        default: warp-ubuntu-2404-x64-2x
+      reeve-runner:
+        description: Runner for the reeve job (4x for headroom on larger plans)
+        type: string
+        required: false
+        default: warp-ubuntu-2404-x64-4x
 
     # No `secrets:` block: every secret used here (IAC_TOKEN_APP_*,
     # RELEASE_DOWNLOADER_APP_*, PCTL_SLACK_BOT_TOKEN, CLOUDFLARE_API_TOKEN) is
@@ -114,6 +120,9 @@ jobs:
           job: lint
           outcome: ${{ steps.lint.outcome }}
           output-file: lint-output.txt
+          # IaC runs lint only; mark the others so they don't show "Pending".
+          security-enabled: "false"
+          test-enabled: "false"
 
       - name: Fail on lint errors
         if: steps.lint.outcome == 'failure'
@@ -122,7 +131,7 @@ jobs:
 
   reeve:
     if: inputs.reeve && (github.event_name != 'issue_comment' || github.event.issue.pull_request != null)
-    runs-on: ${{ inputs.runner }}
+    runs-on: ${{ inputs.reeve-runner }}
     timeout-minutes: 30
     permissions:
       contents: read
