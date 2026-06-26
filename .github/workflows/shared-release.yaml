@@ -422,8 +422,10 @@ jobs:
   # ============================================================
   # MANUAL MODE: workflow_dispatch (both modes)
   # ============================================================
+  # Manual dispatch OR a pushed vX.Y.Z tag. Dispatch computes the next tag;
+  # tag-push uses the pushed tag directly. Works for any mode.
   manual-release:
-    if: github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')
     runs-on: ${{ inputs.runner }}
     permissions:
       contents: write
@@ -434,21 +436,42 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Resolve tag
+        id: tag
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            echo "tag=${GITHUB_REF_NAME}" >> "${GITHUB_OUTPUT}"
+          else
+            echo "tag=" >> "${GITHUB_OUTPUT}"
+          fi
+
       - name: Compute next version
         id: version
+        if: steps.tag.outputs.tag == ''
         uses: credova/platform-workflows/actions/increment-tag@master
         with:
           bump: ${{ github.event.inputs.bump || 'patch' }}
           prefix: ${{ inputs.tag-prefix }}
 
+      - name: Set final tag
+        id: final
+        shell: bash
+        run: |
+          TAG="${{ steps.tag.outputs.tag || steps.version.outputs.tag }}"
+          echo "tag=${TAG}" >> "${GITHUB_OUTPUT}"
+
       - name: Create tag and GitHub Release
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ steps.version.outputs.tag }}
+          TAG: ${{ steps.final.outputs.tag }}
         run: |
-          git tag "${TAG}"
-          git push origin "${TAG}"
+          # Tag-push runs already have the tag; only create it for dispatch.
+          if [[ "${GITHUB_REF}" != refs/tags/* ]]; then
+            git tag "${TAG}"
+            git push origin "${TAG}"
+          fi
           gh release create "${TAG}" \
             --title "${TAG}" \
             --generate-notes
@@ -458,7 +481,7 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ steps.version.outputs.tag }}
+          TAG: ${{ steps.final.outputs.tag }}
           PATTERN: ${{ inputs.release-assets }}
         run: |
           for file in ${PATTERN}; do
@@ -480,7 +503,7 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ github.token }}
           NPM_DIRS: ${{ inputs.npm-package-dir }}
-          VERSION: ${{ steps.version.outputs.tag }}
+          VERSION: ${{ steps.final.outputs.tag }}
           PREFIX: ${{ inputs.tag-prefix }}
         run: |
           VERSION="${VERSION#${PREFIX}}"
@@ -505,7 +528,7 @@ jobs:
         shell: bash
         env:
           NUGET_AUTH_TOKEN: ${{ github.token }}
-          VERSION: ${{ steps.version.outputs.tag }}
+          VERSION: ${{ steps.final.outputs.tag }}
           PREFIX: ${{ inputs.tag-prefix }}
         run: |
           VERSION="${VERSION#${PREFIX}}"
