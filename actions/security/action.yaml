@@ -76,6 +76,28 @@ runs:
       shell: bash
       run: ${{ github.action_path }}/../../scripts/install-anchore.sh
 
+    # Hour-keyed cache for the grype vulnerability DB. grype-scan.sh still runs
+    # `grype db update` on every scan, so CVE data is never stale — the cache
+    # only skips the full DB download when the restored copy is already
+    # current. Keying by hour (instead of a static key) matters because
+    # actions/cache never re-saves on a primary-key hit: the first run each
+    # hour restores the newest previous entry via restore-keys, refreshes it
+    # if upstream published a newer DB, and saves it under the new hour key.
+    - name: Compute grype DB cache key
+      if: inputs.packages == 'true'
+      id: grype-db-key
+      shell: bash
+      run: echo "hour=$(date -u +'%Y-%m-%d-%H')" >> "$GITHUB_OUTPUT"
+
+    - name: Cache grype DB
+      if: inputs.packages == 'true'
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/grype/db
+        key: grype-db-${{ runner.os }}-${{ steps.grype-db-key.outputs.hour }}
+        restore-keys: |
+          grype-db-${{ runner.os }}-
+
     - name: Generate SBOM
       if: inputs.packages == 'true' || inputs.licenses == 'true'
       shell: bash
