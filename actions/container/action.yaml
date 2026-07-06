@@ -89,6 +89,13 @@ inputs:
     description: "WarpBuild API key (only needed when NOT running on WarpBuild runners)"
     required: false
     default: ""
+  # Blacksmith (opt-in)
+  blacksmith:
+    description: >
+      Use Blacksmith's sticky-disk-backed Docker builder so BuildKit layer
+      cache persists across runs (requires Blacksmith runners)
+    required: false
+    default: "false"
 
 outputs:
   image:
@@ -124,6 +131,8 @@ runs:
         PROJECT_ID: ${{ inputs.project-id }}
         RETAG: ${{ inputs.retag }}
         SOURCE_TAG: ${{ inputs.source-tag }}
+        BLACKSMITH: ${{ inputs.blacksmith }}
+        WARPBUILD_PROFILE: ${{ inputs.warpbuild-profile }}
       run: |
         if [ -z "${PROJECT_ID}" ]; then
           echo "::error::project-id is required for container operations"
@@ -131,6 +140,10 @@ runs:
         fi
         if [ "${RETAG}" = "true" ] && [ -z "${SOURCE_TAG}" ]; then
           echo "::error::source-tag is required when retag is true"
+          exit 1
+        fi
+        if [ "${BLACKSMITH}" = "true" ] && [ -n "${WARPBUILD_PROFILE}" ]; then
+          echo "::error::blacksmith and warpbuild-profile are mutually exclusive"
           exit 1
         fi
 
@@ -204,9 +217,24 @@ runs:
         load: ${{ inputs.push != 'true' }}
         build-args: ${{ inputs.build-args }}
 
-    # --- Standard build path (default - no WarpBuild) ---
+    # --- Blacksmith builder (opt-in via blacksmith) ---
+    # Sticky-disk-backed buildx builder: BuildKit state (base images, layer
+    # cache, cache mounts) persists across runs. setup-docker-builder sets the
+    # builder as the active one, so the plain `docker buildx build` in
+    # docker-build.sh uses it with no other changes.
+    - name: Setup Blacksmith Docker Builder
+      if: >
+        inputs.blacksmith == 'true' &&
+        inputs.warpbuild-profile == '' &&
+        inputs.build == 'true' &&
+        inputs.retag != 'true' &&
+        steps.reuse-check.outputs.exists != 'true'
+      uses: useblacksmith/setup-docker-builder@v1
+
+    # --- Standard build path (default - no WarpBuild, no Blacksmith) ---
     - name: Setup Docker Buildx
       if: >
+        inputs.blacksmith != 'true' &&
         inputs.warpbuild-profile == '' &&
         inputs.build == 'true' &&
         inputs.retag != 'true' &&

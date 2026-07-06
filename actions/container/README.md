@@ -27,6 +27,7 @@ Container lifecycle: build, scan, push, tag, reuse, retag. Calls `auth-gcp` inte
 | `severity`                   | No       | `HIGH`              | Minimum severity to fail image scan on                   |
 | `warpbuild-profile`          | No       | `""`                | WarpBuild Docker Builder profile name                    |
 | `warpbuild-api-key`          | No       | `""`                | WarpBuild API key (only needed on non-WarpBuild runners) |
+| `blacksmith`                 | No       | `false`             | Use Blacksmith's sticky-disk Docker builder (persistent layer cache; requires Blacksmith runners) |
 
 ## Outputs
 
@@ -113,11 +114,29 @@ Container lifecycle: build, scan, push, tag, reuse, retag. Calls `auth-gcp` inte
     workload-identity-provider: projects/<project-number>/locations/global/...
 ```
 
+### Blacksmith runners: persistent layer cache
+
+On `blacksmith-*` runners, opt in to Blacksmith's sticky-disk-backed builder so
+the BuildKit layer cache (base images, dependency-install layers, cache mounts)
+persists across runs instead of starting cold on every build. Mutually
+exclusive with `warpbuild-profile`.
+
+```yaml
+- uses: credova/platform-workflows/actions/container@master
+  with:
+    name: merchant-portal
+    build: true
+    push: true
+    blacksmith: true
+    project-id: <gcp-project-id>
+    workload-identity-provider: projects/<project-number>/locations/global/...
+```
+
 ## Internal Flow (`build: true`)
 
 1. Compute image metadata.
 2. `auth-gcp`: authenticate to GCP and configure Docker for Artifact Registry.
 3. Reuse check: skip build if image already exists for this SHA (when `reuse: true`).
-4. Build image via buildx or WarpBuild.
+4. Build image via buildx (optionally on a Blacksmith sticky-disk builder) or WarpBuild.
 5. **Image scan:** syft generates SBOM, grype scans for vulns, results posted to PR comment. Blocks on `severity` threshold. Skipped on `retag`, reuse, or `scan: false`.
 6. Tag and push: only if `push: true`.
