@@ -91,7 +91,7 @@ runs:
 
     - name: Cache grype DB
       if: inputs.packages == 'true'
-      uses: actions/cache@v4
+      uses: actions/cache@v6
       with:
         path: ~/.cache/grype/db
         key: grype-db-${{ runner.os }}-${{ steps.grype-db-key.outputs.hour }}
