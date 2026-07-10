@@ -52,6 +52,16 @@ on:
         type: string
         required: false
         default: deployments/
+      staging-target:
+        description: "pctl target name for the staging deploy. Defaults to config-path for backward compatibility."
+        type: string
+        required: false
+        default: ""
+      production-target:
+        description: "pctl target name for the canary/production deploy. Defaults to config-path for backward compatibility."
+        type: string
+        required: false
+        default: ""
       canary:
         description: Canary traffic percentage (0 = full deploy)
         type: number
@@ -272,7 +282,7 @@ jobs:
       - name: Deploy to staging
         uses: credova/platform-workflows/actions/deployment@master
         with:
-          target: ${{ inputs.config-path }}
+          target: ${{ inputs.staging-target != '' && inputs.staging-target || inputs.config-path }}
           tag: ${{ needs.validate.outputs.deploy-tag }}
           config-path: ${{ inputs.config-path }}
           project-id: ${{ inputs.project-id }}
@@ -300,7 +310,7 @@ jobs:
       - name: Deploy canary
         uses: credova/platform-workflows/actions/deployment@master
         with:
-          target: ${{ inputs.config-path }}
+          target: ${{ inputs.production-target != '' && inputs.production-target || inputs.config-path }}
           tag: ${{ needs.validate.outputs.deploy-tag }}
           canary: ${{ inputs.canary }}
           config-path: ${{ inputs.config-path }}
@@ -365,7 +375,7 @@ jobs:
         if: inputs.canary > 0
         uses: credova/platform-workflows/actions/deployment@master
         with:
-          target: ${{ inputs.config-path }}
+          target: ${{ inputs.production-target != '' && inputs.production-target || inputs.config-path }}
           action: promote
           config-path: ${{ inputs.config-path }}
           project-id: ${{ inputs.project-id }}
@@ -379,7 +389,7 @@ jobs:
         if: inputs.canary == 0
         uses: credova/platform-workflows/actions/deployment@master
         with:
-          target: ${{ inputs.config-path }}
+          target: ${{ inputs.production-target != '' && inputs.production-target || inputs.config-path }}
           tag: ${{ needs.validate.outputs.deploy-tag }}-prd
           config-path: ${{ inputs.config-path }}
           project-id: ${{ inputs.project-id }}
