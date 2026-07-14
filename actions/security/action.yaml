@@ -133,6 +133,11 @@ runs:
     - name: Install opengrep
       if: inputs.code == 'true' && inputs.target == 'dir:.'
       shell: bash
+      # Authenticate the installer's GitHub API calls (release lookup + asset
+      # download). Unauthenticated, shared runners hit the 60 req/hr limit and
+      # the install fails with "Failed to fetch available versions from GitHub".
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
       run: |
         curl -fsSL https://raw.githubusercontent.com/opengrep/opengrep/main/install.sh | bash
         echo "$HOME/.opengrep/cli/latest" >> "$GITHUB_PATH"
