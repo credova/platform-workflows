@@ -52,6 +52,16 @@ on:
         type: string
         required: false
         default: deployments/
+      staging-target:
+        description: "pctl target name for the staging deploy. Defaults to config-path for backward compatibility."
+        type: string
+        required: false
+        default: ""
+      production-target:
+        description: "pctl target name for the canary/production deploy. Defaults to config-path for backward compatibility."
+        type: string
+        required: false
+        default: ""
       canary:
         description: Canary traffic percentage (0 = full deploy)
         type: number
@@ -187,21 +197,6 @@ jobs:
             echo "deploy-tag=${SHA}" >> "$GITHUB_OUTPUT"
           fi
 
-  # --- Generate release download token (for pctl) ---
-  auth:
-    if: inputs.deploy
-    runs-on: ${{ inputs.runner }}
-    outputs:
-      token: ${{ steps.token.outputs.token }}
-    steps:
-      - uses: actions/checkout@v7
-      - name: Generate release download token
-        id: token
-        uses: credova/platform-workflows/actions/auth-release-token@master
-        with:
-          client-id: ${{ secrets.RELEASE_DOWNLOADER_APP_ID }}
-          private-key: ${{ secrets.RELEASE_DOWNLOADER_APP_PRIVATE_KEY }}
-
   # --- Tests (skipped for hotfix) ---
   test:
     if: ${{ !inputs.hotfix }}
@@ -264,15 +259,24 @@ jobs:
   # --- Deploy staging (skipped for hotfix) ---
   deploy-staging:
     if: inputs.deploy && !inputs.hotfix && always() && !failure() && !cancelled()
-    needs: [auth, build-scan-push, test, validate]
+    needs: [build-scan-push, test, validate]
     runs-on: ${{ inputs.runner }}
     environment: staging
     steps:
       - uses: actions/checkout@v7
+      # Mint the pctl-download token in-job: create-github-app-token registers it
+      # as a secret, and masked values are scrubbed from cross-job needs.* outputs
+      # (they arrive empty), so it cannot be generated in a shared upstream job.
+      - name: Generate release download token
+        id: token
+        uses: credova/platform-workflows/actions/auth-release-token@master
+        with:
+          client-id: ${{ secrets.RELEASE_DOWNLOADER_APP_ID }}
+          private-key: ${{ secrets.RELEASE_DOWNLOADER_APP_PRIVATE_KEY }}
       - name: Deploy to staging
         uses: credova/platform-workflows/actions/deployment@master
         with:
-          target: ${{ inputs.config-path }}
+          target: ${{ inputs.staging-target != '' && inputs.staging-target || inputs.config-path }}
           tag: ${{ needs.validate.outputs.deploy-tag }}
           config-path: ${{ inputs.config-path }}
           project-id: ${{ inputs.project-id }}
@@ -280,7 +284,7 @@ jobs:
           slack-token: ${{ secrets.PCTL_SLACK_BOT_TOKEN }}
           dash0-url: ${{ inputs.dash0-annotations && vars.DASH0_URL || '' }}
           dash0-token: ${{ inputs.dash0-annotations && secrets.DASH0_TOKEN || '' }}
-          token: ${{ needs.auth.outputs.token }}
+          token: ${{ steps.token.outputs.token }}
 
   # --- Canary flow ---
   approve-canary:
@@ -293,14 +297,20 @@ jobs:
 
   deploy-canary:
     if: inputs.deploy && inputs.canary > 0
-    needs: [auth, approve-canary, validate]
+    needs: [approve-canary, validate]
     runs-on: ${{ inputs.runner }}
     steps:
       - uses: actions/checkout@v7
+      - name: Generate release download token
+        id: token
+        uses: credova/platform-workflows/actions/auth-release-token@master
+        with:
+          client-id: ${{ secrets.RELEASE_DOWNLOADER_APP_ID }}
+          private-key: ${{ secrets.RELEASE_DOWNLOADER_APP_PRIVATE_KEY }}
       - name: Deploy canary
         uses: credova/platform-workflows/actions/deployment@master
         with:
-          target: ${{ inputs.config-path }}
+          target: ${{ inputs.production-target != '' && inputs.production-target || inputs.config-path }}
           tag: ${{ needs.validate.outputs.deploy-tag }}
           canary: ${{ inputs.canary }}
           config-path: ${{ inputs.config-path }}
@@ -309,7 +319,7 @@ jobs:
           slack-token: ${{ secrets.PCTL_SLACK_BOT_TOKEN }}
           dash0-url: ${{ inputs.dash0-annotations && vars.DASH0_URL || '' }}
           dash0-token: ${{ inputs.dash0-annotations && secrets.DASH0_TOKEN || '' }}
-          token: ${{ needs.auth.outputs.token }}
+          token: ${{ steps.token.outputs.token }}
 
   # --- Production approval ---
   approve-production:
@@ -345,10 +355,17 @@ jobs:
   # --- Deploy production ---
   deploy-production:
     if: inputs.deploy && always() && !failure() && !cancelled()
-    needs: [auth, approve-production, retag-production, validate]
+    needs: [approve-production, retag-production, validate]
     runs-on: ${{ inputs.runner }}
     steps:
       - uses: actions/checkout@v7
+
+      - name: Generate release download token
+        id: token
+        uses: credova/platform-workflows/actions/auth-release-token@master
+        with:
+          client-id: ${{ secrets.RELEASE_DOWNLOADER_APP_ID }}
+          private-key: ${{ secrets.RELEASE_DOWNLOADER_APP_PRIVATE_KEY }}
 
       - name: Require Slack token for production
         if: inputs.notifications
@@ -365,7 +382,7 @@ jobs:
         if: inputs.canary > 0
         uses: credova/platform-workflows/actions/deployment@master
         with:
-          target: ${{ inputs.config-path }}
+          target: ${{ inputs.production-target != '' && inputs.production-target || inputs.config-path }}
           action: promote
           config-path: ${{ inputs.config-path }}
           project-id: ${{ inputs.project-id }}
@@ -373,13 +390,13 @@ jobs:
           slack-token: ${{ secrets.PCTL_SLACK_BOT_TOKEN }}
           dash0-url: ${{ inputs.dash0-annotations && vars.DASH0_URL || '' }}
           dash0-token: ${{ inputs.dash0-annotations && secrets.DASH0_TOKEN || '' }}
-          token: ${{ needs.auth.outputs.token }}
+          token: ${{ steps.token.outputs.token }}
 
       - name: Deploy to production (full)
         if: inputs.canary == 0
         uses: credova/platform-workflows/actions/deployment@master
         with:
-          target: ${{ inputs.config-path }}
+          target: ${{ inputs.production-target != '' && inputs.production-target || inputs.config-path }}
           tag: ${{ needs.validate.outputs.deploy-tag }}-prd
           config-path: ${{ inputs.config-path }}
           project-id: ${{ inputs.project-id }}
@@ -387,7 +404,7 @@ jobs:
           slack-token: ${{ secrets.PCTL_SLACK_BOT_TOKEN }}
           dash0-url: ${{ inputs.dash0-annotations && vars.DASH0_URL || '' }}
           dash0-token: ${{ inputs.dash0-annotations && secrets.DASH0_TOKEN || '' }}
-          token: ${{ needs.auth.outputs.token }}
+          token: ${{ steps.token.outputs.token }}
 
   # --- Release ---
   release:
