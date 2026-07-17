@@ -1,6 +1,8 @@
 # deployment
 
-Deploy to Cloud Run via pctl. Handles auth, notifications, canary, promote, and rollback. Calls `auth-gcp` internally. Notifications are handled by pctl during deploy.
+Deploy to Cloud Run via pctl. Handles auth, notifications, and tag-based canary rollouts (promote, abort, set-weight, rollback). Calls `auth-gcp` internally. Notifications are handled by pctl during deploy.
+
+pctl tracks revision roles with Cloud Run revision tags (`stable` / `canary`) and manages traffic through the `pctl deploy rollout` command group. A canary deploy tags the new revision `canary`; `promote` sends it 100% traffic and makes it `stable`, `abort` restores traffic to `stable`, and `set-weight` shifts the split without ending the rollout.
 
 ## Inputs
 
@@ -8,10 +10,10 @@ Deploy to Cloud Run via pctl. Handles auth, notifications, canary, promote, and 
 | ---------------------------- | -------- | ------------- | -------------------------------------------------- |
 | `target`                     | Yes      | -             | Target name from CUE config                        |
 | `tag`                        | No       | `github.sha`  | Image tag to deploy                                |
-| `action`                     | No       | `deploy`      | Action: `deploy`, `promote`, `rollback`, `abort`   |
-| `canary`                     | No       | `0`           | Canary traffic percentage (0 = full deploy)        |
+| `action`                     | No       | `deploy`      | Action: `deploy`, `promote`, `abort`, `set-weight`, `status`, `rollback` |
+| `canary`                     | No       | -             | `deploy`: canary traffic % — empty = full deploy, `0` = dark canary (no traffic), `1-99` = canary rollout; `set-weight`: target canary weight (0-100) |
 | `config-path`                | No       | `deployments` | Path to CUE config directory                       |
-| `revision`                   | No       | -             | Revision name (for `promote`/`rollback`)           |
+| `revision`                   | No       | -             | Explicit revision to roll back to (`rollback` only) |
 | `project-id`                 | No       | -             | GCP project ID                                     |
 | `workload-identity-provider` | No       | -             | WIF provider resource name                         |
 | `slack-token`                | No       | -             | Slack bot token for deploy notifications           |
@@ -87,12 +89,34 @@ The token is passed to pctl via `PCTL_SLACK_BOT_TOKEN`. The channel and template
 
 ### Promote canary to 100%
 
+Promotes whichever revision holds the `canary` tag — no revision needs to be passed.
+
 ```yaml
 - uses: credova/platform-workflows/actions/deployment@master
   with:
     target: gcp-prd-central1
     action: promote
-    revision: ${{ steps.canary.outputs.revision }}
+    token: ${{ steps.auth.outputs.token }}
+```
+
+### Shift canary weight (ramp)
+
+```yaml
+- uses: credova/platform-workflows/actions/deployment@master
+  with:
+    target: gcp-prd-central1
+    action: set-weight
+    canary: 50
+    token: ${{ steps.auth.outputs.token }}
+```
+
+### Abort canary (restore traffic to stable)
+
+```yaml
+- uses: credova/platform-workflows/actions/deployment@master
+  with:
+    target: gcp-prd-central1
+    action: abort
     token: ${{ steps.auth.outputs.token }}
 ```
 

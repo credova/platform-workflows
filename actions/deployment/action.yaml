@@ -1,7 +1,8 @@
 name: deployment
 description: >
-  Deploy to Cloud Run via pctl. Handles auth, notifications, canary, promote, and rollback.
-  Self-contained: calls auth-gcp internally. Notifications handled by pctl.
+  Deploy to Cloud Run via pctl. Handles auth, notifications, and tag-based canary
+  rollouts (promote, abort, set-weight, rollback). Self-contained: calls auth-gcp
+  internally. Notifications handled by pctl.
 
 inputs:
   target:
@@ -12,19 +13,25 @@ inputs:
     required: false
     default: ${{ github.sha }}
   action:
-    description: "Action to perform: deploy, promote, rollback, abort"
+    description: "Action to perform: deploy, promote, abort, set-weight, status, rollback"
     required: false
     default: deploy
   canary:
-    description: Canary traffic percentage (0 = full deploy)
+    description: >
+      For deploy: canary traffic percentage. Leave empty for a full deploy (100%);
+      0 starts a dark canary (created but served no traffic — smoke-test via its
+      tagged URL); 1-99 starts a canary rollout at that percentage. For set-weight:
+      the canary weight to shift to (0-100).
     required: false
-    default: "0"
+    default: ""
   config-path:
     description: Path to CUE config directory
     required: false
     default: deployments
   revision:
-    description: Revision name (required for promote/rollback)
+    description: >
+      Explicit revision to roll back to (rollback action only). Unused by
+      promote/abort, which act on the tag-based rollout's canary/stable revisions.
     required: false
     default: ""
   # Auth inputs
