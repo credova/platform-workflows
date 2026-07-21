@@ -139,9 +139,9 @@ runs:
     - name: Install opengrep
       if: inputs.code == 'true' && inputs.target == 'dir:.'
       shell: bash
-      # gh authenticates with the runner token (5,000 req/hr), so the install
-      # is immune to the unauthenticated 60 req/hr API limit that made opengrep's
-      # own install.sh flake with "Failed to fetch available versions from GitHub".
+      # gh authenticates with the runner token, so the install is immune to the
+      # unauthenticated 60 req/hr API limit that made opengrep's own install.sh
+      # flake with "Failed to fetch available versions from GitHub".
       env:
         GH_TOKEN: ${{ github.token }}
       run: ${{ github.action_path }}/../../scripts/install-opengrep.sh

@@ -10,14 +10,25 @@ set -euo pipefail
 # `-v` doesn't help - the installer still calls the same endpoint to validate.
 #
 # Instead we fetch a pinned release asset via `gh release download`, which is
-# authenticated with the runner token (5,000 req/hr) and takes no dependency on
-# the rate-limited unauthenticated path. cosign then verifies the binary's
-# signature before we install it.
+# authenticated with the runner token (far above the 60 req/hr unauthenticated
+# cap) and takes no dependency on the rate-limited unauthenticated path. cosign
+# then verifies the binary's signature before we install it.
 #
 # Version is pinned here intentionally - bump it deliberately.
 
 OPENGREP_VERSION="v1.25.0"
 OPENGREP_REPO="opengrep/opengrep"
+
+# Both tools are provided by earlier steps (gh is preinstalled on GitHub-hosted
+# runners; cosign by the sigstore/cosign-installer step). Fail with an
+# actionable message if either is missing - e.g. a self-hosted runner without
+# gh - rather than a bare "command not found".
+for tool in gh cosign; do
+  if ! command -v "$tool" >/dev/null 2>&1; then
+    echo "::error::$tool is required to install opengrep but was not found on PATH" >&2
+    exit 1
+  fi
+done
 
 # Map OS/arch to the release asset name (mirrors opengrep's install.sh).
 OS="$(uname -s)"
