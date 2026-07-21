@@ -130,17 +130,21 @@ runs:
       shell: bash
       run: ${{ github.action_path }}/../../scripts/grant-scan.sh
 
+    # cosign is not preinstalled on GitHub-hosted runners; install-opengrep.sh
+    # uses it to verify the downloaded binary's signature (blocking).
+    - name: Install cosign
+      if: inputs.code == 'true' && inputs.target == 'dir:.'
+      uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+
     - name: Install opengrep
       if: inputs.code == 'true' && inputs.target == 'dir:.'
       shell: bash
-      # Authenticate the installer's GitHub API calls (release lookup + asset
-      # download). Unauthenticated, shared runners hit the 60 req/hr limit and
-      # the install fails with "Failed to fetch available versions from GitHub".
+      # gh authenticates with the runner token (5,000 req/hr), so the install
+      # is immune to the unauthenticated 60 req/hr API limit that made opengrep's
+      # own install.sh flake with "Failed to fetch available versions from GitHub".
       env:
-        GITHUB_TOKEN: ${{ github.token }}
-      run: |
-        curl -fsSL https://raw.githubusercontent.com/opengrep/opengrep/main/install.sh | bash
-        echo "$HOME/.opengrep/cli/latest" >> "$GITHUB_PATH"
+        GH_TOKEN: ${{ github.token }}
+      run: ${{ github.action_path }}/../../scripts/install-opengrep.sh
 
     - name: Code static analysis
       if: inputs.code == 'true' && inputs.target == 'dir:.'
