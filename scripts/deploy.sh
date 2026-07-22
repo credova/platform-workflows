@@ -23,11 +23,23 @@ set -e
 : "${ACTION:?ACTION is required}"
 : "${CONFIG_PATH:?CONFIG_PATH is required}"
 
+# Reject anything that wouldn't survive the `script -c "${CMD_ARGS[*]}"`
+# re-tokenization below unscathed (e.g. shell metacharacters), since that
+# joins the array into a single string executed through a shell.
+validate_pctl_arg() {
+  local name="$1" value="$2" pattern="$3"
+  if ! printf '%s' "${value}" | grep -Eq "${pattern}"; then
+    echo "::error::Invalid ${name} '${value}'"
+    exit 1
+  fi
+}
+
 CMD_ARGS=("pctl" "deploy")
 
 case "${ACTION}" in
   deploy)
     : "${TAG:?TAG is required for deploy action}"
+    validate_pctl_arg "TAG" "${TAG}" '^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$'
     CMD_ARGS+=("execute" "${TARGET}" "--tag" "${TAG}" "--deploy-config" "${CONFIG_PATH}" "--no-tui")
     # Match pctl's --canary semantics: omit the flag entirely for a full deploy;
     # pass it through when set, including 0 (dark canary: created, served no
@@ -58,6 +70,7 @@ case "${ACTION}" in
     # Stays top-level; moves the stable tag to a healthy prior revision.
     CMD_ARGS+=("rollback" "${TARGET}" "--deploy-config" "${CONFIG_PATH}")
     if [ -n "${REVISION}" ]; then
+      validate_pctl_arg "REVISION" "${REVISION}" '^[a-z0-9-]+$'
       CMD_ARGS+=("--revision" "${REVISION}")
     fi
     ;;
