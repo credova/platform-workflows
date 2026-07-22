@@ -10,7 +10,7 @@ permissions:
   id-token: write
 jobs:
   release:
-    uses: credova/platform-workflows/.github/workflows/go-deploy.yaml@master
+    uses: credova/platform-workflows/.github/workflows/go-deploy.yaml@v1.0.1
     secrets: inherit
     with:
       container: false

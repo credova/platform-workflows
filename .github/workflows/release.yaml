@@ -77,7 +77,7 @@ jobs:
           # master stays clean with @master refs; the tag snapshot has pinned refs.
           find . -not -path './.git/*' \( -name '*.yaml' -o -name '*.yml' \) \
             -exec grep -lF 'credova/platform-workflows/' {} \; \
-            | xargs sed -i "s|credova/platform-workflows/\(.\+\)@master|credova/platform-workflows/\1@${TAG}|g"
+            | xargs sed -i "s|credova/platform-workflows/\(.\+\)@v1.0.1|credova/platform-workflows/\1@${TAG}|g"
           git commit -am "chore: pin internal action refs to ${TAG}"
           RELEASE_SHA=$(git rev-parse HEAD)
           echo "RELEASE_SHA=${RELEASE_SHA}" >> "${GITHUB_ENV}"

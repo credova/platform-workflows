@@ -8,5 +8,5 @@ permissions:
   pull-requests: write
 jobs:
   ci:
-    uses: credova/platform-workflows/.github/workflows/node-pull-request.yaml@master
+    uses: credova/platform-workflows/.github/workflows/node-pull-request.yaml@v1.0.1
     secrets: inherit

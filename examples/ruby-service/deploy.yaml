@@ -9,7 +9,7 @@ permissions:
   id-token: write
 jobs:
   deploy:
-    uses: credova/platform-workflows/.github/workflows/ruby-deploy.yaml@master
+    uses: credova/platform-workflows/.github/workflows/ruby-deploy.yaml@v1.0.1
     secrets: inherit
     with:
       container: true
