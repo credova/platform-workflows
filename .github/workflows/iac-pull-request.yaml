@@ -55,6 +55,16 @@ on:
         required: false
         default: info
 
+      reeve-ref:
+        description: >
+          reeve action version to run. Defaults to the pinned release; set to
+          "next" to test the next branch. uses:@ref cannot be an expression, so
+          each supported ref is a separate if-gated step below — add a step to
+          support another ref.
+        type: string
+        required: false
+        default: v0.2.0
+
       compliance-ticket:
         description: Require Shortcut ticket reference
         type: boolean
@@ -246,13 +256,23 @@ jobs:
           private-key: ${{ secrets.IAC_TOKEN_APP_PRIVATE_KEY }}
           owner: credova
 
-      - uses: FynxLabs/reeve@master
+      # uses:@ref cannot take an expression, so each supported reeve-ref is its
+      # own if-gated step. The with: blocks are identical; keep them in sync.
+      - if: inputs.reeve-ref == 'v0.2.0'
+        uses: FynxLabs/reeve@v0.2.0
         with:
-          # Pass ref explicitly: reeve's inner checkout resolves github.action_ref
-          # to its own version otherwise and dies.
-          ref: master
           # When pre-warmed we already installed pulumi; leave blank so reeve
           # doesn't reinstall. Otherwise let reeve install latest.
+          pulumi-version: ${{ inputs.prewarm && '' || 'latest' }}
+          github-token: ${{ steps.reeve-token.outputs.token }}
+          gcp-workload-identity-provider: ${{ inputs.gcp-workload-identity-provider }}
+          gcp-service-account: ${{ inputs.gcp-service-account }}
+          slack-token: ${{ secrets.PCTL_SLACK_BOT_TOKEN }}
+          log-level: ${{ inputs.reeve-log-level }}
+
+      - if: inputs.reeve-ref == 'next'
+        uses: FynxLabs/reeve@next
+        with:
           pulumi-version: ${{ inputs.prewarm && '' || 'latest' }}
           github-token: ${{ steps.reeve-token.outputs.token }}
           gcp-workload-identity-provider: ${{ inputs.gcp-workload-identity-provider }}
