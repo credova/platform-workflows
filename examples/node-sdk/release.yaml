@@ -18,7 +18,7 @@ permissions:
   packages: write
 jobs:
   release:
-    uses: credova/platform-workflows/.github/workflows/shared-release.yaml@master
+    uses: credova/platform-workflows/.github/workflows/shared-release.yaml@v1.0.2
     with:
       mode: edge
       publish-npm: true

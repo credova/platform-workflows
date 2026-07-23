@@ -9,7 +9,7 @@ permissions:
   id-token: write
 jobs:
   deploy:
-    uses: credova/platform-workflows/.github/workflows/dotnet-deploy.yaml@master
+    uses: credova/platform-workflows/.github/workflows/dotnet-deploy.yaml@v1.0.2
     secrets: inherit
     with:
       container: true

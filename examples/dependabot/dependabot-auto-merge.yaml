@@ -7,4 +7,4 @@ permissions:
   pull-requests: write
 jobs:
   auto-merge:
-    uses: credova/platform-workflows/.github/workflows/dependabot-auto-merge.yaml@master
+    uses: credova/platform-workflows/.github/workflows/dependabot-auto-merge.yaml@v1.0.2

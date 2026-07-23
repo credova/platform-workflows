@@ -124,7 +124,7 @@ jobs:
 
       - name: Parse image inputs
         id: parse
-        uses: credova/platform-workflows/actions/parse-images@master
+        uses: credova/platform-workflows/actions/parse-images@v1.0.2
         with:
           image: ${{ inputs.image }}
           images: ${{ inputs.images }}
@@ -140,14 +140,14 @@ jobs:
 
       - name: Setup language
         if: inputs.language != ''
-        uses: credova/platform-workflows/actions/setup-language@master
+        uses: credova/platform-workflows/actions/setup-language@v1.0.2
         with:
           language: ${{ inputs.language }}
           version: ${{ inputs.language-version }}
           cache: ${{ inputs.cache && 'true' || 'false' }}
 
       - name: Security scan
-        uses: credova/platform-workflows/actions/security@master
+        uses: credova/platform-workflows/actions/security@v1.0.2
         with:
           packages: ${{ inputs.security-packages && 'true' || 'false' }}
           licenses: ${{ inputs.security-licenses && 'true' || 'false' }}
@@ -163,7 +163,7 @@ jobs:
       - uses: actions/checkout@v7
 
       - name: Setup language
-        uses: credova/platform-workflows/actions/setup-language@master
+        uses: credova/platform-workflows/actions/setup-language@v1.0.2
         with:
           language: ${{ inputs.language }}
           version: ${{ inputs.language-version }}
@@ -205,7 +205,7 @@ jobs:
       - uses: actions/checkout@v7
 
       - name: Build container image (${{ matrix.name }})
-        uses: credova/platform-workflows/actions/container@master
+        uses: credova/platform-workflows/actions/container@v1.0.2
         with:
           name: ${{ matrix.name }}
           dockerfile: ${{ matrix.dockerfile }}
@@ -226,6 +226,6 @@ jobs:
       - uses: actions/checkout@v7
 
       - name: Compliance checks
-        uses: credova/platform-workflows/actions/compliance@master
+        uses: credova/platform-workflows/actions/compliance@v1.0.2
         with:
           ticket: ${{ inputs.compliance-ticket && 'true' || 'false' }}
