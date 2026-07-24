@@ -6,11 +6,14 @@ Post or update Go job results (lint/security/test) on a PR comment.
 
 ## Inputs
 
-| Input         | Required | Default | Description                                  |
-| ------------- | -------- | ------- | -------------------------------------------- |
-| `job`         | Yes      |         | `"lint"`, `"security"`, or `"test"`          |
-| `outcome`     | Yes      |         | `success \| failure \| skipped \| cancelled` |
-| `output-file` | No       | `""`    | Path to captured command output              |
+| Input              | Required | Default  | Description                                                              |
+| ------------------ | -------- | -------- | ------------------------------------------------------------------------ |
+| `job`              | Yes      |          | `"lint"`, `"security"`, or `"test"`                                      |
+| `outcome`          | Yes      |          | `success \| failure \| skipped \| cancelled`                             |
+| `output-file`      | No       | `""`     | Path to captured command output                                          |
+| `lint-enabled`     | No       | `"true"` | If `"false"`, the Lint section renders `_Not enabled._` instead of pending |
+| `security-enabled` | No       | `"true"` | If `"false"`, the Security section renders `_Not enabled._`              |
+| `test-enabled`     | No       | `"true"` | If `"false"`, the Tests section renders `_Not enabled._`                 |
 
 ## Examples
 

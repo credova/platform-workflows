@@ -120,14 +120,14 @@ ignore:
 
 ## Tool Versions
 
-Pinned in [`scripts/install-anchore.sh`](../../scripts/install-anchore.sh). Bump deliberately. Do not use `latest`.
+Pinned in the install scripts below. Bump deliberately. Do not use `latest`.
 
-| Tool     | Purpose                                         |
-| -------- | ----------------------------------------------- |
-| syft     | SBOM generation                                 |
-| grype    | Vulnerability scanning (offline after first DB) |
-| grant    | License compliance                              |
-| opengrep | Static analysis / SAST                          |
+| Tool     | Purpose                                         | Pinned in                                                          |
+| -------- | ----------------------------------------------- | ------------------------------------------------------------------ |
+| syft     | SBOM generation                                 | [`scripts/install-anchore.sh`](../../scripts/install-anchore.sh)   |
+| grype    | Vulnerability scanning (offline after first DB) | [`scripts/install-anchore.sh`](../../scripts/install-anchore.sh)   |
+| grant    | License compliance                              | [`scripts/install-anchore.sh`](../../scripts/install-anchore.sh)   |
+| opengrep | Static analysis / SAST                          | [`scripts/install-opengrep.sh`](../../scripts/install-opengrep.sh) |
 
 ## Output Files
 

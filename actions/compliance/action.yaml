@@ -12,7 +12,10 @@ inputs:
 runs:
   using: composite
   steps:
+    # Run the check but don't abort the composite yet: capture the outcome so
+    # the comment step can surface the reason, then fail at the end.
     - name: Check ticket reference
+      id: ticket
       if: inputs.ticket == 'true'
       shell: bash
       env:
@@ -23,4 +26,28 @@ runs:
         PR_NUMBER: ${{ github.event.pull_request.number || '' }}
         REPO: ${{ github.repository }}
         GH_TOKEN: ${{ github.token }}
-      run: ${{ github.action_path }}/../../scripts/check-shortcut-ticket.sh
+        REASON_FILE: ${{ runner.temp }}/compliance-reason.txt
+      run: |
+        if "${{ github.action_path }}/../../scripts/check-shortcut-ticket.sh"; then
+          echo "outcome=success" >> "$GITHUB_OUTPUT"
+        else
+          echo "outcome=failure" >> "$GITHUB_OUTPUT"
+        fi
+
+    # Upsert the compliance PR comment (passed / failed + reason). Never let a
+    # comment-posting failure mask the real compliance outcome: the next step
+    # decides pass/fail from steps.ticket, not from this step.
+    - name: Post compliance comment
+      if: always() && inputs.ticket == 'true' && github.event_name == 'pull_request'
+      continue-on-error: true
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        JOB_OUTCOME: ${{ steps.ticket.outputs.outcome }}
+        REASON_FILE: ${{ runner.temp }}/compliance-reason.txt
+      run: bash "${{ github.action_path }}/../../scripts/post-compliance-comment.sh"
+
+    - name: Fail on compliance errors
+      if: steps.ticket.outputs.outcome == 'failure'
+      shell: bash
+      run: exit 1

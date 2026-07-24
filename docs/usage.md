@@ -353,7 +353,9 @@ jobs:
 | `project-id`                 | string  | `""`                          | GCP project ID                     |
 | `workload-identity-provider` | string  | `""`                          | WIF provider resource name         |
 | `service-account`            | string  | `""`                          | GCP service account to impersonate |
-| `runner`                     | string  | `warp-ubuntu-latest-arm64-4x` | GitHub Actions runner label        |
+| `runner`                     | string  | `warp-ubuntu-2404-x64-2x`     | Runner for lint/test (near-idle)   |
+| `goreleaser-runner`          | string  | `warp-ubuntu-2404-x64-8x`     | Runner for the GoReleaser job      |
+| `security-runner`            | string  | `warp-ubuntu-2404-x64-8x`     | Runner for the security job        |
 
 ### go.yaml secrets
 
@@ -977,10 +979,10 @@ flowchart TD
     GCP["Authenticate to GCP\n<i>via auth-gcp</i>"]
 
     RETAG_CHECK{"retag mode?"}
-    RETAG["Retag existing image\n<i>gcrane cp source → target</i>"]
+    RETAG["Retag existing image\n<i>gcloud artifacts docker tags add</i>"]
 
     REUSE_CHECK{"reuse enabled?"}
-    REUSE["Check for existing image\n<i>gcrane ls</i>"]
+    REUSE["Check for existing image\n<i>docker manifest inspect</i>"]
     EXISTS{"image exists?"}
 
     WARP_CHECK{"warpbuild-profile\nset?"}
@@ -1093,9 +1095,11 @@ flowchart TD
     IN --> GCP --> PCTL --> DEPLOY --> OUT
 ```
 
-`deploy.sh` supports four actions via the `action` input:
+`deploy.sh` supports six actions via the `action` input:
 
 - **deploy** - full deploy (or canary if `canary > 0`)
 - **promote** - promote canary to full traffic
-- **rollback** - rollback to a previous revision
 - **abort** - abort an in-progress canary
+- **set-weight** - shift the in-progress rollout's canary to a target weight
+- **status** - read-only: revision roles, traffic split, tagged URLs
+- **rollback** - rollback to a previous revision
