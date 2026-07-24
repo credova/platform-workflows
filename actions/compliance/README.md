@@ -32,6 +32,14 @@ Security asks "is this artifact safe?" Compliance asks "did the team follow the 
     ticket: false
 ```
 
+## PR Comment
+
+The action upserts a single `<!-- compliance-report -->` comment on every run:
+`❌ Failed` with the reason (e.g. missing ticket reference) on failure, or
+`✅ Passed` on success. A passing re-run flips a prior failure comment to
+`✅ Passed`, so a fixed PR never leaves a stale failure comment behind. No
+comment is posted outside `pull_request` events.
+
 ## Ticket Patterns
 
 The check searches the PR title, body, branch name, commit message, and PR comments for:

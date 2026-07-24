@@ -133,5 +133,5 @@ Promotes whichever revision holds the `canary` tag — no revision needs to be p
 ## Notes
 
 - Canary is supported for Cloud Run Services only, not Jobs. Jobs deploy to 100% immediately.
-- Wraps `pctl deploy execute`: CUE-based, type-safe deployment with native Go Cloud Run API calls.
+- Wraps the `pctl deploy` command group (execute, rollout promote/abort/set-weight/status, rollback): CUE-based, type-safe deployment with native Go Cloud Run API calls.
 - Notification channel and template are set in the CUE config `notifications` block, not in action inputs.

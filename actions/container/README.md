@@ -33,7 +33,7 @@ Container lifecycle: build, scan, push, tag, reuse, retag. Calls `auth-gcp` inte
 
 | Output   | Description                              |
 | -------- | ---------------------------------------- |
-| `image`  | Full image reference (registry/name:tag) |
+| `image`  | Full image reference (registry/project/repo/name:tag) |
 | `digest` | Image content digest                     |
 | `reused` | True if image was reused from registry   |
 
@@ -138,5 +138,5 @@ exclusive with `warpbuild-profile`.
 2. `auth-gcp`: authenticate to GCP and configure Docker for Artifact Registry.
 3. Reuse check: skip build if image already exists for this SHA (when `reuse: true`).
 4. Build image via buildx (optionally on a Blacksmith sticky-disk builder) or WarpBuild.
-5. **Image scan:** syft generates SBOM, grype scans for vulns, results posted to PR comment. Blocks on `severity` threshold. Skipped on `retag`, reuse, or `scan: false`.
+5. **Image scan:** delegates to the `security` action (syft SBOM + grype vuln scan), which posts results to the PR comment. Blocks on `severity` threshold. Skipped on `retag`, reuse, or `scan: false`.
 6. Tag and push: only if `push: true`.
