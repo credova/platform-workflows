@@ -121,7 +121,7 @@ jobs:
 
       - name: Post Go comment
         if: always() && github.event_name == 'pull_request'
-        uses: credova/platform-workflows/actions/go-report@master
+        uses: credova/platform-workflows/actions/go-report@v1.0.3
         with:
           job: lint
           outcome: ${{ steps.lint.outcome }}
@@ -170,7 +170,7 @@ jobs:
 
       - name: Post Go comment
         if: always() && github.event_name == 'pull_request'
-        uses: credova/platform-workflows/actions/go-report@master
+        uses: credova/platform-workflows/actions/go-report@v1.0.3
         with:
           job: security
           outcome: ${{ steps.security.outcome }}
@@ -227,7 +227,7 @@ jobs:
 
       - name: Post Go comment
         if: always() && github.event_name == 'pull_request'
-        uses: credova/platform-workflows/actions/go-report@master
+        uses: credova/platform-workflows/actions/go-report@v1.0.3
         with:
           job: test
           outcome: ${{ steps.test.outcome }}
@@ -281,7 +281,7 @@ jobs:
 
       - name: Authenticate to GCP
         if: startsWith(github.ref, 'refs/tags/v') && inputs.workload-identity-provider != ''
-        uses: credova/platform-workflows/actions/auth-gcp@master
+        uses: credova/platform-workflows/actions/auth-gcp@v1.0.3
         with:
           project-id: ${{ inputs.project-id }}
           workload-identity-provider: ${{ inputs.workload-identity-provider }}
