@@ -1,2 +1,50 @@
-# Platform team owns all workflow and action changes
+# CODEOWNERS: last matching pattern wins. Platform owns everything by default;
+# Engineering can co-approve the project-facing surface (reusable workflows,
+# most actions, docs/examples/scripts) while Platform stays a required owner.
+# Security and compliance (actions + their scripts) and this repo's own
+# CI/release plumbing remain Platform-only.
+
+# Default: Platform owns everything.
 * @credova/platform
+
+# Reusable workflows (workflow_call) consumed by other repos: Engineering can
+# co-approve. Excludes ci.yaml/release.yaml (this repo's own plumbing, below).
+/.github/workflows/*-pull-request.yaml @credova/engineering @credova/platform
+/.github/workflows/*-deploy.yaml       @credova/engineering @credova/platform
+/.github/workflows/pull-request.yaml   @credova/engineering @credova/platform
+/.github/workflows/deploy.yaml         @credova/engineering @credova/platform
+/.github/workflows/go.yaml             @credova/engineering @credova/platform
+/.github/workflows/iac-pull-request.yaml @credova/engineering @credova/platform
+/.github/workflows/shared-release.yaml @credova/engineering @credova/platform
+/.github/workflows/dependabot-auto-merge.yaml @credova/engineering @credova/platform
+
+# Composite actions: Engineering can co-approve (security/compliance re-locked below).
+/actions/ @credova/engineering @credova/platform
+
+# Docs, examples, and scripts: Engineering can co-approve.
+/docs/     @credova/engineering @credova/platform
+/examples/ @credova/engineering @credova/platform
+/scripts/  @credova/engineering @credova/platform
+
+# --- Platform-only re-locks (must come last to win) ---
+
+# Security and compliance actions.
+/actions/security/   @credova/platform
+/actions/compliance/ @credova/platform
+
+# Security and compliance scripts.
+/scripts/check-shortcut-ticket.sh   @credova/platform
+/scripts/post-compliance-comment.sh @credova/platform
+/scripts/grype-scan.sh              @credova/platform
+/scripts/grant-scan.sh              @credova/platform
+/scripts/opengrep-scan.sh           @credova/platform
+/scripts/install-anchore.sh         @credova/platform
+/scripts/install-opengrep.sh        @credova/platform
+/scripts/post-security-comment.sh   @credova/platform
+
+# This repo's own CI/release plumbing (not consumed by other repos).
+/.github/workflows/ci.yaml      @credova/platform
+/.github/workflows/release.yaml @credova/platform
+
+# CODEOWNERS itself: Platform-only.
+/.github/CODEOWNERS @credova/platform
