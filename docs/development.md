@@ -4,11 +4,15 @@
 
 ```text
 platform-workflows/
-├── .github/workflows/          # Reusable workflows (public interface)
+├── .github/workflows/          # Reusable workflows (public interface; selected below)
 │   ├── ci.yaml                 # Self-test: validate actions
 │   ├── release.yaml            # Version + tag platform-workflows itself
+│   ├── shared-release.yaml     # Shared release (edge/semantic modes)
 │   ├── pull-request.yaml       # Unified PR validation
-│   └── deploy.yaml             # Unified deploy (+ hotfix mode)
+│   ├── deploy.yaml             # Unified deploy (+ hotfix mode)
+│   ├── iac-pull-request.yaml   # Pulumi/IaC PR: lint + reeve + compliance
+│   ├── go.yaml, go-*.yaml      # Language-specific (also node/python/ruby/php/dotnet/kotlin)
+│   └── dependabot-auto-merge.yaml
 ├── actions/                    # Composite actions (building blocks)
 │   ├── auth-gcp/               # INTERNAL - WIF login + docker config
 │   ├── auth-release-token/     # GitHub App token for private repo releases
@@ -27,13 +31,20 @@ platform-workflows/
 │   └── setup-language/         # Runtime setup + WarpBuild dep caching
 ├── scripts/                    # Shell scripts (called by actions)
 │   ├── check-shortcut-ticket.sh  # Shortcut ticket pattern matching
-│   ├── deploy.sh                 # pctl deploy/promote/rollback
+│   ├── deploy.sh                 # pctl deploy (deploy/promote/abort/set-weight/status/rollback)
 │   ├── docker-build.sh           # Docker buildx build wrapper
 │   ├── docker-push.sh            # Docker push + extra tags
+│   ├── grant-scan.sh             # grant license compliance scan
+│   ├── grype-scan.sh             # grype vulnerability scan
+│   ├── install-anchore.sh        # syft/grype/grant installer
+│   ├── install-opengrep.sh       # opengrep installer
 │   ├── install-pctl.sh           # pctl download + SHA256 verify
 │   ├── notify-slack.sh           # Slack notification via pctl
 │   ├── opengrep-scan.sh          # OpenGrep static analysis
 │   ├── parse-images.sh           # Image input → JSON matrix
+│   ├── post-compliance-comment.sh  # Upsert compliance PR comment
+│   ├── post-go-comment.sh        # Upsert Go lint/security/test PR comment
+│   ├── post-security-comment.sh  # Upsert security scan PR comment
 │   └── semver.sh                 # Semver tag computation
 └── docs/                       # Documentation
     ├── README.md               # Doc index

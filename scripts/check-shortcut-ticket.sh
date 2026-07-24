@@ -57,10 +57,20 @@ if [ -n "$PR_NUMBER" ]; then
   fi
 fi
 
+# Write a human-readable failure reason to REASON_FILE (if set) so the
+# comment step can surface it on the PR, then emit the annotation and fail.
+REASON='No Shortcut ticket reference found.
+
+Add a Shortcut reference to your PR title, body, branch name, commit message, or PR comment.
+
+Accepted formats:
+  - Tag:  sc-12345
+  - Link: https://app.shortcut.com/<org>/story/12345'
+
+if [ -n "${REASON_FILE:-}" ]; then
+  printf '%s\n' "$REASON" > "$REASON_FILE"
+fi
+
 echo "::error::No Shortcut ticket reference found."
-echo ""
-echo "Add a Shortcut reference to your PR title, body, branch name, commit message, or PR comment."
-echo "Accepted formats:"
-echo "  - Tag:  sc-12345"
-echo "  - Link: https://app.shortcut.com/<org>/story/12345"
+printf '%s\n' "$REASON"
 exit 1

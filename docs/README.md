@@ -21,9 +21,13 @@
 | Python   | `python-pull-request.yaml` | `python-deploy.yaml` |
 | Ruby     | `ruby-pull-request.yaml`   | `ruby-deploy.yaml`   |
 
+## IaC Workflows
+
+- **[iac-pull-request.yaml](../.github/workflows/iac-pull-request.yaml)**: shared PR workflow for Pulumi/IaC repos (platform-iac, github-meta, product-iac). Runs mise lint, reeve (preview/apply), and compliance.
+
 ## Shared Workflows
 
-- **[shared-release.yaml](../.github/workflows/shared-release.yaml)**: reusable release workflow. Supports edge/stable modes, npm publish, and version bumping.
+- **[shared-release.yaml](../.github/workflows/shared-release.yaml)**: reusable release workflow. Supports edge/semantic modes, npm publish, and version bumping.
 - **[dependabot-auto-merge.yaml](../.github/workflows/dependabot-auto-merge.yaml)**: auto-merge Dependabot PRs for patch/minor updates.
 
 ## Actions

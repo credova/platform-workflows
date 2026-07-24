@@ -67,6 +67,7 @@ See the [usage guide](docs/usage.md) for customization.
 ### Other
 
 - **go.yaml**: Go repos with mise + GoReleaser (lint, security, test, release)
+- **iac-pull-request.yaml**: Pulumi/IaC repos (platform-iac, github-meta, product-iac). lint + reeve (preview/apply) + compliance
 - **shared-release.yaml**: package publishing (npm, NuGet) with edge/semantic release modes
 - **dependabot-auto-merge.yaml**: auto-merge Dependabot PRs
 
