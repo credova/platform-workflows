@@ -31,7 +31,7 @@ platform-workflows/
 │   └── setup-language/         # Runtime setup + WarpBuild dep caching
 ├── scripts/                    # Shell scripts (called by actions)
 │   ├── check-shortcut-ticket.sh  # Shortcut ticket pattern matching
-│   ├── deploy.sh                 # pctl deploy/rollout/rollback
+│   ├── deploy.sh                 # pctl deploy (deploy/promote/abort/set-weight/status/rollback)
 │   ├── docker-build.sh           # Docker buildx build wrapper
 │   ├── docker-push.sh            # Docker push + extra tags
 │   ├── grant-scan.sh             # grant license compliance scan
