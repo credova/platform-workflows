@@ -109,6 +109,19 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.final.outputs.tag }}
         run: |
-          gh release create "${TAG}" \
-            --title "${TAG}" \
-            --generate-notes
+          # Greatest release tag strictly less than TAG, so notes only cover the delta.
+          # awk exits 0 even when nothing matches, so PREV_TAG is empty on first release
+          # without tripping pipefail/-e.
+          PREV_TAG=$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=version:refname \
+            | awk -v t="${TAG}" '$0 == t {exit} {p=$0} END {print p}')
+
+          if [[ -n "${PREV_TAG}" ]]; then
+            gh release create "${TAG}" \
+              --title "${TAG}" \
+              --generate-notes \
+              --notes-start-tag "${PREV_TAG}"
+          else
+            gh release create "${TAG}" \
+              --title "${TAG}" \
+              --generate-notes
+          fi
