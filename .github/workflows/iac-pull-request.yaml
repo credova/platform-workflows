@@ -257,6 +257,8 @@ jobs:
           gcp-service-account: ${{ inputs.gcp-service-account }}
           slack-token: ${{ secrets.PCTL_SLACK_BOT_TOKEN }}
           log-level: ${{ inputs.reeve-log-level }}
+        env:
+          DASH0_TOKEN: ${{ secrets.DASH0_TOKEN }}
 
   compliance:
     needs: [lint, reeve]
