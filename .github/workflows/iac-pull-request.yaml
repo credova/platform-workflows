@@ -247,7 +247,7 @@ jobs:
           owner: credova
 
       - name: Reeve
-        uses: reeveops/reeve@v1.0.0
+        uses: reeveops/reeve@v0.3.0
         with:
           # When pre-warmed we already installed pulumi; leave blank so reeve
           # doesn't reinstall. Otherwise let reeve install latest.
