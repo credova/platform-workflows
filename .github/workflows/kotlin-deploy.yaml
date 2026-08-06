@@ -399,11 +399,23 @@ jobs:
             )
           fi
 
-          echo "Dispatching ${WORKFLOW} on ${REF} (inputs: ${INPUTS_JSON:-none})"
+          # Log only that inputs were provided, never their values — this is a generic workflow and
+          # a caller's inputs may carry sensitive identifiers, and workflow logs are retained.
+          if [ -n "${INPUTS_JSON}" ]; then in_note="with caller-provided inputs"; else in_note="no inputs"; fi
+          echo "Dispatching ${WORKFLOW} on ${REF} (${in_note})"
           gh workflow run "${WORKFLOW}" -R "${REPO}" --ref "${REF}" "${field_args[@]}"
 
-          # Wait (up to ~2 min) for the dispatched run to register, identified by a databaseId newer
-          # than the pre-dispatch max on this workflow+branch.
+          # Wait (up to ~2 min) for the dispatched run to register, then track it by the greatest
+          # databaseId newer than the pre-dispatch max for this workflow+branch.
+          #
+          # Accepted limitation (CodeRabbit, PR #31): this correlates by "newest new run", not by a
+          # per-dispatch token, so a *concurrent* workflow_dispatch of the SAME workflow on the SAME
+          # ref within this window could be tracked instead. In practice the window is closed:
+          # deploys are serialised by the top-level concurrency group, and the 6h schedule is a
+          # `schedule` event (excluded by --event workflow_dispatch). The residual case is a human
+          # manually dispatching this same workflow on the deploy branch mid-deploy. A fully-correct
+          # fix (inject a correlation id + match on run-name) would change the consumer contract, so
+          # it is deferred pending Platform-team input.
           run_id=""
           for _ in $(seq 1 24); do
             run_id="$(gh run list -R "${REPO}" --workflow "${WORKFLOW}" --branch "${REF}" \
@@ -421,7 +433,10 @@ jobs:
 
           # Poll to conclusion or timeout. A run queued behind another (acceptance suites often cap
           # concurrency to one) stays non-'completed' until it starts, which the timeout covers.
-          deadline=$(( $(date +%s) + TIMEOUT_MINUTES * 60 ))
+          # Convert minutes → whole seconds via awk so a fractional input (e.g. 0.5) doesn't break
+          # Bash integer arithmetic; floor to a 1s minimum.
+          timeout_seconds="$(awk -v m="${TIMEOUT_MINUTES}" 'BEGIN { s = m * 60; if (s < 1) s = 1; printf "%d", s }')"
+          deadline=$(( $(date +%s) + timeout_seconds ))
           while :; do
             read -r status conclusion < <(gh run view "${run_id}" -R "${REPO}" \
               --json status,conclusion --jq '"\(.status) \(.conclusion)"')
@@ -599,11 +614,23 @@ jobs:
             )
           fi
 
-          echo "Dispatching ${WORKFLOW} on ${REF} (inputs: ${INPUTS_JSON:-none})"
+          # Log only that inputs were provided, never their values — this is a generic workflow and
+          # a caller's inputs may carry sensitive identifiers, and workflow logs are retained.
+          if [ -n "${INPUTS_JSON}" ]; then in_note="with caller-provided inputs"; else in_note="no inputs"; fi
+          echo "Dispatching ${WORKFLOW} on ${REF} (${in_note})"
           gh workflow run "${WORKFLOW}" -R "${REPO}" --ref "${REF}" "${field_args[@]}"
 
-          # Wait (up to ~2 min) for the dispatched run to register, identified by a databaseId newer
-          # than the pre-dispatch max on this workflow+branch.
+          # Wait (up to ~2 min) for the dispatched run to register, then track it by the greatest
+          # databaseId newer than the pre-dispatch max for this workflow+branch.
+          #
+          # Accepted limitation (CodeRabbit, PR #31): this correlates by "newest new run", not by a
+          # per-dispatch token, so a *concurrent* workflow_dispatch of the SAME workflow on the SAME
+          # ref within this window could be tracked instead. In practice the window is closed:
+          # deploys are serialised by the top-level concurrency group, and the 6h schedule is a
+          # `schedule` event (excluded by --event workflow_dispatch). The residual case is a human
+          # manually dispatching this same workflow on the deploy branch mid-deploy. A fully-correct
+          # fix (inject a correlation id + match on run-name) would change the consumer contract, so
+          # it is deferred pending Platform-team input.
           run_id=""
           for _ in $(seq 1 24); do
             run_id="$(gh run list -R "${REPO}" --workflow "${WORKFLOW}" --branch "${REF}" \
@@ -619,8 +646,10 @@ jobs:
           run_url="$(gh run view "${run_id}" -R "${REPO}" --json url --jq .url)"
           echo "Waiting on production-validation run: ${run_url}"
 
-          # Poll to conclusion or timeout.
-          deadline=$(( $(date +%s) + TIMEOUT_MINUTES * 60 ))
+          # Poll to conclusion or timeout. Convert minutes → whole seconds via awk so a fractional
+          # input (e.g. 0.5) doesn't break Bash integer arithmetic; floor to a 1s minimum.
+          timeout_seconds="$(awk -v m="${TIMEOUT_MINUTES}" 'BEGIN { s = m * 60; if (s < 1) s = 1; printf "%d", s }')"
+          deadline=$(( $(date +%s) + timeout_seconds ))
           while :; do
             read -r status conclusion < <(gh run view "${run_id}" -R "${REPO}" \
               --json status,conclusion --jq '"\(.status) \(.conclusion)"')
