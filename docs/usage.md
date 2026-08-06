@@ -688,21 +688,71 @@ When `cache: true`, built-in caches from `actions/setup-go` and `actions/setup-n
 
 Shares the build/runtime inputs from pull-request.yaml (`language`, `language-version`, `test-command`, `container`, `image`, `images`, `platform`, `warpbuild-profile`, `cache`, `runner`, `security-severity`) plus:
 
-| Input                        | Type    | Default        | Description                                                      |
-| ---------------------------- | ------- | -------------- | ---------------------------------------------------------------- |
-| `deploy`                     | boolean | `true`         | Deploy to Cloud Run via pctl                                     |
-| `config-path`                | string  | `deployments/` | Path to CUE config directory                                     |
-| `canary`                     | number  | `0`            | Canary traffic percentage                                        |
-| `require-approval`           | boolean | `true`         | Require manual approval for production                           |
-| `container-reuse`            | boolean | `true`         | Skip build if image exists for this SHA                          |
-| `hotfix`                     | boolean | `false`        | Hotfix mode: skip tests, staging, canary, straight to production |
-| `notifications`              | boolean | `true`         | Send Slack notifications                                         |
-| `project-id`                 | string  | `""`           | GCP project ID                                                   |
-| `workload-identity-provider` | string  | `""`           | WIF provider resource name                                       |
-| `service-account`            | string  | `""`           | GCP service account to impersonate                               |
+| Input                                | Type    | Default        | Description                                                      |
+|--------------------------------------| ------- | -------------- | ---------------------------------------------------------------- |
+| `deploy`                             | boolean | `true`         | Deploy to Cloud Run via pctl                                     |
+| `config-path`                        | string  | `deployments/` | Path to CUE config directory                                     |
+| `canary`                             | number  | `0`            | Canary traffic percentage                                        |
+| `require-approval`                   | boolean | `true`         | Require manual approval for production                           |
+| `container-reuse`                    | boolean | `true`         | Skip build if image exists for this SHA                          |
+| `hotfix`                             | boolean | `false`        | Hotfix mode: skip tests, staging, canary, straight to production |
+| `notifications`                      | boolean | `true`         | Send Slack notifications                                         |
+| `project-id`                         | string  | `""`           | GCP project ID                                                   |
+| `workload-identity-provider`         | string  | `""`           | WIF provider resource name                                       |
+| `service-account`                    | string  | `""`           | GCP service account to impersonate                               |
+| `staging-validation-workflow`        | string | `""` | Post-staging gate: filename of a `workflow_dispatch` workflow in the caller repo to run after the staging deploy and before the production approval. Empty = disabled. |
+| `staging-validation-inputs`          | string | `""` | JSON object of inputs for the dispatched validation workflow, e.g. `'{"environment":"staging","suite":"smoke"}'`. |
+| `staging-validation-ref`             | string | `""` | Branch/tag to dispatch the validation workflow on (default: `github.ref_name`). |
+| `staging-validation-timeout-minutes` | number | `20` | How long to wait for the validation run before failing. |
+| `production-validation-workflow`        | string | `""` | Post-production check: filename of a `workflow_dispatch` workflow in the caller repo to run after the production deploy. A failure skips the release and reds the pipeline. Empty = disabled. |
+| `production-validation-inputs`          | string | `""` | JSON object of inputs for the dispatched validation workflow, e.g. `'{"environment":"production","suite":"smoke"}'`. |
+| `production-validation-ref`             | string | `""` | Branch/tag to dispatch the validation workflow on (default: `github.ref_name`). |
+| `production-validation-timeout-minutes` | number | `20` | How long to wait for the validation run before failing. |
 
 **Secrets** (both workflows): `WARPBUILD_API_KEY` (optional, needed only on non-WarpBuild runners).
 Deploy also requires: `RELEASE_DOWNLOADER_APP_ID`, `RELEASE_DOWNLOADER_APP_PRIVATE_KEY`.
+
+### Post-staging validation gate
+
+Set `staging-validation-workflow` to run a `workflow_dispatch` workflow in your own repo after the
+staging deploy and **before** the production approval. If that run fails, production promotion is
+skipped and the deploy pipeline fails (it is a real gate, not a warning). The dispatched workflow
+owns all of its own setup — runtime, browsers, credentials — so this stays language/app-agnostic;
+this workflow only triggers it and polls the result.
+
+Requires `actions: write` in the caller's top-level `permissions` (to dispatch and read the run in
+its own repo). Leave the input unset (the default) and the gate job is skipped — no change for
+existing consumers.
+
+```yaml
+permissions:
+  contents: write
+  id-token: write
+  actions: write # required for the validation gates
+jobs:
+  deploy:
+    uses: credova/platform-workflows/.github/workflows/kotlin-deploy.yaml@v1
+    secrets: inherit
+    with:
+      container: true
+      release: true
+      staging-validation-workflow: acceptance-tests.yaml
+      staging-validation-inputs: '{"environment":"staging","suite":"smoke"}'
+```
+
+### Post-production validation
+
+`production-validation-*` mirrors the staging gate but runs **after** the production deploy — a
+post-deploy synthetic check against production. A failure skips the GitHub release and fails the
+pipeline; it does **not** roll back (use the rollback workflow to recover). Same `actions: write`
+requirement, same dispatch-and-poll mechanism, same "unset = skipped" default.
+
+```yaml
+    with:
+      # ... staging-validation-* as above ...
+      production-validation-workflow: acceptance-tests.yaml
+      production-validation-inputs: '{"environment":"production","suite":"smoke"}'
+```
 
 ---
 
@@ -825,12 +875,16 @@ flowchart TD
 
     STG["deploy-staging\n<i>Cloud Run via pctl</i>\n🔒 staging env"]
 
+    VS["validate-staging\n<i>dispatch caller workflow + wait</i>"]
+
     AC{{"approve-canary\n🔒 production-canary env"}}
     DC["deploy-canary\n<i>canary % traffic</i>"]
 
     AP{{"approve-production\n🔒 production env"}}
     RETAG["retag-production\n<i>tag images as *-prd</i>"]
     DP["deploy-production\n<i>full production rollout</i>"]
+
+    VP["validate-production\n<i>dispatch caller workflow + wait</i>"]
 
     REL["release\n<i>increment tag + GitHub Release</i>"]
     CS["cancel-superseded\n<i>cancel older waiting runs</i>"]
@@ -842,33 +896,41 @@ flowchart TD
     VI & TEST --> BSP
     AUTH & BSP & TEST & VI --> STG
 
-    STG & BSP --> AC
+    STG --> VS
+
+    STG & VS & BSP --> AC
     AUTH & AC & VI --> DC
 
-    BSP & STG & DC --> AP
+    BSP & STG & VS & DC --> AP
     AP & VI --> RETAG
     AUTH & AP & RETAG & VI --> DP
 
-    DP & VI --> REL
+    DP --> VP
+
+    DP & VP & VI --> REL
     DP --> CS
     REL & CS --> DONE
 
     style TEST stroke-dasharray: 5 5
+    style VS stroke-dasharray: 5 5
+    style VP stroke-dasharray: 5 5
     style AC stroke-dasharray: 5 5
     style DC stroke-dasharray: 5 5
 ```
 
 **Toggle map:**
 
-| Input                                | What it gates                                                         |
-| ------------------------------------ | --------------------------------------------------------------------- |
-| `language` + `language-version`      | **test** job runs                                                     |
-| `container` (default: `true`)        | **build-scan-push** and **retag-production** jobs run                 |
-| `deploy` (default: `true`)           | **staging**, **approval**, **canary**, and **production** jobs run    |
-| `canary` (default: `0`)              | **approve-canary** and **deploy-canary** jobs run (set > 0 to enable) |
-| `require-approval` (default: `true`) | **approve-production** gate runs                                      |
-| `notifications` (default: `true`)    | Slack notifications in **deploy-production**                          |
-| `container-reuse` (default: `true`)  | **build-scan-push** skips build if image already exists for this SHA  |
+| Input                                         | What it gates                                                         |
+|-----------------------------------------------| --------------------------------------------------------------------- |
+| `language` + `language-version`               | **test** job runs                                                     |
+| `container` (default: `true`)                 | **build-scan-push** and **retag-production** jobs run                 |
+| `deploy` (default: `true`)                    | **staging**, **approval**, **canary**, and **production** jobs run    |
+| `canary` (default: `0`)                       | **approve-canary** and **deploy-canary** jobs run (set > 0 to enable) |
+| `require-approval` (default: `true`)          | **approve-production** gate runs                                      |
+| `staging-validation-workflow` (default: `""`) | **validate-staging** gate runs (dispatches a caller workflow after staging; a failure blocks promotion) |
+| `production-validation-workflow` (default: `""`) | **validate-production** runs after the production deploy; a failure skips the release and reds the pipeline |
+| `notifications` (default: `true`)             | Slack notifications in **deploy-production**                          |
+| `container-reuse` (default: `true`)           | **build-scan-push** skips build if image already exists for this SHA  |
 
 ### Deploy (hotfix)
 

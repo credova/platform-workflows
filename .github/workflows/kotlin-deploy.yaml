@@ -104,6 +104,76 @@ on:
         required: false
         default: true
 
+      # Post-staging validation gate
+      # Optional. When set, a validate-staging job runs after the staging deploy and BEFORE the
+      # production approval: it dispatches a workflow_dispatch workflow in the CALLER repo (e.g. a
+      # post-deploy smoke/acceptance suite) and waits for it. If that run fails, production promotion
+      # is skipped and the deploy pipeline fails. Left empty (the default), the job is skipped and
+      # behaviour is unchanged for every existing consumer. The dispatched workflow, its runner
+      # setup, and any credentials it needs live entirely in the caller repo — this workflow only
+      # triggers it by filename and polls the result, so it stays language/app-agnostic. Requires the
+      # caller to grant `actions: write` (to dispatch + read the run in its own repo).
+      staging-validation-workflow:
+        description: >
+          Filename (e.g. "acceptance-tests.yaml") of a workflow_dispatch workflow in the caller repo
+          to run after the staging deploy and gate production promotion on. Empty = disabled.
+        type: string
+        required: false
+        default: ""
+      staging-validation-inputs:
+        description: >
+          JSON object of inputs passed to the dispatched staging-validation workflow, e.g.
+          '{"environment":"staging","suite":"smoke"}'. Ignored when staging-validation-workflow is empty.
+        type: string
+        required: false
+        default: ""
+      staging-validation-ref:
+        description: >
+          Branch or tag the staging-validation workflow is dispatched on (workflow_dispatch requires a
+          branch/tag ref, not a commit SHA). Defaults to the ref that triggered the deploy
+          (github.ref_name, e.g. master).
+        type: string
+        required: false
+        default: ""
+      staging-validation-timeout-minutes:
+        description: Minutes to wait for the staging-validation run to conclude before failing.
+        type: number
+        required: false
+        default: 20
+
+      # Post-production validation
+      # Optional, symmetric to the staging gate above but running AFTER the production deploy — a
+      # post-deploy synthetic check against production. A failure fails the pipeline (and skips the
+      # GitHub release) but does not roll back; recover via the rollback workflow. Same dispatch-and-
+      # poll mechanism and the same `actions: write` requirement. Empty (default) = job skipped.
+      production-validation-workflow:
+        description: >
+          Filename (e.g. "acceptance-tests.yaml") of a workflow_dispatch workflow in the caller repo
+          to run after the production deploy. Empty = disabled.
+        type: string
+        required: false
+        default: ""
+      production-validation-inputs:
+        description: >
+          JSON object of inputs passed to the dispatched production-validation workflow, e.g.
+          '{"environment":"production","suite":"smoke"}'. Ignored when production-validation-workflow is empty.
+        type: string
+        required: false
+        default: ""
+      production-validation-ref:
+        description: >
+          Branch or tag the production-validation workflow is dispatched on (workflow_dispatch requires
+          a branch/tag ref, not a commit SHA). Defaults to the ref that triggered the deploy
+          (github.ref_name, e.g. master).
+        type: string
+        required: false
+        default: ""
+      production-validation-timeout-minutes:
+        description: Minutes to wait for the production-validation run to conclude before failing.
+        type: number
+        required: false
+        default: 20
+
       # WarpBuild
       warpbuild-profile:
         description: "WarpBuild Docker Builder profile name"
@@ -286,10 +356,94 @@ jobs:
           dash0-token: ${{ inputs.dash0-annotations && secrets.DASH0_TOKEN || '' }}
           token: ${{ steps.token.outputs.token }}
 
+  # --- Post-staging validation gate (opt-in) ---
+  # Runs only when the caller sets staging-validation-workflow. Dispatches that workflow_dispatch
+  # workflow in the CALLER repo (e.g. a post-deploy smoke/acceptance suite), waits for it, and fails
+  # if it fails. Because the approval jobs below `needs:` this job, failure() propagates transitively
+  # and skips production promotion — so a failed validation reds the pipeline instead of promoting.
+  # When the input is empty the job is skipped (failure() stays false), leaving every existing
+  # consumer's flow unchanged. All app-specific setup (runtime, browsers, credentials) lives in the
+  # dispatched workflow; this job only triggers and polls, keeping kotlin-deploy language-agnostic.
+  # Needs `actions: write` on the caller's GITHUB_TOKEN to dispatch + read runs in its own repo.
+  validate-staging:
+    if: inputs.deploy && !inputs.hotfix && inputs.staging-validation-workflow != '' && always() && !failure() && !cancelled()
+    needs: [deploy-staging]
+    runs-on: ${{ inputs.runner }}
+    permissions:
+      actions: write
+      contents: read
+    steps:
+      - name: Dispatch staging-validation workflow and wait
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          WORKFLOW: ${{ inputs.staging-validation-workflow }}
+          REF: ${{ inputs.staging-validation-ref != '' && inputs.staging-validation-ref || github.ref_name }}
+          INPUTS_JSON: ${{ inputs.staging-validation-inputs }}
+          TIMEOUT_MINUTES: ${{ inputs.staging-validation-timeout-minutes }}
+        run: |
+          set -euo pipefail
+
+          # gh workflow run does not return a run id, so record the newest existing run id for this
+          # workflow+branch first, dispatch, then poll for a run newer than that. The deploy
+          # concurrency group serialises deploys, so at most one dispatch is in flight per commit.
+          before="$(gh run list -R "${REPO}" --workflow "${WORKFLOW}" --branch "${REF}" \
+            --event workflow_dispatch --json databaseId --jq 'map(.databaseId) | max // 0')"
+
+          # Turn the JSON inputs object into repeated `--raw-field key=value` args (empty = none).
+          field_args=()
+          if [ -n "${INPUTS_JSON}" ]; then
+            while IFS= read -r kv; do field_args+=(--raw-field "$kv"); done < <(
+              printf '%s' "${INPUTS_JSON}" | jq -r 'to_entries[] | "\(.key)=\(.value)"'
+            )
+          fi
+
+          echo "Dispatching ${WORKFLOW} on ${REF} (inputs: ${INPUTS_JSON:-none})"
+          gh workflow run "${WORKFLOW}" -R "${REPO}" --ref "${REF}" "${field_args[@]}"
+
+          # Wait (up to ~2 min) for the dispatched run to register, identified by a databaseId newer
+          # than the pre-dispatch max on this workflow+branch.
+          run_id=""
+          for _ in $(seq 1 24); do
+            run_id="$(gh run list -R "${REPO}" --workflow "${WORKFLOW}" --branch "${REF}" \
+              --event workflow_dispatch --json databaseId \
+              --jq "map(.databaseId) | map(select(. > ${before})) | max // empty")"
+            [ -n "${run_id}" ] && break
+            sleep 5
+          done
+          if [ -z "${run_id}" ]; then
+            echo "::error::staging-validation workflow '${WORKFLOW}' did not start on ${REF} (no run newer than ${before})"
+            exit 1
+          fi
+          run_url="$(gh run view "${run_id}" -R "${REPO}" --json url --jq .url)"
+          echo "Waiting on staging-validation run: ${run_url}"
+
+          # Poll to conclusion or timeout. A run queued behind another (acceptance suites often cap
+          # concurrency to one) stays non-'completed' until it starts, which the timeout covers.
+          deadline=$(( $(date +%s) + TIMEOUT_MINUTES * 60 ))
+          while :; do
+            read -r status conclusion < <(gh run view "${run_id}" -R "${REPO}" \
+              --json status,conclusion --jq '"\(.status) \(.conclusion)"')
+            if [ "${status}" = "completed" ]; then
+              if [ "${conclusion}" = "success" ]; then
+                echo "staging-validation passed: ${run_url}"
+                break
+              fi
+              echo "::error::staging-validation failed (${conclusion}): ${run_url}"
+              exit 1
+            fi
+            if [ "$(date +%s)" -ge "${deadline}" ]; then
+              echo "::error::staging-validation timed out after ${TIMEOUT_MINUTES}m (still '${status}'): ${run_url}"
+              exit 1
+            fi
+            sleep 15
+          done
+
   # --- Canary flow ---
   approve-canary:
     if: inputs.deploy && inputs.canary > 0 && always() && !failure() && !cancelled()
-    needs: [deploy-staging, build-scan-push]
+    needs: [deploy-staging, validate-staging, build-scan-push]
     runs-on: ${{ inputs.runner }}
     environment: production-canary
     steps:
@@ -324,7 +478,7 @@ jobs:
   # --- Production approval ---
   approve-production:
     if: inputs.deploy && inputs.require-approval && always() && !failure() && !cancelled()
-    needs: [build-scan-push, deploy-staging, deploy-canary]
+    needs: [build-scan-push, deploy-staging, validate-staging, deploy-canary]
     runs-on: ${{ inputs.runner }}
     environment: production
     steps:
@@ -406,10 +560,89 @@ jobs:
           dash0-token: ${{ inputs.dash0-annotations && secrets.DASH0_TOKEN || '' }}
           token: ${{ steps.token.outputs.token }}
 
+  # --- Post-production validation (opt-in) ---
+  # Symmetric to validate-staging but runs AFTER the production deploy as a post-deploy synthetic
+  # check. On failure the release job below is skipped (via needs) and the pipeline is red; it does
+  # not roll back (use the rollback workflow). Skipped when production-validation-workflow is empty.
+  # Needs `actions: write` on the caller's GITHUB_TOKEN to dispatch + read runs in its own repo.
+  validate-production:
+    if: inputs.deploy && inputs.production-validation-workflow != '' && always() && !failure() && !cancelled()
+    needs: [deploy-production]
+    runs-on: ${{ inputs.runner }}
+    permissions:
+      actions: write
+      contents: read
+    steps:
+      - name: Dispatch production-validation workflow and wait
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          WORKFLOW: ${{ inputs.production-validation-workflow }}
+          REF: ${{ inputs.production-validation-ref != '' && inputs.production-validation-ref || github.ref_name }}
+          INPUTS_JSON: ${{ inputs.production-validation-inputs }}
+          TIMEOUT_MINUTES: ${{ inputs.production-validation-timeout-minutes }}
+        run: |
+          set -euo pipefail
+
+          # gh workflow run does not return a run id, so record the newest existing run id for this
+          # workflow+branch first, dispatch, then poll for a run newer than that. The deploy
+          # concurrency group serialises deploys, so at most one dispatch is in flight per commit.
+          before="$(gh run list -R "${REPO}" --workflow "${WORKFLOW}" --branch "${REF}" \
+            --event workflow_dispatch --json databaseId --jq 'map(.databaseId) | max // 0')"
+
+          # Turn the JSON inputs object into repeated `--raw-field key=value` args (empty = none).
+          field_args=()
+          if [ -n "${INPUTS_JSON}" ]; then
+            while IFS= read -r kv; do field_args+=(--raw-field "$kv"); done < <(
+              printf '%s' "${INPUTS_JSON}" | jq -r 'to_entries[] | "\(.key)=\(.value)"'
+            )
+          fi
+
+          echo "Dispatching ${WORKFLOW} on ${REF} (inputs: ${INPUTS_JSON:-none})"
+          gh workflow run "${WORKFLOW}" -R "${REPO}" --ref "${REF}" "${field_args[@]}"
+
+          # Wait (up to ~2 min) for the dispatched run to register, identified by a databaseId newer
+          # than the pre-dispatch max on this workflow+branch.
+          run_id=""
+          for _ in $(seq 1 24); do
+            run_id="$(gh run list -R "${REPO}" --workflow "${WORKFLOW}" --branch "${REF}" \
+              --event workflow_dispatch --json databaseId \
+              --jq "map(.databaseId) | map(select(. > ${before})) | max // empty")"
+            [ -n "${run_id}" ] && break
+            sleep 5
+          done
+          if [ -z "${run_id}" ]; then
+            echo "::error::production-validation workflow '${WORKFLOW}' did not start on ${REF} (no run newer than ${before})"
+            exit 1
+          fi
+          run_url="$(gh run view "${run_id}" -R "${REPO}" --json url --jq .url)"
+          echo "Waiting on production-validation run: ${run_url}"
+
+          # Poll to conclusion or timeout.
+          deadline=$(( $(date +%s) + TIMEOUT_MINUTES * 60 ))
+          while :; do
+            read -r status conclusion < <(gh run view "${run_id}" -R "${REPO}" \
+              --json status,conclusion --jq '"\(.status) \(.conclusion)"')
+            if [ "${status}" = "completed" ]; then
+              if [ "${conclusion}" = "success" ]; then
+                echo "production-validation passed: ${run_url}"
+                break
+              fi
+              echo "::error::production-validation failed (${conclusion}): ${run_url}"
+              exit 1
+            fi
+            if [ "$(date +%s)" -ge "${deadline}" ]; then
+              echo "::error::production-validation timed out after ${TIMEOUT_MINUTES}m (still '${status}'): ${run_url}"
+              exit 1
+            fi
+            sleep 15
+          done
+
   # --- Release ---
   release:
     if: inputs.release && always() && !failure() && !cancelled()
-    needs: [deploy-production, validate]
+    needs: [deploy-production, validate-production, validate]
     runs-on: ${{ inputs.runner }}
     steps:
       - uses: actions/checkout@v7
