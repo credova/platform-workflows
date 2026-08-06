@@ -1,0 +1,119 @@
+name: dispatch-and-wait
+description: >
+  Dispatch a workflow_dispatch workflow in a repo and wait for it to conclude, failing the step if
+  the run fails. Used by kotlin-deploy's staging/production validation gates to run a caller-owned
+  smoke/acceptance suite as a post-deploy gate without pulling any app-specific setup into the
+  shared workflow. Needs a token with `actions: write` on the target repo (dispatch + read runs).
+
+inputs:
+  workflow:
+    description: Workflow filename to dispatch (e.g. "acceptance-tests.yaml").
+    required: true
+  ref:
+    description: Branch or tag to dispatch on (workflow_dispatch requires a branch/tag ref, not a SHA).
+    required: true
+  token:
+    description: "GitHub token with `actions: write` on the target repo."
+    required: true
+  inputs-json:
+    description: JSON object of inputs passed to the dispatched workflow (empty = none). Values are never logged.
+    required: false
+    default: ""
+  timeout-minutes:
+    description: Minutes to wait for the run to conclude before failing.
+    required: false
+    default: "20"
+  label:
+    description: Human label used in log/error messages (e.g. "staging-validation").
+    required: false
+    default: validation
+  repo:
+    description: "owner/repo the workflow lives in. Defaults to the current repository."
+    required: false
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - name: Dispatch ${{ inputs.workflow }} and wait
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.token }}
+        REPO: ${{ inputs.repo }}
+        WORKFLOW: ${{ inputs.workflow }}
+        REF: ${{ inputs.ref }}
+        INPUTS_JSON: ${{ inputs.inputs-json }}
+        TIMEOUT_MINUTES: ${{ inputs.timeout-minutes }}
+        LABEL: ${{ inputs.label }}
+      run: |
+        set -euo pipefail
+        REPO="${REPO:-$GITHUB_REPOSITORY}"
+
+        # gh workflow run does not return a run id, so record the newest existing run id for this
+        # workflow+branch first, dispatch, then poll for a run newer than that.
+        before="$(gh run list -R "${REPO}" --workflow "${WORKFLOW}" --branch "${REF}" \
+          --event workflow_dispatch --json databaseId --jq 'map(.databaseId) | max // 0')"
+
+        # Turn the JSON inputs object into repeated `--raw-field key=value` args (empty = none).
+        field_args=()
+        if [ -n "${INPUTS_JSON}" ]; then
+          while IFS= read -r kv; do field_args+=(--raw-field "$kv"); done < <(
+            printf '%s' "${INPUTS_JSON}" | jq -r 'to_entries[] | "\(.key)=\(.value)"'
+          )
+        fi
+
+        # Log only that inputs were provided, never their values — a caller's inputs may carry
+        # sensitive identifiers, and workflow logs are retained.
+        if [ -n "${INPUTS_JSON}" ]; then in_note="with caller-provided inputs"; else in_note="no inputs"; fi
+        echo "Dispatching ${WORKFLOW} on ${REF} (${in_note})"
+        gh workflow run "${WORKFLOW}" -R "${REPO}" --ref "${REF}" "${field_args[@]}"
+
+        # Wait (up to ~2 min) for the dispatched run to register, then track it by the greatest
+        # databaseId newer than the pre-dispatch max for this workflow+branch.
+        #
+        # Accepted limitation (CodeRabbit, PR #31): this correlates by "newest new run", not by a
+        # per-dispatch token, so a *concurrent* workflow_dispatch of the SAME workflow on the SAME
+        # ref within this window could be tracked instead. Callers that gate deploys serialise them
+        # (concurrency group) and their schedules are `schedule` events (excluded here by
+        # --event workflow_dispatch), so the window is narrow; the residual case is a human manually
+        # dispatching the same workflow on the same ref mid-run. A fully-correct fix (inject a
+        # correlation id + match on run-name) would change the consumer contract, so it is deferred
+        # pending Platform-team input.
+        run_id=""
+        for _ in $(seq 1 24); do
+          run_id="$(gh run list -R "${REPO}" --workflow "${WORKFLOW}" --branch "${REF}" \
+            --event workflow_dispatch --json databaseId \
+            --jq "map(.databaseId) | map(select(. > ${before})) | max // empty")"
+          [ -n "${run_id}" ] && break
+          sleep 5
+        done
+        if [ -z "${run_id}" ]; then
+          echo "::error::${LABEL} workflow '${WORKFLOW}' did not start on ${REF} (no run newer than ${before})"
+          exit 1
+        fi
+        run_url="$(gh run view "${run_id}" -R "${REPO}" --json url --jq .url)"
+        echo "Waiting on ${LABEL} run: ${run_url}"
+
+        # Poll to conclusion or timeout. A run queued behind another (acceptance suites often cap
+        # concurrency to one) stays non-'completed' until it starts, which the timeout covers.
+        # Convert minutes → whole seconds via awk so a fractional input (e.g. 0.5) doesn't break
+        # Bash integer arithmetic; floor to a 1s minimum.
+        timeout_seconds="$(awk -v m="${TIMEOUT_MINUTES}" 'BEGIN { s = m * 60; if (s < 1) s = 1; printf "%d", s }')"
+        deadline=$(( $(date +%s) + timeout_seconds ))
+        while :; do
+          read -r status conclusion < <(gh run view "${run_id}" -R "${REPO}" \
+            --json status,conclusion --jq '"\(.status) \(.conclusion)"')
+          if [ "${status}" = "completed" ]; then
+            if [ "${conclusion}" = "success" ]; then
+              echo "${LABEL} passed: ${run_url}"
+              break
+            fi
+            echo "::error::${LABEL} failed (${conclusion}): ${run_url}"
+            exit 1
+          fi
+          if [ "$(date +%s)" -ge "${deadline}" ]; then
+            echo "::error::${LABEL} timed out after ${TIMEOUT_MINUTES}m (still '${status}'): ${run_url}"
+            exit 1
+          fi
+          sleep 15
+        done

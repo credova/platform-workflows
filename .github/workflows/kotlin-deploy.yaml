@@ -373,87 +373,14 @@ jobs:
       actions: write
       contents: read
     steps:
-      - name: Dispatch staging-validation workflow and wait
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
-          WORKFLOW: ${{ inputs.staging-validation-workflow }}
-          REF: ${{ inputs.staging-validation-ref != '' && inputs.staging-validation-ref || github.ref_name }}
-          INPUTS_JSON: ${{ inputs.staging-validation-inputs }}
-          TIMEOUT_MINUTES: ${{ inputs.staging-validation-timeout-minutes }}
-        run: |
-          set -euo pipefail
-
-          # gh workflow run does not return a run id, so record the newest existing run id for this
-          # workflow+branch first, dispatch, then poll for a run newer than that. The deploy
-          # concurrency group serialises deploys, so at most one dispatch is in flight per commit.
-          before="$(gh run list -R "${REPO}" --workflow "${WORKFLOW}" --branch "${REF}" \
-            --event workflow_dispatch --json databaseId --jq 'map(.databaseId) | max // 0')"
-
-          # Turn the JSON inputs object into repeated `--raw-field key=value` args (empty = none).
-          field_args=()
-          if [ -n "${INPUTS_JSON}" ]; then
-            while IFS= read -r kv; do field_args+=(--raw-field "$kv"); done < <(
-              printf '%s' "${INPUTS_JSON}" | jq -r 'to_entries[] | "\(.key)=\(.value)"'
-            )
-          fi
-
-          # Log only that inputs were provided, never their values — this is a generic workflow and
-          # a caller's inputs may carry sensitive identifiers, and workflow logs are retained.
-          if [ -n "${INPUTS_JSON}" ]; then in_note="with caller-provided inputs"; else in_note="no inputs"; fi
-          echo "Dispatching ${WORKFLOW} on ${REF} (${in_note})"
-          gh workflow run "${WORKFLOW}" -R "${REPO}" --ref "${REF}" "${field_args[@]}"
-
-          # Wait (up to ~2 min) for the dispatched run to register, then track it by the greatest
-          # databaseId newer than the pre-dispatch max for this workflow+branch.
-          #
-          # Accepted limitation (CodeRabbit, PR #31): this correlates by "newest new run", not by a
-          # per-dispatch token, so a *concurrent* workflow_dispatch of the SAME workflow on the SAME
-          # ref within this window could be tracked instead. In practice the window is closed:
-          # deploys are serialised by the top-level concurrency group, and the 6h schedule is a
-          # `schedule` event (excluded by --event workflow_dispatch). The residual case is a human
-          # manually dispatching this same workflow on the deploy branch mid-deploy. A fully-correct
-          # fix (inject a correlation id + match on run-name) would change the consumer contract, so
-          # it is deferred pending Platform-team input.
-          run_id=""
-          for _ in $(seq 1 24); do
-            run_id="$(gh run list -R "${REPO}" --workflow "${WORKFLOW}" --branch "${REF}" \
-              --event workflow_dispatch --json databaseId \
-              --jq "map(.databaseId) | map(select(. > ${before})) | max // empty")"
-            [ -n "${run_id}" ] && break
-            sleep 5
-          done
-          if [ -z "${run_id}" ]; then
-            echo "::error::staging-validation workflow '${WORKFLOW}' did not start on ${REF} (no run newer than ${before})"
-            exit 1
-          fi
-          run_url="$(gh run view "${run_id}" -R "${REPO}" --json url --jq .url)"
-          echo "Waiting on staging-validation run: ${run_url}"
-
-          # Poll to conclusion or timeout. A run queued behind another (acceptance suites often cap
-          # concurrency to one) stays non-'completed' until it starts, which the timeout covers.
-          # Convert minutes → whole seconds via awk so a fractional input (e.g. 0.5) doesn't break
-          # Bash integer arithmetic; floor to a 1s minimum.
-          timeout_seconds="$(awk -v m="${TIMEOUT_MINUTES}" 'BEGIN { s = m * 60; if (s < 1) s = 1; printf "%d", s }')"
-          deadline=$(( $(date +%s) + timeout_seconds ))
-          while :; do
-            read -r status conclusion < <(gh run view "${run_id}" -R "${REPO}" \
-              --json status,conclusion --jq '"\(.status) \(.conclusion)"')
-            if [ "${status}" = "completed" ]; then
-              if [ "${conclusion}" = "success" ]; then
-                echo "staging-validation passed: ${run_url}"
-                break
-              fi
-              echo "::error::staging-validation failed (${conclusion}): ${run_url}"
-              exit 1
-            fi
-            if [ "$(date +%s)" -ge "${deadline}" ]; then
-              echo "::error::staging-validation timed out after ${TIMEOUT_MINUTES}m (still '${status}'): ${run_url}"
-              exit 1
-            fi
-            sleep 15
-          done
+      - uses: credova/platform-workflows/actions/dispatch-and-wait@master
+        with:
+          workflow: ${{ inputs.staging-validation-workflow }}
+          ref: ${{ inputs.staging-validation-ref != '' && inputs.staging-validation-ref || github.ref_name }}
+          inputs-json: ${{ inputs.staging-validation-inputs }}
+          timeout-minutes: ${{ inputs.staging-validation-timeout-minutes }}
+          label: staging-validation
+          token: ${{ github.token }}
 
   # --- Canary flow ---
   approve-canary:
@@ -588,85 +515,14 @@ jobs:
       actions: write
       contents: read
     steps:
-      - name: Dispatch production-validation workflow and wait
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
-          WORKFLOW: ${{ inputs.production-validation-workflow }}
-          REF: ${{ inputs.production-validation-ref != '' && inputs.production-validation-ref || github.ref_name }}
-          INPUTS_JSON: ${{ inputs.production-validation-inputs }}
-          TIMEOUT_MINUTES: ${{ inputs.production-validation-timeout-minutes }}
-        run: |
-          set -euo pipefail
-
-          # gh workflow run does not return a run id, so record the newest existing run id for this
-          # workflow+branch first, dispatch, then poll for a run newer than that. The deploy
-          # concurrency group serialises deploys, so at most one dispatch is in flight per commit.
-          before="$(gh run list -R "${REPO}" --workflow "${WORKFLOW}" --branch "${REF}" \
-            --event workflow_dispatch --json databaseId --jq 'map(.databaseId) | max // 0')"
-
-          # Turn the JSON inputs object into repeated `--raw-field key=value` args (empty = none).
-          field_args=()
-          if [ -n "${INPUTS_JSON}" ]; then
-            while IFS= read -r kv; do field_args+=(--raw-field "$kv"); done < <(
-              printf '%s' "${INPUTS_JSON}" | jq -r 'to_entries[] | "\(.key)=\(.value)"'
-            )
-          fi
-
-          # Log only that inputs were provided, never their values — this is a generic workflow and
-          # a caller's inputs may carry sensitive identifiers, and workflow logs are retained.
-          if [ -n "${INPUTS_JSON}" ]; then in_note="with caller-provided inputs"; else in_note="no inputs"; fi
-          echo "Dispatching ${WORKFLOW} on ${REF} (${in_note})"
-          gh workflow run "${WORKFLOW}" -R "${REPO}" --ref "${REF}" "${field_args[@]}"
-
-          # Wait (up to ~2 min) for the dispatched run to register, then track it by the greatest
-          # databaseId newer than the pre-dispatch max for this workflow+branch.
-          #
-          # Accepted limitation (CodeRabbit, PR #31): this correlates by "newest new run", not by a
-          # per-dispatch token, so a *concurrent* workflow_dispatch of the SAME workflow on the SAME
-          # ref within this window could be tracked instead. In practice the window is closed:
-          # deploys are serialised by the top-level concurrency group, and the 6h schedule is a
-          # `schedule` event (excluded by --event workflow_dispatch). The residual case is a human
-          # manually dispatching this same workflow on the deploy branch mid-deploy. A fully-correct
-          # fix (inject a correlation id + match on run-name) would change the consumer contract, so
-          # it is deferred pending Platform-team input.
-          run_id=""
-          for _ in $(seq 1 24); do
-            run_id="$(gh run list -R "${REPO}" --workflow "${WORKFLOW}" --branch "${REF}" \
-              --event workflow_dispatch --json databaseId \
-              --jq "map(.databaseId) | map(select(. > ${before})) | max // empty")"
-            [ -n "${run_id}" ] && break
-            sleep 5
-          done
-          if [ -z "${run_id}" ]; then
-            echo "::error::production-validation workflow '${WORKFLOW}' did not start on ${REF} (no run newer than ${before})"
-            exit 1
-          fi
-          run_url="$(gh run view "${run_id}" -R "${REPO}" --json url --jq .url)"
-          echo "Waiting on production-validation run: ${run_url}"
-
-          # Poll to conclusion or timeout. Convert minutes → whole seconds via awk so a fractional
-          # input (e.g. 0.5) doesn't break Bash integer arithmetic; floor to a 1s minimum.
-          timeout_seconds="$(awk -v m="${TIMEOUT_MINUTES}" 'BEGIN { s = m * 60; if (s < 1) s = 1; printf "%d", s }')"
-          deadline=$(( $(date +%s) + timeout_seconds ))
-          while :; do
-            read -r status conclusion < <(gh run view "${run_id}" -R "${REPO}" \
-              --json status,conclusion --jq '"\(.status) \(.conclusion)"')
-            if [ "${status}" = "completed" ]; then
-              if [ "${conclusion}" = "success" ]; then
-                echo "production-validation passed: ${run_url}"
-                break
-              fi
-              echo "::error::production-validation failed (${conclusion}): ${run_url}"
-              exit 1
-            fi
-            if [ "$(date +%s)" -ge "${deadline}" ]; then
-              echo "::error::production-validation timed out after ${TIMEOUT_MINUTES}m (still '${status}'): ${run_url}"
-              exit 1
-            fi
-            sleep 15
-          done
+      - uses: credova/platform-workflows/actions/dispatch-and-wait@master
+        with:
+          workflow: ${{ inputs.production-validation-workflow }}
+          ref: ${{ inputs.production-validation-ref != '' && inputs.production-validation-ref || github.ref_name }}
+          inputs-json: ${{ inputs.production-validation-inputs }}
+          timeout-minutes: ${{ inputs.production-validation-timeout-minutes }}
+          label: production-validation
+          token: ${{ github.token }}
 
   # --- Release ---
   release:
