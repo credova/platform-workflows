@@ -7,6 +7,9 @@ on:
 permissions:
   contents: write
   id-token: write
+  # Add `actions: write` ONLY if you use either validation gate below (staging or production) — both
+  # dispatch and read a workflow run in this repo.
+  # actions: write
 jobs:
   deploy:
     uses: credova/platform-workflows/.github/workflows/kotlin-deploy.yaml@master
@@ -14,3 +17,18 @@ jobs:
     with:
       container: true
       release: true
+
+      # --- Optional: validation gates ---
+      # Run a workflow_dispatch workflow in THIS repo as a post-deploy check. The dispatched workflow
+      # owns all its own setup (runtime, browsers, credentials); requires `actions: write` above.
+      # Leave unset to disable (default).
+      #   staging: runs after the staging deploy and BEFORE the production approval — a failure skips
+      #            promotion and fails the pipeline (a real gate).
+      #   production: runs AFTER the production deploy — a failure skips the release and reds the
+      #               pipeline (does not roll back).
+      # staging-validation-workflow: acceptance-tests.yaml
+      # staging-validation-inputs: '{"environment":"staging","suite":"smoke"}'
+      # staging-validation-timeout-minutes: 20
+      # production-validation-workflow: acceptance-tests.yaml
+      # production-validation-inputs: '{"environment":"production","suite":"smoke"}'
+      # production-validation-timeout-minutes: 20
