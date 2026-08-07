@@ -177,6 +177,46 @@ jobs:
       publish-npm: true
 ```
 
+#### Publishing with Bun instead of npm
+
+Packages publish with npm by default. Repos that have switched to Bun can opt
+in per-repo with the `package-manager` input — no other changes needed:
+
+```yaml
+jobs:
+  release:
+    uses: credova/platform-workflows/.github/workflows/shared-release.yaml@master
+    secrets: inherit
+    with:
+      mode: semantic
+      publish-npm: true
+      package-manager: bun   # default: npm
+      bun-version: latest    # optional, default: latest
+```
+
+Auth differs between the two:
+
+- **npm** (default): authenticates via OIDC trusted publishing — no token
+  needed, but the package must have this repo configured as a
+  [trusted publisher](https://docs.npmjs.com/trusted-publishers) on npmjs.com.
+- **bun**: Bun does not support OIDC trusted publishing, so the workflow needs
+  an `NPM_TOKEN` secret (npm automation token). `secrets: inherit` passes it
+  through automatically if it exists at the org/repo level; otherwise pass it
+  explicitly:
+
+  ```yaml
+      secrets:
+        NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+  ```
+
+  The release job fails fast with a clear error if `package-manager: bun` is
+  set without the token.
+
+To swap an existing repo from npm to bun: set `package-manager: bun`, ensure
+`NPM_TOKEN` is available, done. Version bumping and publishing switch to
+`bun pm pkg set version` / `bun publish`; tags, releases, and dist-tags
+(`edge` / `latest`) behave identically. Swapping back is deleting the input.
+
 ### Dependabot auto-merge
 
 For repos using Dependabot, wire up `dependabot-auto-merge.yaml` to merge patch and minor version updates after CI passes.
