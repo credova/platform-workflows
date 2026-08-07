@@ -99,6 +99,18 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Validate bun publish config
+        if: inputs.publish-npm && inputs.package-manager == 'bun'
+        shell: bash
+        env:
+          NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          # Fail before any tag/release side effects, not mid-publish.
+          if [[ -z "${NPM_CONFIG_TOKEN}" ]]; then
+            echo "::error::package-manager: bun requires the NPM_TOKEN secret (bun cannot use OIDC trusted publishing)"
+            exit 1
+          fi
+
       - name: Compute edge version
         id: version
         shell: bash
@@ -174,10 +186,6 @@ jobs:
           NPM_DIRS: ${{ inputs.npm-package-dir }}
           VERSION: ${{ steps.version.outputs.version }}
         run: |
-          if [[ "${PKG_MGR}" == "bun" && -z "${NPM_CONFIG_TOKEN}" ]]; then
-            echo "::error::package-manager: bun requires the NPM_TOKEN secret (bun cannot use OIDC trusted publishing)"
-            exit 1
-          fi
           if [[ "${PKG_MGR}" == "npm" ]]; then
             # OIDC trusted publishing needs npm >= 11.5.1; Node 20 bundles npm 10
             npm install -g npm@latest
@@ -236,6 +244,18 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Validate bun publish config
+        if: inputs.publish-npm && inputs.package-manager == 'bun'
+        shell: bash
+        env:
+          NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          # Fail before any tag/release side effects, not mid-publish.
+          if [[ -z "${NPM_CONFIG_TOKEN}" ]]; then
+            echo "::error::package-manager: bun requires the NPM_TOKEN secret (bun cannot use OIDC trusted publishing)"
+            exit 1
+          fi
+
       - name: Extract version from tag
         id: version
         shell: bash
@@ -293,10 +313,6 @@ jobs:
           NPM_DIRS: ${{ inputs.npm-package-dir }}
           VERSION: ${{ steps.version.outputs.version }}
         run: |
-          if [[ "${PKG_MGR}" == "bun" && -z "${NPM_CONFIG_TOKEN}" ]]; then
-            echo "::error::package-manager: bun requires the NPM_TOKEN secret (bun cannot use OIDC trusted publishing)"
-            exit 1
-          fi
           if [[ "${PKG_MGR}" == "npm" ]]; then
             # OIDC trusted publishing needs npm >= 11.5.1; Node 20 bundles npm 10
             npm install -g npm@latest
@@ -352,6 +368,18 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
+
+      - name: Validate bun publish config
+        if: inputs.publish-npm && inputs.package-manager == 'bun'
+        shell: bash
+        env:
+          NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          # Fail before any tag/release side effects, not mid-publish.
+          if [[ -z "${NPM_CONFIG_TOKEN}" ]]; then
+            echo "::error::package-manager: bun requires the NPM_TOKEN secret (bun cannot use OIDC trusted publishing)"
+            exit 1
+          fi
 
       - name: Determine version bump
         id: bump
@@ -452,10 +480,6 @@ jobs:
           PREFIX: ${{ inputs.tag-prefix }}
         run: |
           VERSION="${VERSION#${PREFIX}}"
-          if [[ "${PKG_MGR}" == "bun" && -z "${NPM_CONFIG_TOKEN}" ]]; then
-            echo "::error::package-manager: bun requires the NPM_TOKEN secret (bun cannot use OIDC trusted publishing)"
-            exit 1
-          fi
           if [[ "${PKG_MGR}" == "npm" ]]; then
             # OIDC trusted publishing needs npm >= 11.5.1; Node 20 bundles npm 10
             npm install -g npm@latest
@@ -518,6 +542,18 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
+
+      - name: Validate bun publish config
+        if: inputs.publish-npm && inputs.package-manager == 'bun'
+        shell: bash
+        env:
+          NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          # Fail before any tag/release side effects, not mid-publish.
+          if [[ -z "${NPM_CONFIG_TOKEN}" ]]; then
+            echo "::error::package-manager: bun requires the NPM_TOKEN secret (bun cannot use OIDC trusted publishing)"
+            exit 1
+          fi
 
       - name: Resolve tag
         id: tag
@@ -596,10 +632,6 @@ jobs:
           PREFIX: ${{ inputs.tag-prefix }}
         run: |
           VERSION="${VERSION#${PREFIX}}"
-          if [[ "${PKG_MGR}" == "bun" && -z "${NPM_CONFIG_TOKEN}" ]]; then
-            echo "::error::package-manager: bun requires the NPM_TOKEN secret (bun cannot use OIDC trusted publishing)"
-            exit 1
-          fi
           if [[ "${PKG_MGR}" == "npm" ]]; then
             # OIDC trusted publishing needs npm >= 11.5.1; Node 20 bundles npm 10
             npm install -g npm@latest

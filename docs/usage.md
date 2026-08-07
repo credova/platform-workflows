@@ -197,8 +197,26 @@ jobs:
 Auth differs between the two:
 
 - **npm** (default): authenticates via OIDC trusted publishing — no token
-  needed, but the package must have this repo configured as a
-  [trusted publisher](https://docs.npmjs.com/trusted-publishers) on npmjs.com.
+  needed, but two things must be in place in the **calling repo**:
+
+  1. The caller job must grant the OIDC permission (plus the write scopes the
+     shared workflow needs):
+
+     ```yaml
+     jobs:
+       release:
+         permissions:
+           contents: write
+           id-token: write
+           packages: write
+         uses: credova/platform-workflows/.github/workflows/shared-release.yaml@master
+     ```
+
+  2. Each published package must be configured on npmjs.com with the calling
+     repo and its workflow filename (e.g. `credova/your-sdk` +
+     `release.yaml`) as a
+     [trusted publisher](https://docs.npmjs.com/trusted-publishers). npm
+     matches the top-level caller workflow, not this shared one.
 - **bun**: Bun does not support OIDC trusted publishing, so the workflow needs
   an `NPM_TOKEN` secret (npm automation token). `secrets: inherit` passes it
   through automatically if it exists at the org/repo level; otherwise pass it
