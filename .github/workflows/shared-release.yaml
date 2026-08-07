@@ -48,10 +48,12 @@ on:
 
       # Language versions (for package publish steps)
       node-version:
-        description: Node.js version (for npm publish)
+        description: >-
+          Node.js version (for npm publish). npm trusted publishing requires
+          Node >= 22.14.0; older versions are rejected at publish time.
         type: string
         required: false
-        default: "20"
+        default: "24"
       package-manager:
         description: "JS package manager for publishing: npm (default) or bun"
         type: string
@@ -167,7 +169,7 @@ jobs:
 
       - name: Setup Node.js
         if: inputs.publish-npm && inputs.package-manager == 'npm'
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ inputs.node-version }}
 
@@ -187,7 +189,15 @@ jobs:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
           if [[ "${PKG_MGR}" == "npm" ]]; then
-            # OIDC trusted publishing needs npm >= 11.5.1; Node 20 bundles npm 10
+            # OIDC trusted publishing needs Node >= 22.14.0 and npm >= 11.5.1
+            # (https://docs.npmjs.com/trusted-publishers). Reject incompatible
+            # node-version overrides instead of failing with an opaque 401.
+            NODE_VER="$(node --version)"; NODE_VER="${NODE_VER#v}"
+            IFS='.' read -r NODE_MAJOR NODE_MINOR _ <<< "${NODE_VER}"
+            if (( NODE_MAJOR < 22 || (NODE_MAJOR == 22 && NODE_MINOR < 14) )); then
+              echo "::error::node-version ${NODE_VER} is below 22.14.0, the minimum for npm trusted publishing"
+              exit 1
+            fi
             npm install -g npm@latest
           fi
 
@@ -208,7 +218,7 @@ jobs:
 
       - name: Setup .NET
         if: inputs.publish-nuget
-        uses: actions/setup-dotnet@v5
+        uses: actions/setup-dotnet@v6
         with:
           dotnet-version: ${{ inputs.dotnet-version }}
 
@@ -294,7 +304,7 @@ jobs:
 
       - name: Setup Node.js
         if: inputs.publish-npm && inputs.package-manager == 'npm'
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ inputs.node-version }}
 
@@ -314,7 +324,15 @@ jobs:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
           if [[ "${PKG_MGR}" == "npm" ]]; then
-            # OIDC trusted publishing needs npm >= 11.5.1; Node 20 bundles npm 10
+            # OIDC trusted publishing needs Node >= 22.14.0 and npm >= 11.5.1
+            # (https://docs.npmjs.com/trusted-publishers). Reject incompatible
+            # node-version overrides instead of failing with an opaque 401.
+            NODE_VER="$(node --version)"; NODE_VER="${NODE_VER#v}"
+            IFS='.' read -r NODE_MAJOR NODE_MINOR _ <<< "${NODE_VER}"
+            if (( NODE_MAJOR < 22 || (NODE_MAJOR == 22 && NODE_MINOR < 14) )); then
+              echo "::error::node-version ${NODE_VER} is below 22.14.0, the minimum for npm trusted publishing"
+              exit 1
+            fi
             npm install -g npm@latest
           fi
 
@@ -335,7 +353,7 @@ jobs:
 
       - name: Setup .NET
         if: inputs.publish-nuget
-        uses: actions/setup-dotnet@v5
+        uses: actions/setup-dotnet@v6
         with:
           dotnet-version: ${{ inputs.dotnet-version }}
 
@@ -459,7 +477,7 @@ jobs:
 
       - name: Setup Node.js
         if: steps.bump.outputs.has-changes == 'true' && inputs.publish-npm && inputs.package-manager == 'npm'
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ inputs.node-version }}
 
@@ -481,7 +499,15 @@ jobs:
         run: |
           VERSION="${VERSION#${PREFIX}}"
           if [[ "${PKG_MGR}" == "npm" ]]; then
-            # OIDC trusted publishing needs npm >= 11.5.1; Node 20 bundles npm 10
+            # OIDC trusted publishing needs Node >= 22.14.0 and npm >= 11.5.1
+            # (https://docs.npmjs.com/trusted-publishers). Reject incompatible
+            # node-version overrides instead of failing with an opaque 401.
+            NODE_VER="$(node --version)"; NODE_VER="${NODE_VER#v}"
+            IFS='.' read -r NODE_MAJOR NODE_MINOR _ <<< "${NODE_VER}"
+            if (( NODE_MAJOR < 22 || (NODE_MAJOR == 22 && NODE_MINOR < 14) )); then
+              echo "::error::node-version ${NODE_VER} is below 22.14.0, the minimum for npm trusted publishing"
+              exit 1
+            fi
             npm install -g npm@latest
           fi
 
@@ -502,7 +528,7 @@ jobs:
 
       - name: Setup .NET
         if: steps.bump.outputs.has-changes == 'true' && inputs.publish-nuget
-        uses: actions/setup-dotnet@v5
+        uses: actions/setup-dotnet@v6
         with:
           dotnet-version: ${{ inputs.dotnet-version }}
 
@@ -611,7 +637,7 @@ jobs:
 
       - name: Setup Node.js
         if: inputs.publish-npm && inputs.package-manager == 'npm'
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ inputs.node-version }}
 
@@ -633,7 +659,15 @@ jobs:
         run: |
           VERSION="${VERSION#${PREFIX}}"
           if [[ "${PKG_MGR}" == "npm" ]]; then
-            # OIDC trusted publishing needs npm >= 11.5.1; Node 20 bundles npm 10
+            # OIDC trusted publishing needs Node >= 22.14.0 and npm >= 11.5.1
+            # (https://docs.npmjs.com/trusted-publishers). Reject incompatible
+            # node-version overrides instead of failing with an opaque 401.
+            NODE_VER="$(node --version)"; NODE_VER="${NODE_VER#v}"
+            IFS='.' read -r NODE_MAJOR NODE_MINOR _ <<< "${NODE_VER}"
+            if (( NODE_MAJOR < 22 || (NODE_MAJOR == 22 && NODE_MINOR < 14) )); then
+              echo "::error::node-version ${NODE_VER} is below 22.14.0, the minimum for npm trusted publishing"
+              exit 1
+            fi
             npm install -g npm@latest
           fi
 
@@ -654,7 +688,7 @@ jobs:
 
       - name: Setup .NET
         if: inputs.publish-nuget
-        uses: actions/setup-dotnet@v5
+        uses: actions/setup-dotnet@v6
         with:
           dotnet-version: ${{ inputs.dotnet-version }}
 
