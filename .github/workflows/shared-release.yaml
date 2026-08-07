@@ -48,10 +48,22 @@ on:
 
       # Language versions (for package publish steps)
       node-version:
-        description: Node.js version (for npm publish)
+        description: >-
+          Node.js version (for npm publish). npm trusted publishing requires
+          Node >= 22.14.0; older versions are rejected at publish time.
         type: string
         required: false
-        default: "20"
+        default: "24"
+      package-manager:
+        description: "JS package manager for publishing: npm (default) or bun"
+        type: string
+        required: false
+        default: npm
+      bun-version:
+        description: Bun version (when package-manager is bun)
+        type: string
+        required: false
+        default: latest
       dotnet-version:
         description: .NET version (for NuGet publish)
         type: string
@@ -64,6 +76,14 @@ on:
         type: string
         required: false
         default: warp-ubuntu-2404-x64-2x
+
+    secrets:
+      NPM_TOKEN:
+        description: >-
+          npm automation token. Required when package-manager is bun (bun has
+          no OIDC trusted publishing); unused for npm, which authenticates via
+          OIDC.
+        required: false
 
 jobs:
   # ============================================================
@@ -80,6 +100,18 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
+
+      - name: Validate bun publish config
+        if: inputs.publish-npm && inputs.package-manager == 'bun'
+        shell: bash
+        env:
+          NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          # Fail before any tag/release side effects, not mid-publish.
+          if [[ -z "${NPM_CONFIG_TOKEN}" ]]; then
+            echo "::error::package-manager: bun requires the NPM_TOKEN secret (bun cannot use OIDC trusted publishing)"
+            exit 1
+          fi
 
       - name: Compute edge version
         id: version
@@ -136,33 +168,57 @@ jobs:
             --prerelease
 
       - name: Setup Node.js
-        if: inputs.publish-npm
-        uses: actions/setup-node@v6
+        if: inputs.publish-npm && inputs.package-manager == 'npm'
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ inputs.node-version }}
-          registry-url: https://registry.npmjs.org
+
+      - name: Setup Bun
+        if: inputs.publish-npm && inputs.package-manager == 'bun'
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ inputs.bun-version }}
 
       - name: Publish npm packages (edge)
         if: inputs.publish-npm
         shell: bash
         env:
-          NODE_AUTH_TOKEN: ${{ github.token }}
+          PKG_MGR: ${{ inputs.package-manager }}
+          NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_DIRS: ${{ inputs.npm-package-dir }}
           VERSION: ${{ steps.version.outputs.version }}
         run: |
+          if [[ "${PKG_MGR}" == "npm" ]]; then
+            # OIDC trusted publishing needs Node >= 22.14.0 and npm >= 11.5.1
+            # (https://docs.npmjs.com/trusted-publishers). Reject incompatible
+            # node-version overrides instead of failing with an opaque 401.
+            NODE_VER="$(node --version)"; NODE_VER="${NODE_VER#v}"
+            IFS='.' read -r NODE_MAJOR NODE_MINOR _ <<< "${NODE_VER}"
+            if (( NODE_MAJOR < 22 || (NODE_MAJOR == 22 && NODE_MINOR < 14) )); then
+              echo "::error::node-version ${NODE_VER} is below 22.14.0, the minimum for npm trusted publishing"
+              exit 1
+            fi
+            npm install -g npm@latest
+          fi
+
           IFS=',' read -ra DIRS <<< "${NPM_DIRS}"
           for dir in "${DIRS[@]}"; do
             dir=$(echo "${dir}" | xargs)
             echo "Publishing ${dir} as edge..."
             cd "${dir}"
-            npm version "${VERSION}" --no-git-tag-version --allow-same-version 2>/dev/null || true
-            npm publish --tag edge --provenance --access public
+            if [[ "${PKG_MGR}" == "bun" ]]; then
+              bun pm pkg set version="${VERSION}"
+              bun publish --tag edge --access public
+            else
+              npm version "${VERSION}" --no-git-tag-version --allow-same-version 2>/dev/null || true
+              npm publish --tag edge --provenance --access public
+            fi
             cd -
           done
 
       - name: Setup .NET
         if: inputs.publish-nuget
-        uses: actions/setup-dotnet@v5
+        uses: actions/setup-dotnet@v6
         with:
           dotnet-version: ${{ inputs.dotnet-version }}
 
@@ -185,7 +241,9 @@ jobs:
   # EDGE MODE: Tag push -> full release
   # ============================================================
   edge-full-release:
-    if: inputs.mode == 'edge' && startsWith(github.ref, 'refs/tags/')
+    # Prerelease tags (-edge.N etc.) never get a full release; the '-' guard
+    # keeps a manually pushed prerelease tag from publishing as stable.
+    if: inputs.mode == 'edge' && startsWith(github.ref, 'refs/tags/') && !contains(github.ref_name, '-')
     runs-on: ${{ inputs.runner }}
     permissions:
       contents: write
@@ -195,6 +253,18 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
+
+      - name: Validate bun publish config
+        if: inputs.publish-npm && inputs.package-manager == 'bun'
+        shell: bash
+        env:
+          NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          # Fail before any tag/release side effects, not mid-publish.
+          if [[ -z "${NPM_CONFIG_TOKEN}" ]]; then
+            echo "::error::package-manager: bun requires the NPM_TOKEN secret (bun cannot use OIDC trusted publishing)"
+            exit 1
+          fi
 
       - name: Extract version from tag
         id: version
@@ -233,33 +303,57 @@ jobs:
           done
 
       - name: Setup Node.js
-        if: inputs.publish-npm
-        uses: actions/setup-node@v6
+        if: inputs.publish-npm && inputs.package-manager == 'npm'
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ inputs.node-version }}
-          registry-url: https://registry.npmjs.org
+
+      - name: Setup Bun
+        if: inputs.publish-npm && inputs.package-manager == 'bun'
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ inputs.bun-version }}
 
       - name: Publish npm packages (latest)
         if: inputs.publish-npm
         shell: bash
         env:
-          NODE_AUTH_TOKEN: ${{ github.token }}
+          PKG_MGR: ${{ inputs.package-manager }}
+          NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_DIRS: ${{ inputs.npm-package-dir }}
           VERSION: ${{ steps.version.outputs.version }}
         run: |
+          if [[ "${PKG_MGR}" == "npm" ]]; then
+            # OIDC trusted publishing needs Node >= 22.14.0 and npm >= 11.5.1
+            # (https://docs.npmjs.com/trusted-publishers). Reject incompatible
+            # node-version overrides instead of failing with an opaque 401.
+            NODE_VER="$(node --version)"; NODE_VER="${NODE_VER#v}"
+            IFS='.' read -r NODE_MAJOR NODE_MINOR _ <<< "${NODE_VER}"
+            if (( NODE_MAJOR < 22 || (NODE_MAJOR == 22 && NODE_MINOR < 14) )); then
+              echo "::error::node-version ${NODE_VER} is below 22.14.0, the minimum for npm trusted publishing"
+              exit 1
+            fi
+            npm install -g npm@latest
+          fi
+
           IFS=',' read -ra DIRS <<< "${NPM_DIRS}"
           for dir in "${DIRS[@]}"; do
             dir=$(echo "${dir}" | xargs)
             echo "Publishing ${dir} as latest..."
             cd "${dir}"
-            npm version "${VERSION}" --no-git-tag-version --allow-same-version 2>/dev/null || true
-            npm publish --provenance --access public
+            if [[ "${PKG_MGR}" == "bun" ]]; then
+              bun pm pkg set version="${VERSION}"
+              bun publish --access public
+            else
+              npm version "${VERSION}" --no-git-tag-version --allow-same-version 2>/dev/null || true
+              npm publish --provenance --access public
+            fi
             cd -
           done
 
       - name: Setup .NET
         if: inputs.publish-nuget
-        uses: actions/setup-dotnet@v5
+        uses: actions/setup-dotnet@v6
         with:
           dotnet-version: ${{ inputs.dotnet-version }}
 
@@ -292,6 +386,18 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
+
+      - name: Validate bun publish config
+        if: inputs.publish-npm && inputs.package-manager == 'bun'
+        shell: bash
+        env:
+          NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          # Fail before any tag/release side effects, not mid-publish.
+          if [[ -z "${NPM_CONFIG_TOKEN}" ]]; then
+            echo "::error::package-manager: bun requires the NPM_TOKEN secret (bun cannot use OIDC trusted publishing)"
+            exit 1
+          fi
 
       - name: Determine version bump
         id: bump
@@ -370,35 +476,59 @@ jobs:
           done
 
       - name: Setup Node.js
-        if: steps.bump.outputs.has-changes == 'true' && inputs.publish-npm
-        uses: actions/setup-node@v6
+        if: steps.bump.outputs.has-changes == 'true' && inputs.publish-npm && inputs.package-manager == 'npm'
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ inputs.node-version }}
-          registry-url: https://registry.npmjs.org
+
+      - name: Setup Bun
+        if: steps.bump.outputs.has-changes == 'true' && inputs.publish-npm && inputs.package-manager == 'bun'
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ inputs.bun-version }}
 
       - name: Publish npm packages
         if: steps.bump.outputs.has-changes == 'true' && inputs.publish-npm
         shell: bash
         env:
-          NODE_AUTH_TOKEN: ${{ github.token }}
+          PKG_MGR: ${{ inputs.package-manager }}
+          NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_DIRS: ${{ inputs.npm-package-dir }}
           VERSION: ${{ steps.version.outputs.tag }}
           PREFIX: ${{ inputs.tag-prefix }}
         run: |
           VERSION="${VERSION#${PREFIX}}"
+          if [[ "${PKG_MGR}" == "npm" ]]; then
+            # OIDC trusted publishing needs Node >= 22.14.0 and npm >= 11.5.1
+            # (https://docs.npmjs.com/trusted-publishers). Reject incompatible
+            # node-version overrides instead of failing with an opaque 401.
+            NODE_VER="$(node --version)"; NODE_VER="${NODE_VER#v}"
+            IFS='.' read -r NODE_MAJOR NODE_MINOR _ <<< "${NODE_VER}"
+            if (( NODE_MAJOR < 22 || (NODE_MAJOR == 22 && NODE_MINOR < 14) )); then
+              echo "::error::node-version ${NODE_VER} is below 22.14.0, the minimum for npm trusted publishing"
+              exit 1
+            fi
+            npm install -g npm@latest
+          fi
+
           IFS=',' read -ra DIRS <<< "${NPM_DIRS}"
           for dir in "${DIRS[@]}"; do
             dir=$(echo "${dir}" | xargs)
             echo "Publishing ${dir}..."
             cd "${dir}"
-            npm version "${VERSION}" --no-git-tag-version --allow-same-version 2>/dev/null || true
-            npm publish --provenance --access public
+            if [[ "${PKG_MGR}" == "bun" ]]; then
+              bun pm pkg set version="${VERSION}"
+              bun publish --access public
+            else
+              npm version "${VERSION}" --no-git-tag-version --allow-same-version 2>/dev/null || true
+              npm publish --provenance --access public
+            fi
             cd -
           done
 
       - name: Setup .NET
         if: steps.bump.outputs.has-changes == 'true' && inputs.publish-nuget
-        uses: actions/setup-dotnet@v5
+        uses: actions/setup-dotnet@v6
         with:
           dotnet-version: ${{ inputs.dotnet-version }}
 
@@ -425,7 +555,10 @@ jobs:
   # Manual dispatch OR a pushed vX.Y.Z tag. Dispatch computes the next tag;
   # tag-push uses the pushed tag directly. Works for any mode.
   manual-release:
-    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')
+    # Tag pushes in edge mode are handled by edge-full-release; running here
+    # too would double-create the release and double-publish packages.
+    # Prerelease tags ('-' in the name) never release as stable.
+    if: github.event_name == 'workflow_dispatch' || (inputs.mode != 'edge' && startsWith(github.ref, 'refs/tags/') && !contains(github.ref_name, '-'))
     runs-on: ${{ inputs.runner }}
     permissions:
       contents: write
@@ -435,6 +568,18 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
+
+      - name: Validate bun publish config
+        if: inputs.publish-npm && inputs.package-manager == 'bun'
+        shell: bash
+        env:
+          NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          # Fail before any tag/release side effects, not mid-publish.
+          if [[ -z "${NPM_CONFIG_TOKEN}" ]]; then
+            echo "::error::package-manager: bun requires the NPM_TOKEN secret (bun cannot use OIDC trusted publishing)"
+            exit 1
+          fi
 
       - name: Resolve tag
         id: tag
@@ -491,35 +636,59 @@ jobs:
           done
 
       - name: Setup Node.js
-        if: inputs.publish-npm
-        uses: actions/setup-node@v6
+        if: inputs.publish-npm && inputs.package-manager == 'npm'
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ inputs.node-version }}
-          registry-url: https://registry.npmjs.org
+
+      - name: Setup Bun
+        if: inputs.publish-npm && inputs.package-manager == 'bun'
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ inputs.bun-version }}
 
       - name: Publish npm packages
         if: inputs.publish-npm
         shell: bash
         env:
-          NODE_AUTH_TOKEN: ${{ github.token }}
+          PKG_MGR: ${{ inputs.package-manager }}
+          NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_DIRS: ${{ inputs.npm-package-dir }}
           VERSION: ${{ steps.final.outputs.tag }}
           PREFIX: ${{ inputs.tag-prefix }}
         run: |
           VERSION="${VERSION#${PREFIX}}"
+          if [[ "${PKG_MGR}" == "npm" ]]; then
+            # OIDC trusted publishing needs Node >= 22.14.0 and npm >= 11.5.1
+            # (https://docs.npmjs.com/trusted-publishers). Reject incompatible
+            # node-version overrides instead of failing with an opaque 401.
+            NODE_VER="$(node --version)"; NODE_VER="${NODE_VER#v}"
+            IFS='.' read -r NODE_MAJOR NODE_MINOR _ <<< "${NODE_VER}"
+            if (( NODE_MAJOR < 22 || (NODE_MAJOR == 22 && NODE_MINOR < 14) )); then
+              echo "::error::node-version ${NODE_VER} is below 22.14.0, the minimum for npm trusted publishing"
+              exit 1
+            fi
+            npm install -g npm@latest
+          fi
+
           IFS=',' read -ra DIRS <<< "${NPM_DIRS}"
           for dir in "${DIRS[@]}"; do
             dir=$(echo "${dir}" | xargs)
             echo "Publishing ${dir}..."
             cd "${dir}"
-            npm version "${VERSION}" --no-git-tag-version --allow-same-version 2>/dev/null || true
-            npm publish --provenance --access public
+            if [[ "${PKG_MGR}" == "bun" ]]; then
+              bun pm pkg set version="${VERSION}"
+              bun publish --access public
+            else
+              npm version "${VERSION}" --no-git-tag-version --allow-same-version 2>/dev/null || true
+              npm publish --provenance --access public
+            fi
             cd -
           done
 
       - name: Setup .NET
         if: inputs.publish-nuget
-        uses: actions/setup-dotnet@v5
+        uses: actions/setup-dotnet@v6
         with:
           dotnet-version: ${{ inputs.dotnet-version }}
 

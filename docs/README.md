@@ -27,7 +27,7 @@
 
 ## Shared Workflows
 
-- **[shared-release.yaml](../.github/workflows/shared-release.yaml)**: reusable release workflow. Supports edge/semantic modes, npm publish, and version bumping.
+- **[shared-release.yaml](../.github/workflows/shared-release.yaml)**: reusable release workflow. Supports edge/semantic modes, npm publish (via npm or Bun, see `package-manager` input), and version bumping.
 - **[dependabot-auto-merge.yaml](../.github/workflows/dependabot-auto-merge.yaml)**: auto-merge Dependabot PRs for patch/minor updates.
 
 ## Actions
