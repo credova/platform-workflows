@@ -83,6 +83,28 @@ on:
         required: false
         default: false
 
+      # Concurrency (opt-in; empty group => unique-per-run => no cross-run serialization)
+      staging-concurrency-group:
+        description: "Concurrency group for the staging deploy. Empty = unique per run (no cross-run serialization)."
+        type: string
+        required: false
+        default: ""
+      staging-cancel-in-progress:
+        description: Cancel an in-progress staging deploy when a newer run joins the same group.
+        type: boolean
+        required: false
+        default: false
+      production-concurrency-group:
+        description: "Concurrency group for the canary and production deploys. Empty = unique per run (no cross-run serialization)."
+        type: string
+        required: false
+        default: ""
+      production-cancel-in-progress:
+        description: Cancel an in-progress production deploy when a newer run joins the same group.
+        type: boolean
+        required: false
+        default: false
+
       # Release
       release:
         description: Create a GitHub Release after successful production deploy
@@ -159,8 +181,13 @@ jobs:
     outputs:
       image-matrix: ${{ steps.parse.outputs.image-matrix }}
       deploy-tag: ${{ steps.tag.outputs.deploy-tag }}
+      protected-ref: ${{ steps.protected-ref.outputs.protected-ref }}
     steps:
       - uses: actions/checkout@v7
+
+      - name: Check protected ref
+        id: protected-ref
+        uses: credova/platform-workflows/actions/protected-ref@master
 
       - name: Validate inputs
         shell: bash
@@ -261,6 +288,9 @@ jobs:
     if: inputs.deploy && !inputs.hotfix && always() && !failure() && !cancelled()
     needs: [build-scan-push, test, validate]
     runs-on: ${{ inputs.runner }}
+    concurrency:
+      group: ${{ inputs.staging-concurrency-group != '' && inputs.staging-concurrency-group || github.run_id }}
+      cancel-in-progress: ${{ inputs.staging-cancel-in-progress }}
     environment: staging
     steps:
       - uses: actions/checkout@v7
@@ -285,17 +315,24 @@ jobs:
 
   # --- Canary flow ---
   approve-canary:
-    if: inputs.deploy && inputs.canary > 0 && always() && !failure() && !cancelled()
-    needs: [deploy-staging, build-scan-push]
+    if: >-
+      inputs.deploy && inputs.canary > 0 && always() && !failure() && !cancelled() &&
+      needs.validate.outputs.protected-ref == 'true'
+    needs: [deploy-staging, build-scan-push, validate]
     runs-on: ${{ inputs.runner }}
     environment: production-canary
     steps:
       - run: echo "Canary deployment approved"
 
   deploy-canary:
-    if: inputs.deploy && inputs.canary > 0
+    if: >-
+      inputs.deploy && inputs.canary > 0 &&
+      needs.validate.outputs.protected-ref == 'true'
     needs: [approve-canary, validate]
     runs-on: ${{ inputs.runner }}
+    concurrency:
+      group: ${{ inputs.production-concurrency-group != '' && inputs.production-concurrency-group || github.run_id }}
+      cancel-in-progress: ${{ inputs.production-cancel-in-progress }}
     steps:
       - uses: actions/checkout@v7
       - name: Generate release download token
@@ -320,8 +357,10 @@ jobs:
 
   # --- Production approval ---
   approve-production:
-    if: inputs.deploy && inputs.require-approval && always() && !failure() && !cancelled()
-    needs: [build-scan-push, deploy-staging, deploy-canary]
+    if: >-
+      inputs.deploy && inputs.require-approval && always() && !failure() && !cancelled() &&
+      needs.validate.outputs.protected-ref == 'true'
+    needs: [build-scan-push, deploy-staging, deploy-canary, validate]
     runs-on: ${{ inputs.runner }}
     environment: production
     steps:
@@ -329,7 +368,9 @@ jobs:
 
   # --- Retag images for production ---
   retag-production:
-    if: inputs.container && inputs.deploy && always() && !failure() && !cancelled()
+    if: >-
+      inputs.container && inputs.deploy && always() && !failure() && !cancelled() &&
+      needs.validate.outputs.protected-ref == 'true'
     needs: [approve-production, validate]
     runs-on: ${{ inputs.runner }}
     strategy:
@@ -351,9 +392,14 @@ jobs:
 
   # --- Deploy production ---
   deploy-production:
-    if: inputs.deploy && always() && !failure() && !cancelled()
+    if: >-
+      inputs.deploy && always() && !failure() && !cancelled() &&
+      needs.validate.outputs.protected-ref == 'true'
     needs: [approve-production, retag-production, validate]
     runs-on: ${{ inputs.runner }}
+    concurrency:
+      group: ${{ inputs.production-concurrency-group != '' && inputs.production-concurrency-group || github.run_id }}
+      cancel-in-progress: ${{ inputs.production-cancel-in-progress }}
     steps:
       - uses: actions/checkout@v7
 
@@ -405,7 +451,9 @@ jobs:
 
   # --- Release ---
   release:
-    if: inputs.release && always() && !failure() && !cancelled()
+    if: >-
+      inputs.release && always() && !failure() && !cancelled() &&
+      needs.validate.outputs.protected-ref == 'true'
     needs: [deploy-production, validate]
     runs-on: ${{ inputs.runner }}
     steps:

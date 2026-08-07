@@ -1,0 +1,26 @@
+name: protected-ref
+description: >
+  Report whether the triggering ref is a protected ref: the repository default
+  branch or a tag. Callers gate production-path jobs on the output.
+
+outputs:
+  protected-ref:
+    description: "'true' when github.ref is the default branch or github.ref_type is a tag, else 'false'"
+    value: ${{ steps.check.outputs.protected-ref }}
+
+runs:
+  using: composite
+  steps:
+    - name: Check ref
+      id: check
+      shell: bash
+      env:
+        REF: ${{ github.ref }}
+        REF_TYPE: ${{ github.ref_type }}
+        DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+      run: |
+        if [ "${REF}" = "refs/heads/${DEFAULT_BRANCH}" ] || [ "${REF_TYPE}" = "tag" ]; then
+          echo "protected-ref=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "protected-ref=false" >> "$GITHUB_OUTPUT"
+        fi
