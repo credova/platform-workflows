@@ -437,7 +437,10 @@ jobs:
 
   # --- Release ---
   release:
-    if: inputs.release && always() && !failure() && !cancelled()
+    if: >-
+      inputs.release && always() && !failure() && !cancelled() &&
+      ( github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+        || github.ref_type == 'tag' )
     needs: [deploy-production, validate]
     runs-on: ${{ inputs.runner }}
     steps:
