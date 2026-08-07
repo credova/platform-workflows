@@ -115,6 +115,15 @@ jobs:
           PREV_TAG=$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=version:refname \
             | awk -v t="${TAG}" '$0 == t {exit} {p=$0} END {print p}')
 
+          # A release may already exist when the tag was created through the
+          # GitHub UI (which creates the release AND pushes the tag, triggering
+          # this workflow). In that case delete it - keeping the tag, which we
+          # already force-moved to the pinned-refs commit - and recreate it so
+          # the notes are the delta from PREV_TAG and it targets the pinned tag.
+          if gh release view "${TAG}" >/dev/null 2>&1; then
+            gh release delete "${TAG}" --yes
+          fi
+
           if [[ -n "${PREV_TAG}" ]]; then
             gh release create "${TAG}" \
               --title "${TAG}" \
