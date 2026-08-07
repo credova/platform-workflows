@@ -181,8 +181,13 @@ jobs:
     outputs:
       image-matrix: ${{ steps.parse.outputs.image-matrix }}
       deploy-tag: ${{ steps.tag.outputs.deploy-tag }}
+      protected-ref: ${{ steps.protected-ref.outputs.protected-ref }}
     steps:
       - uses: actions/checkout@v7
+
+      - name: Check protected ref
+        id: protected-ref
+        uses: credova/platform-workflows/actions/protected-ref@master
 
       - name: Validate inputs
         shell: bash
@@ -312,9 +317,8 @@ jobs:
   approve-canary:
     if: >-
       inputs.deploy && inputs.canary > 0 && always() && !failure() && !cancelled() &&
-      ( github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
-        || github.ref_type == 'tag' )
-    needs: [deploy-staging, build-scan-push]
+      needs.validate.outputs.protected-ref == 'true'
+    needs: [deploy-staging, build-scan-push, validate]
     runs-on: ${{ inputs.runner }}
     environment: production-canary
     steps:
@@ -323,8 +327,7 @@ jobs:
   deploy-canary:
     if: >-
       inputs.deploy && inputs.canary > 0 &&
-      ( github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
-        || github.ref_type == 'tag' )
+      needs.validate.outputs.protected-ref == 'true'
     needs: [approve-canary, validate]
     runs-on: ${{ inputs.runner }}
     concurrency:
@@ -356,9 +359,8 @@ jobs:
   approve-production:
     if: >-
       inputs.deploy && inputs.require-approval && always() && !failure() && !cancelled() &&
-      ( github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
-        || github.ref_type == 'tag' )
-    needs: [build-scan-push, deploy-staging, deploy-canary]
+      needs.validate.outputs.protected-ref == 'true'
+    needs: [build-scan-push, deploy-staging, deploy-canary, validate]
     runs-on: ${{ inputs.runner }}
     environment: production
     steps:
@@ -368,8 +370,7 @@ jobs:
   retag-production:
     if: >-
       inputs.container && inputs.deploy && always() && !failure() && !cancelled() &&
-      ( github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
-        || github.ref_type == 'tag' )
+      needs.validate.outputs.protected-ref == 'true'
     needs: [approve-production, validate]
     runs-on: ${{ inputs.runner }}
     strategy:
@@ -393,8 +394,7 @@ jobs:
   deploy-production:
     if: >-
       inputs.deploy && always() && !failure() && !cancelled() &&
-      ( github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
-        || github.ref_type == 'tag' )
+      needs.validate.outputs.protected-ref == 'true'
     needs: [approve-production, retag-production, validate]
     runs-on: ${{ inputs.runner }}
     concurrency:
@@ -453,8 +453,7 @@ jobs:
   release:
     if: >-
       inputs.release && always() && !failure() && !cancelled() &&
-      ( github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
-        || github.ref_type == 'tag' )
+      needs.validate.outputs.protected-ref == 'true'
     needs: [deploy-production, validate]
     runs-on: ${{ inputs.runner }}
     steps:
