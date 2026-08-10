@@ -1,10 +1,15 @@
 name: "IaC: Pull Request"
 
-# Shared pull-request workflow for Pulumi/IaC repos (platform-iac, github-meta,
-# product-iac): lint (mise) + reeve (preview/apply) + compliance (Shortcut
-# ticket). Reeve is event + comment driven; callers carry the
-# pull_request / pull_request_review / issue_comment triggers (and any path
-# filters) and pass these inputs.
+# Shared pull-request workflow for IaC repos (platform-iac, github-meta,
+# product-iac on Pulumi; square_root on Terraform): lint (mise) + reeve
+# (preview/apply) + compliance (Shortcut ticket). Reeve is event + comment
+# driven; callers carry the pull_request / pull_request_review /
+# issue_comment triggers (and any path filters) and pass these inputs.
+#
+# Engine selection follows the caller's .reeve engine config. Terraform
+# repos set `terraform: true` (the terraform version is read from
+# engine.binary.version in .reeve/terraform.yaml — the reeve action does
+# not install terraform itself); Pulumi repos leave it false.
 on:
   workflow_call:
     inputs:
@@ -45,6 +50,43 @@ on:
           Newline-separated list of pulumi resource plugin NAMES to pre-install
           (e.g. "cloudflare\ngcp"). Set per-repo downstream. Versions are read
           from the caller's go.mod, never hardcoded here. Empty = none.
+        type: string
+        required: false
+        default: ""
+
+      # Terraform engines (reeve engine.type terraform/tofu)
+      terraform:
+        description: >
+          Install terraform before reeve, pinned to engine.binary.version
+          from the caller's .reeve/terraform.yaml. Also suppresses the
+          pulumi install.
+        type: boolean
+        required: false
+        default: false
+
+      tailscale:
+        description: >
+          Join the tailnet (tag:githubactions) before reeve, for providers
+          that reach private endpoints. Uses the caller's
+          TAILSCALE_OAUTH_CLIENT_ID/SECRET secrets.
+        type: boolean
+        required: false
+        default: false
+
+      env-vars:
+        description: >
+          Newline-separated NAME=VALUE pairs exported into the reeve job
+          environment (engine subprocesses inherit them), e.g. TF_VAR_*
+          plumbing that isn't secret.
+        type: string
+        required: false
+        default: ""
+
+      env-secrets:
+        description: >
+          Newline-separated ENV_NAME=SECRET_NAME pairs exported into the
+          reeve job environment from the caller's secrets (requires
+          `secrets: inherit`), e.g. TF_VAR_foo=FOO_SECRET.
         type: string
         required: false
         default: ""
@@ -236,22 +278,99 @@ jobs:
             pulumi plugin install resource "${plugin}" "${ver}"
           done <<< "${PREWARM_PLUGINS}"
 
+      # Opt-in per caller (default off): providers that reach private
+      # endpoints (e.g. GKE internal) need the runner on the tailnet. Kill
+      # by dropping `tailscale: true` from the caller.
+      - name: Connect to Tailscale
+        if: inputs.tailscale
+        uses: tailscale/github-action@v2
+        with:
+          oauth-client-id: ${{ secrets.TAILSCALE_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TAILSCALE_OAUTH_CLIENT_SECRET }}
+          tags: tag:githubactions
+
+      # The reeve action never installs terraform; pin to the version the
+      # engine config declares so config and runtime cannot drift.
+      - name: Read terraform version from engine config
+        if: inputs.terraform
+        id: tf-version
+        shell: bash
+        run: |
+          version=$(yq '.engine.binary.version // ""' .reeve/terraform.yaml)
+          if [ -z "${version}" ]; then
+            echo "::error::engine.binary.version is not set in .reeve/terraform.yaml" >&2
+            exit 1
+          fi
+          echo "version=${version}" >> "${GITHUB_OUTPUT}"
+
+      - name: Setup Terraform
+        if: inputs.terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ steps.tf-version.outputs.version }}
+          # The wrapper shim breaks programmatic callers that parse stdout.
+          terraform_wrapper: false
+
+      - name: Export environment variables
+        if: inputs.env-vars != '' || inputs.env-secrets != ''
+        shell: bash
+        env:
+          SECRETS_CONTEXT: ${{ toJson(secrets) }}
+          ENV_VARS: ${{ inputs.env-vars }}
+          ENV_SECRETS: ${{ inputs.env-secrets }}
+        run: |
+          # NAME=VALUE pairs, exported verbatim.
+          while IFS= read -r line; do
+            line="$(echo "${line}" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+            [ -z "${line}" ] && continue
+            echo "${line}" >> "${GITHUB_ENV}"
+          done <<< "${ENV_VARS}"
+          # ENV_NAME=SECRET_NAME pairs, resolved from the caller's secrets.
+          # Heredoc form with a random delimiter so multiline values
+          # (PEM keys) survive; GitHub keeps masking them in logs.
+          while IFS= read -r line; do
+            line="$(echo "${line}" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+            [ -z "${line}" ] && continue
+            name="${line%%=*}"
+            secret="${line#*=}"
+            value=$(jq -r --arg k "${secret}" '.[$k] // empty' <<< "${SECRETS_CONTEXT}")
+            if [ -z "${value}" ]; then
+              echo "::error::secret ${secret} (for ${name}) is empty or missing — pass \`secrets: inherit\` and check the name" >&2
+              exit 1
+            fi
+            delim="EOF_$(od -An -N8 -tx1 /dev/urandom | tr -d ' \n')"
+            {
+              echo "${name}<<${delim}"
+              echo "${value}"
+              echo "${delim}"
+            } >> "${GITHUB_ENV}"
+          done <<< "${ENV_SECRETS}"
+
       # reeve needs a token with org Members: read (CODEOWNERS team expansion)
-      # plus repo scopes — the iac-token GH App.
+      # plus repo scopes — the iac-token GH App. The app is installed
+      # enterprise-wide; mint against the calling repo's org so the token can
+      # comment on its PRs.
       - name: Generate reeve token
         id: reeve-token
         uses: actions/create-github-app-token@v3
         with:
           client-id: ${{ secrets.IAC_TOKEN_APP_ID }}
           private-key: ${{ secrets.IAC_TOKEN_APP_PRIVATE_KEY }}
-          owner: credova
+          owner: ${{ github.repository_owner }}
+          # Least privilege: reeve only touches the calling repo. Org
+          # Members: read (CODEOWNERS team expansion) is an installation-level
+          # org permission, unaffected by this repo restriction.
+          repositories: ${{ github.event.repository.name }}
 
       - name: Reeve
-        uses: reeveops/reeve@v0.3.0
+        uses: reeveops/reeve@v0.4.0
         with:
           # When pre-warmed we already installed pulumi; leave blank so reeve
-          # doesn't reinstall. Otherwise let reeve install latest.
-          pulumi-version: ${{ inputs.prewarm && '' || 'latest' }}
+          # doesn't reinstall. Same for terraform engines, which never need
+          # pulumi. Otherwise let reeve install latest. The literal must sit
+          # on the && side: `x && '' || 'latest'` always yields 'latest'
+          # because '' is falsy in expression evaluation.
+          pulumi-version: ${{ !(inputs.prewarm || inputs.terraform) && 'latest' || '' }}
           github-token: ${{ steps.reeve-token.outputs.token }}
           gcp-workload-identity-provider: ${{ inputs.gcp-workload-identity-provider }}
           gcp-service-account: ${{ inputs.gcp-service-account }}
