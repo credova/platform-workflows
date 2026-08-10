@@ -33,7 +33,7 @@ CMD_ARGS+=("--service" "${SERVICE}")
 [ -n "${ROLLBACK_URL}" ] && CMD_ARGS+=("--rollback-url" "${ROLLBACK_URL}")
 [ -n "${ROLLBACK_REVISION}" ] && CMD_ARGS+=("--rollback-revision" "${ROLLBACK_REVISION}")
 
-CMD_ARGS+=("--output-json")
+CMD_ARGS+=("--json")
 
 echo "Running: ${CMD_ARGS[*]}"
 OUTPUT=$("${CMD_ARGS[@]}" 2>&1) || { echo "${OUTPUT}"; exit 1; }
