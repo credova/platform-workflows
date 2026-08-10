@@ -357,14 +357,20 @@ jobs:
           client-id: ${{ secrets.IAC_TOKEN_APP_ID }}
           private-key: ${{ secrets.IAC_TOKEN_APP_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
+          # Least privilege: reeve only touches the calling repo. Org
+          # Members: read (CODEOWNERS team expansion) is an installation-level
+          # org permission, unaffected by this repo restriction.
+          repositories: ${{ github.event.repository.name }}
 
       - name: Reeve
         uses: reeveops/reeve@v0.4.0
         with:
           # When pre-warmed we already installed pulumi; leave blank so reeve
           # doesn't reinstall. Same for terraform engines, which never need
-          # pulumi. Otherwise let reeve install latest.
-          pulumi-version: ${{ (inputs.prewarm || inputs.terraform) && '' || 'latest' }}
+          # pulumi. Otherwise let reeve install latest. The literal must sit
+          # on the && side: `x && '' || 'latest'` always yields 'latest'
+          # because '' is falsy in expression evaluation.
+          pulumi-version: ${{ !(inputs.prewarm || inputs.terraform) && 'latest' || '' }}
           github-token: ${{ steps.reeve-token.outputs.token }}
           gcp-workload-identity-provider: ${{ inputs.gcp-workload-identity-provider }}
           gcp-service-account: ${{ inputs.gcp-service-account }}
