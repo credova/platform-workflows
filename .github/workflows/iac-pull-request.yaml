@@ -333,7 +333,9 @@ jobs:
             [ -z "${line}" ] && continue
             name="${line%%=*}"
             secret="${line#*=}"
-            value=$(jq -r --arg k "${secret}" '.[$k] // empty' <<< "${SECRETS_CONTEXT}")
+            # Case-insensitive: `secrets.foo` expression lookups ignore case,
+            # but toJson(secrets) keys carry the stored casing.
+            value=$(jq -r --arg k "${secret}" '[to_entries[] | select(.key | ascii_upcase == ($k | ascii_upcase)) | .value][0] // empty' <<< "${SECRETS_CONTEXT}")
             if [ -z "${value}" ]; then
               echo "::error::secret ${secret} (for ${name}) is empty or missing — pass \`secrets: inherit\` and check the name" >&2
               exit 1
