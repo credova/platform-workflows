@@ -71,9 +71,16 @@ runs:
         echo "  code:     ${{ inputs.code }}"
         echo "  severity: ${{ inputs.severity }}"
 
+    # Install only the tools this phase actually uses. grant is skipped for the
+    # image phase (licenses is false / target is docker:<ref>) so a transient
+    # download failure on a tool we never invoke can't fail the job.
     - name: Install Anchore tools
       if: inputs.packages == 'true' || inputs.licenses == 'true'
       shell: bash
+      env:
+        INSTALL_SYFT: "true"
+        INSTALL_GRYPE: ${{ inputs.packages == 'true' }}
+        INSTALL_GRANT: ${{ inputs.licenses == 'true' && inputs.target == 'dir:.' }}
       run: ${{ github.action_path }}/../../scripts/install-anchore.sh
 
     # Hour-keyed cache for the grype vulnerability DB. grype-scan.sh still runs
