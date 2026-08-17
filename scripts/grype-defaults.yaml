@@ -1,0 +1,24 @@
+# Shared grype defaults applied to every scan (source + image) by grype-scan.sh.
+#
+# A repo-local `.grype.yaml` is merged on top of this file (its `ignore` rules are
+# appended, scalars it sets win), so individual repos can still add their own rules
+# without losing these org-wide defaults.
+#
+# Keep suppressions narrow: scope every ignore to a specific vulnerability + package so a
+# genuine, differently-identified CVE still fails the gate. This is a security control —
+# additions need security-owner sign-off.
+ignore:
+  # syft catalogs the Adoptium Temurin JDK/JRE as a generic `openjdk` package carrying an
+  # `cpe:2.3:a:oracle:openjdk:*` CPE. grype's stock (CPE) matcher then pulls in Oracle
+  # Java SE advisories that do not apply to Temurin — they report a Java 8 fix version
+  # (e.g. "Fixed In 1.8.0_5xx") against a Temurin 21 runtime. Disabling CPE matching would
+  # have to be done at the broad `match.stock` level (unsafe for all binary packages), so
+  # these are scoped, per-CVE ignores on the `openjdk` package instead. A real, correctly
+  # identified openjdk CVE (different ID) still fails the gate.
+  # Revisit when the base image advances past the affected build or the CPE is corrected.
+  - vulnerability: CVE-2026-41254
+    package:
+      name: openjdk
+  - vulnerability: CVE-2026-47063
+    package:
+      name: openjdk

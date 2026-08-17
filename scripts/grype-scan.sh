@@ -18,9 +18,35 @@ SEVERITY_LOWER=$(echo "${SEVERITY}" | tr '[:upper:]' '[:lower:]')
 
 GRYPE_ARGS=(sbom.spdx.json --output json --file "${RESULTS_FILE}" --fail-on "${SEVERITY_LOWER}" --only-fixed)
 
-if [ -f .grype.yaml ]; then
-  GRYPE_ARGS+=(--config .grype.yaml)
-  echo "Using .grype.yaml config"
+# Resolve the effective grype config. We ship org-wide defaults next to this script
+# (grype-defaults.yaml, e.g. narrowly-scoped false-positive suppressions that every repo
+# should inherit) and still honor a repo-local .grype.yaml. When both exist, merge them so
+# a repo can add its own rules without losing the org defaults; grype only accepts a single
+# --config, so we deep-merge into a temp file (repo scalars win, ignore lists concatenate).
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DEFAULT_CONFIG="${SCRIPT_DIR}/grype-defaults.yaml"
+EFFECTIVE_CONFIG=""
+
+if [ -f .grype.yaml ] && [ -f "${DEFAULT_CONFIG}" ]; then
+  if command -v yq &>/dev/null; then
+    EFFECTIVE_CONFIG="$(mktemp)"
+    # `*+` = deep-merge with array concatenation; ireduce folds the two docs into one.
+    yq eval-all '. as $item ireduce ({}; . *+ $item)' "${DEFAULT_CONFIG}" .grype.yaml >"${EFFECTIVE_CONFIG}"
+    echo "Merged org grype defaults with repo-local .grype.yaml"
+  else
+    echo "::warning::yq not found; using repo-local .grype.yaml only (org grype defaults not applied)"
+    EFFECTIVE_CONFIG=".grype.yaml"
+  fi
+elif [ -f .grype.yaml ]; then
+  EFFECTIVE_CONFIG=".grype.yaml"
+  echo "Using repo-local .grype.yaml config"
+elif [ -f "${DEFAULT_CONFIG}" ]; then
+  EFFECTIVE_CONFIG="${DEFAULT_CONFIG}"
+  echo "Using org grype defaults (${DEFAULT_CONFIG})"
+fi
+
+if [ -n "${EFFECTIVE_CONFIG}" ]; then
+  GRYPE_ARGS+=(--config "${EFFECTIVE_CONFIG}")
 fi
 
 echo "::group::Grype vulnerability scan (fail-on: ${SEVERITY})"
