@@ -365,7 +365,7 @@ jobs:
           repositories: ${{ github.event.repository.name }}
 
       - name: Reeve
-        uses: reeveops/reeve@v0.4.0
+        uses: reeveops/reeve@v0.5.0
         with:
           # When pre-warmed we already installed pulumi; leave blank so reeve
           # doesn't reinstall. Same for terraform engines, which never need
