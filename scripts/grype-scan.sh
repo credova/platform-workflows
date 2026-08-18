@@ -29,9 +29,7 @@ EFFECTIVE_CONFIG=""
 
 if [ -f .grype.yaml ] && [ -f "${DEFAULT_CONFIG}" ]; then
   if command -v yq &>/dev/null; then
-    # Must end in .yaml -- grype infers the config format from the extension and
-    # rejects the extensionless paths bare mktemp produces. (--suffix is GNU-only,
-    # so append instead; the redirect below creates the file.)
+    # Must end in .yaml -- grype infers the config format from the file extension.
     EFFECTIVE_CONFIG="$(mktemp).yaml"
     # `*+` = deep-merge with array concatenation; ireduce folds the two docs into one.
     yq eval-all '. as $item ireduce ({}; . *+ $item)' "${DEFAULT_CONFIG}" .grype.yaml >"${EFFECTIVE_CONFIG}"
