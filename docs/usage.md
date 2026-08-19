@@ -745,7 +745,7 @@ When `cache: true`, built-in caches from `actions/setup-go` and `actions/setup-n
 
 ### deploy.yaml
 
-Shares the build/runtime inputs from pull-request.yaml (`language`, `language-version`, `test-command`, `container`, `image`, `images`, `platform`, `warpbuild-profile`, `cache`, `runner`, `security-severity`) plus:
+Shares the build/runtime inputs from pull-request.yaml (`language`, `language-version`, `test-command`, `container`, `image`, `images`, `platform`, `project-id`, `warpbuild-profile`, `cache`, `runner`, `security-severity`) plus:
 
 | Input                                   | Type    | Default        | Description                                                      |
 |-----------------------------------------| ------- | -------------- | ---------------------------------------------------------------- |
