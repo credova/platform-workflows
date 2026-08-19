@@ -207,7 +207,18 @@ jobs:
           # scp form -> token-auth https. GOPRIVATE keeps go off the proxy.
           git config --global url."https://x-access-token:${TOKEN}@github.com/".insteadOf "git@github.com:"
           git config --global --add url."https://x-access-token:${TOKEN}@github.com/".insteadOf "https://github.com/"
-          echo "GOPRIVATE=github.com/credova/*" >> "${GITHUB_ENV}"
+          # --global covers this job's own steps (prewarm's go build). The
+          # engine subprocess gets a temp $HOME and never reads ~/.gitconfig,
+          # so it needs the same rewrite as env, passed through by the
+          # caller's env_passthrough auth provider.
+          {
+            echo "GOPRIVATE=github.com/credova/*"
+            echo "GIT_CONFIG_COUNT=2"
+            echo "GIT_CONFIG_KEY_0=url.https://x-access-token:${TOKEN}@github.com/.insteadOf"
+            echo "GIT_CONFIG_VALUE_0=https://github.com/"
+            echo "GIT_CONFIG_KEY_1=url.https://x-access-token:${TOKEN}@github.com/.insteadOf"
+            echo "GIT_CONFIG_VALUE_1=git@github.com:"
+          } >> "${GITHUB_ENV}"
         env:
           TOKEN: ${{ steps.modules-token.outputs.token }}
 
@@ -221,6 +232,16 @@ jobs:
           # archive is ~924MB and restored at ~13MB/s (~75s), and the 10GB
           # repo cap LRU-evicts it often, forcing cold ~110s rebuilds.
           cache: false
+
+      # After Setup Go so `go env` resolves; the engine subprocess gets a temp
+      # $HOME and would otherwise default these inside it, missing the cache.
+      - name: Export Go cache paths
+        if: inputs.prewarm
+        run: |
+          {
+            echo "GOMODCACHE=$(go env GOMODCACHE)"
+            echo "GOCACHE=$(go env GOCACHE)"
+          } >> "${GITHUB_ENV}"
 
       # Go module + build caches on WarpBuild's backend: a drop-in for
       # actions/cache@v4, but unmetered and high-throughput on warp runners
@@ -365,7 +386,7 @@ jobs:
           repositories: ${{ github.event.repository.name }}
 
       - name: Reeve
-        uses: reeveops/reeve@v0.5.0
+        uses: reeveops/reeve@v0.6.0
         with:
           # When pre-warmed we already installed pulumi; leave blank so reeve
           # doesn't reinstall. Same for terraform engines, which never need
