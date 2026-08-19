@@ -733,7 +733,7 @@ When `cache: true`, built-in caches from `actions/setup-go` and `actions/setup-n
 | `image`             | string  | `""`                  | Single image `name:dockerfile`     |
 | `images`            | string  | `""`                  | Multi-image YAML list              |
 | `platform`          | string  | `linux/amd64`         | Target platform for builds         |
-| `project-id`        | string  | `""`                  | GCP project ID for the image path  |
+| `project-id`        | string  | `fxt-ops-shd`         | GCP project ID for the image path  |
 | `warpbuild-profile` | string  | `""`                  | WarpBuild Docker Builder profile   |
 | `cache`             | boolean | `false`               | WarpBuild dependency caching       |
 | `runner`            | string  | see WarpBuild section | GitHub Actions runner label        |

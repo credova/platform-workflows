@@ -54,7 +54,7 @@ on:
         description: "GCP project ID for the image registry path (no push/auth on PRs)"
         type: string
         required: false
-        default: ""
+        default: fxt-ops-shd
 
       # Run ordering
       run-order:
