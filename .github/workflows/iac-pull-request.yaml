@@ -209,16 +209,9 @@ jobs:
           git config --global --add url."https://x-access-token:${TOKEN}@github.com/".insteadOf "https://github.com/"
           # --global covers this job's own steps (prewarm's go build). The
           # engine subprocess gets a temp $HOME and never reads ~/.gitconfig,
-          # so it needs the same rewrite as env, passed through by the
-          # caller's env_passthrough auth provider.
-          {
-            echo "GOPRIVATE=github.com/credova/*"
-            echo "GIT_CONFIG_COUNT=2"
-            echo "GIT_CONFIG_KEY_0=url.https://x-access-token:${TOKEN}@github.com/.insteadOf"
-            echo "GIT_CONFIG_VALUE_0=https://github.com/"
-            echo "GIT_CONFIG_KEY_1=url.https://x-access-token:${TOKEN}@github.com/.insteadOf"
-            echo "GIT_CONFIG_VALUE_1=git@github.com:"
-          } >> "${GITHUB_ENV}"
+          # so it needs the same rewrite as env -- set on the reeve step only,
+          # not GITHUB_ENV, to keep the token out of later steps.
+          echo "GOPRIVATE=github.com/credova/*" >> "${GITHUB_ENV}"
         env:
           TOKEN: ${{ steps.modules-token.outputs.token }}
 
@@ -401,6 +394,16 @@ jobs:
           log-level: ${{ inputs.reeve-log-level }}
         env:
           DASH0_TOKEN: ${{ secrets.DASH0_TOKEN }}
+          # Private-module git rewrite for the engine subprocess, forwarded by
+          # the caller's env_passthrough auth provider. Scoped to this step so
+          # the token never lands in GITHUB_ENV.
+          # Only when prewarm minted a token; without it the rewrite would
+          # point github.com at a credential-less URL and break all fetches.
+          GIT_CONFIG_COUNT: ${{ inputs.prewarm && '2' || '0' }}
+          GIT_CONFIG_KEY_0: "url.https://x-access-token:${{ steps.modules-token.outputs.token }}@github.com/.insteadOf"
+          GIT_CONFIG_VALUE_0: "https://github.com/"
+          GIT_CONFIG_KEY_1: "url.https://x-access-token:${{ steps.modules-token.outputs.token }}@github.com/.insteadOf"
+          GIT_CONFIG_VALUE_1: "git@github.com:"
 
   compliance:
     needs: [lint, reeve]
