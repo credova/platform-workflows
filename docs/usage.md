@@ -989,7 +989,7 @@ flowchart TD
 | `staging-validation-workflow` (default: `""`)    | **validate-staging** gate runs (dispatches a caller workflow after staging; a failure blocks promotion) |
 | `production-validation-workflow` (default: `""`) | **validate-production** runs after the production deploy; a failure skips the release and reds the pipeline |
 | `notifications` (default: `true`)                | Slack notifications in **deploy-production**                          |
-| `container-reuse` (default: `true`)              | **build-scan-push** skips build if image already exists for this SHA  |
+| `container-reuse` (default: `true`)              | **build-scan-push** skips the build and the push if an image already exists for this SHA. The scan still runs on the existing image |
 
 ### Deploy (hotfix)
 
@@ -1106,6 +1106,8 @@ flowchart TD
     REUSE["Check for existing image\n<i>docker manifest inspect</i>"]
     EXISTS{"image exists?"}
 
+    PULL["Pull image for scan\n<i>skipped if already local</i>"]
+
     WARP_CHECK{"warpbuild-profile\nset?"}
     WARP_SETUP["Configure WarpBuild\nDocker Builder"]
     WARP_BUILD["Build image\n<i>WarpBuild</i>"]
@@ -1116,6 +1118,7 @@ flowchart TD
     STD_BUILD["Build image\n<i>standard buildx</i>"]
 
     SCAN["Scan container image\n<i>via security action</i>"]
+    PUSH_CHECK{"push enabled\n& image is new?"}
     PUSH["Tag and push image"]
 
     OUT(["outputs: image, digest, reused"])
@@ -1127,16 +1130,23 @@ flowchart TD
 
     REUSE_CHECK -->|yes| REUSE --> EXISTS
     REUSE_CHECK -->|no| WARP_CHECK
-    EXISTS -->|yes| OUT
+    EXISTS -->|yes| PULL
     EXISTS -->|no| WARP_CHECK
 
-    WARP_CHECK -->|yes| WARP_SETUP --> WARP_BUILD --> SCAN
+    WARP_CHECK -->|yes| WARP_SETUP --> WARP_BUILD --> PULL
     WARP_CHECK -->|no| BUILDX --> QEMU
-    QEMU -->|yes| QEMU_SETUP --> STD_BUILD --> SCAN
+    QEMU -->|yes| QEMU_SETUP --> STD_BUILD
     QEMU -->|no| STD_BUILD
 
-    SCAN --> PUSH --> OUT
+    STD_BUILD --> PULL --> SCAN --> PUSH_CHECK
+
+    PUSH_CHECK -->|yes| PUSH --> OUT
+    PUSH_CHECK -->|no| OUT
 ```
+
+A reuse hit skips the build and the push. It does not skip the scan. Known
+vulnerabilities change even when the image does not, so the action pulls the existing
+image and scans it. The `scan: false` input turns the scan off.
 
 ### security action
 
