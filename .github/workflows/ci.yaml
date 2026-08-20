@@ -33,6 +33,10 @@ jobs:
 
           echo "All YAML files pass lint."
 
+      - name: Run script tests
+        shell: bash
+        run: ./scripts/tests/run.sh
+
       - name: Validate action.yaml files
         shell: bash
         run: |

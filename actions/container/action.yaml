@@ -1,7 +1,8 @@
 name: container
 description: >
   Full container lifecycle - build, scan, push, tag, reuse, retag.
-  Self-contained: calls auth-gcp internally. Calls security (container scan) automatically after build.
+  Self-contained: calls auth-gcp internally. Calls security (container scan) for
+  a new image and for a reused image.
 
 inputs:
   name:
@@ -28,7 +29,9 @@ inputs:
     required: false
     default: "false"
   reuse:
-    description: Check if image exists first, skip build if so
+    description: >
+      Check if the image exists. If it does, skip the build and the push.
+      The scan always runs. Set scan to false to turn the scan off.
     required: false
     default: "true"
   tag:
@@ -73,7 +76,10 @@ inputs:
     required: false
     default: us-docker.pkg.dev
   scan:
-    description: Run security scan on the built image (syft + grype)
+    description: >
+      Run the security scan on the image (syft + grype). This input is the only
+      one that turns the scan off. The action pulls a reused image and scans it
+      like a new one. Known vulnerabilities change even when the image does not.
     required: false
     default: "true"
   severity:
@@ -267,12 +273,25 @@ runs:
         PUSH: ${{ inputs.push }}
       run: ${{ github.action_path }}/../../scripts/docker-build.sh
 
+    # grype scans the image in the local Docker daemon. A reuse hit, a
+    # multi-arch build, and a WarpBuild build that pushes leave nothing there.
+    # This step pulls the image so the scan always has one to read.
+    - name: Pull image for scan
+      if: >
+        inputs.scan == 'true' &&
+        inputs.build == 'true' &&
+        inputs.retag != 'true'
+      shell: bash
+      env:
+        IMAGE: ${{ steps.meta.outputs.image }}
+        PLATFORM: ${{ inputs.platform }}
+      run: ${{ github.action_path }}/../../scripts/docker-pull-for-scan.sh
+
     - name: Scan container image
       if: >
         inputs.scan == 'true' &&
         inputs.build == 'true' &&
-        inputs.retag != 'true' &&
-        steps.reuse-check.outputs.exists != 'true'
+        inputs.retag != 'true'
       uses: credova/platform-workflows/actions/security@master
       with:
         target: docker:${{ steps.meta.outputs.image }}
