@@ -1,6 +1,6 @@
 # container
 
-Container lifecycle: build, scan, push, tag, reuse, retag. Calls `auth-gcp` internally. Runs a security scan after every build via the `security` action.
+Container lifecycle: build, scan, push, tag, reuse, retag. Calls `auth-gcp` internally. Scans a new image and a reused image via the `security` action.
 
 ## Inputs
 
@@ -12,7 +12,7 @@ Container lifecycle: build, scan, push, tag, reuse, retag. Calls `auth-gcp` inte
 | `target`                     | No       | -                   | Docker build stage target (`--target`)                   |
 | `build`                      | No       | `true`              | Build the image                                          |
 | `push`                       | No       | `false`             | Push to Artifact Registry after scan                     |
-| `reuse`                      | No       | `true`              | Check if image exists first, skip build if so            |
+| `reuse`                      | No       | `true`              | Skip build and push if the image exists. Scan still runs |
 | `tag`                        | No       | `github.sha`        | Image tag                                                |
 | `extra-tags`                 | No       | -                   | Additional tags to apply                                 |
 | `retag`                      | No       | `false`             | Retag an existing image (skip build + scan)              |
@@ -23,7 +23,7 @@ Container lifecycle: build, scan, push, tag, reuse, retag. Calls `auth-gcp` inte
 | `workload-identity-provider` | No       | -                   | WIF provider resource name                               |
 | `service-account`            | No       | -                   | Service account email to impersonate via WIF             |
 | `registry`                   | No       | `us-docker.pkg.dev` | Artifact Registry hostname                               |
-| `scan`                       | No       | `true`              | Run security scan on the built image (syft + grype)      |
+| `scan`                       | No       | `true`              | Run the security scan on the image (syft + grype)        |
 | `severity`                   | No       | `HIGH`              | Minimum severity to fail image scan on                   |
 | `warpbuild-profile`          | No       | `""`                | WarpBuild Docker Builder profile name                    |
 | `warpbuild-api-key`          | No       | `""`                | WarpBuild API key (only needed on non-WarpBuild runners) |
@@ -136,7 +136,8 @@ exclusive with `warpbuild-profile`.
 
 1. Compute image metadata.
 2. `auth-gcp`: authenticate to GCP and configure Docker for Artifact Registry.
-3. Reuse check: skip build if image already exists for this SHA (when `reuse: true`).
+3. Reuse check: skip the build and the push if the image already exists for this SHA (when `reuse: true`).
 4. Build image via buildx (optionally on a Blacksmith sticky-disk builder) or WarpBuild.
-5. **Image scan:** delegates to the `security` action (syft SBOM + grype vuln scan), which posts results to the PR comment. Blocks on `severity` threshold. Skipped on `retag`, reuse, or `scan: false`.
-6. Tag and push: only if `push: true`.
+5. Pull image for scan: `scripts/docker-pull-for-scan.sh` puts the image in the local Docker daemon when the build did not. A reuse hit, a multi-arch build, and a WarpBuild build that pushes all leave nothing there.
+6. **Image scan:** delegates to the `security` action (syft SBOM + grype vuln scan), which posts results to the PR comment. Blocks on `severity` threshold. A reused image is scanned like a new one, because known vulnerabilities change even when the image does not. Skipped on `retag` or `scan: false`; `scan` is the only input that turns the scan off.
+7. Tag and push: only if `push: true`, and only for an image the run built.

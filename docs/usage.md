@@ -1106,6 +1106,7 @@ flowchart TD
     REUSE["Check for existing image\n<i>docker manifest inspect</i>"]
     EXISTS{"image exists?"}
 
+    SCAN_CHECK{"scan enabled?"}
     PULL["Pull image for scan\n<i>skipped if already local</i>"]
 
     WARP_CHECK{"warpbuild-profile\nset?"}
@@ -1130,15 +1131,18 @@ flowchart TD
 
     REUSE_CHECK -->|yes| REUSE --> EXISTS
     REUSE_CHECK -->|no| WARP_CHECK
-    EXISTS -->|yes| PULL
+    EXISTS -->|yes| SCAN_CHECK
     EXISTS -->|no| WARP_CHECK
 
-    WARP_CHECK -->|yes| WARP_SETUP --> WARP_BUILD --> PULL
+    WARP_CHECK -->|yes| WARP_SETUP --> WARP_BUILD --> SCAN_CHECK
     WARP_CHECK -->|no| BUILDX --> QEMU
     QEMU -->|yes| QEMU_SETUP --> STD_BUILD
     QEMU -->|no| STD_BUILD
 
-    STD_BUILD --> PULL --> SCAN --> PUSH_CHECK
+    STD_BUILD --> SCAN_CHECK
+
+    SCAN_CHECK -->|yes| PULL --> SCAN --> PUSH_CHECK
+    SCAN_CHECK -->|no| PUSH_CHECK
 
     PUSH_CHECK -->|yes| PUSH --> OUT
     PUSH_CHECK -->|no| OUT
