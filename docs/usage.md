@@ -408,7 +408,7 @@ jobs:
 | `test-command`               | string  | `""`                          | Custom test command                |
 | `goreleaser`                 | boolean | `true`                        | Run GoReleaser                     |
 | `goreleaser-args`            | string  | `""`                          | Additional GoReleaser args         |
-| `project-id`                 | string  | `""`                          | GCP project ID                     |
+| `project-id`                 | string  | `fxt-ops-shd`                 | GCP project ID                     |
 | `workload-identity-provider` | string  | `""`                          | WIF provider resource name         |
 | `service-account`            | string  | `""`                          | GCP service account to impersonate |
 | `runner`                     | string  | `warp-ubuntu-2404-x64-2x`     | Runner for lint/test (near-idle)   |
@@ -733,6 +733,7 @@ When `cache: true`, built-in caches from `actions/setup-go` and `actions/setup-n
 | `image`             | string  | `""`                  | Single image `name:dockerfile`     |
 | `images`            | string  | `""`                  | Multi-image YAML list              |
 | `platform`          | string  | `linux/amd64`         | Target platform for builds         |
+| `project-id`        | string  | `fxt-ops-shd`         | GCP project ID for the image path  |
 | `warpbuild-profile` | string  | `""`                  | WarpBuild Docker Builder profile   |
 | `cache`             | boolean | `false`               | WarpBuild dependency caching       |
 | `runner`            | string  | see WarpBuild section | GitHub Actions runner label        |
@@ -744,7 +745,7 @@ When `cache: true`, built-in caches from `actions/setup-go` and `actions/setup-n
 
 ### deploy.yaml
 
-Shares the build/runtime inputs from pull-request.yaml (`language`, `language-version`, `test-command`, `container`, `image`, `images`, `platform`, `warpbuild-profile`, `cache`, `runner`, `security-severity`) plus:
+Shares the build/runtime inputs from pull-request.yaml (`language`, `language-version`, `test-command`, `container`, `image`, `images`, `platform`, `project-id`, `warpbuild-profile`, `cache`, `runner`, `security-severity`) plus:
 
 | Input                                   | Type    | Default        | Description                                                      |
 |-----------------------------------------| ------- | -------------- | ---------------------------------------------------------------- |
@@ -755,7 +756,7 @@ Shares the build/runtime inputs from pull-request.yaml (`language`, `language-ve
 | `container-reuse`                       | boolean | `true`         | Skip build if image exists for this SHA                          |
 | `hotfix`                                | boolean | `false`        | Hotfix mode: skip tests, staging, canary, straight to production |
 | `notifications`                         | boolean | `true`         | Send Slack notifications                                         |
-| `project-id`                            | string  | `""`           | GCP project ID                                                   |
+| `project-id`                            | string  | `fxt-ops-shd`  | GCP project ID                                                   |
 | `workload-identity-provider`            | string  | `""`           | WIF provider resource name                                       |
 | `service-account`                       | string  | `""`           | GCP service account to impersonate                               |
 | `staging-validation-workflow`           | string | `""` | Post-staging gate: filename of a `workflow_dispatch` workflow in the caller repo to run after the staging deploy and before the production approval. Empty = disabled. |

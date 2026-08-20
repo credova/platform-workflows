@@ -41,6 +41,11 @@ on:
         type: string
         required: false
         default: linux/amd64
+      project-id:
+        description: "GCP project ID for the image registry path (no push/auth on PRs)"
+        type: string
+        required: false
+        default: fxt-ops-shd
 
       # WarpBuild (opt-in)
       warpbuild-profile:
@@ -212,6 +217,7 @@ jobs:
           context: ${{ matrix.context }}
           target: ${{ matrix.target }}
           platform: ${{ matrix.platform }}
+          project-id: ${{ inputs.project-id }}
           build: "true"
           push: "false"
           warpbuild-profile: ${{ inputs.warpbuild-profile }}
