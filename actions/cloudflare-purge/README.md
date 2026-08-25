@@ -25,6 +25,18 @@ Use this after a deploy that changes an asset served from a long-lived cache. Cl
 
 `prefixes` and `tags` need an Enterprise plan. `files` works on every plan.
 
+## Credentials
+
+`CLOUDFLARE_API_TOKEN` is a GitHub organisation secret. `square_root` and `platform-iac` already use it, and every repo in the org can read it. No per-repo setup is needed — pass it straight through:
+
+```yaml
+api-token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+```
+
+The same name is what `pctl cloudflare` reads from the environment, so one token covers both.
+
+A zone ID is not a secret. `square_root` keeps zone IDs in committed terraform. Pass it as a plain value, or hold it in a repo or org variable if you prefer one place to change it.
+
 ## Outputs
 
 | Output      | Description                 |
@@ -41,8 +53,8 @@ Purge one file after a deploy:
   with:
     mode: files
     value: https://plugin.payments.stg.credova.com/bigcommerce/payments/abc123/checkout.js
-    zone-id: ${{ vars.CLOUDFLARE_ZONE_ID }}
-    api-token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+    zone-id: 0123456789abcdef0123456789abcdef # the zone the hostname belongs to
+    api-token: ${{ secrets.CLOUDFLARE_API_TOKEN }} # org secret, nothing to set up
 ```
 
 Purge several values — one per line:
