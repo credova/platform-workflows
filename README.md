@@ -118,6 +118,7 @@ Confirm latest images: https://www.warpbuild.com/docs/ci/cloud-runners
 
 | Action                                    | Description                                                          |
 | ----------------------------------------- | -------------------------------------------------------------------- |
+| [cloudflare-purge](actions/cloudflare-purge/) | Purge the Cloudflare cache by prefix, file, or tag                |
 | [compliance](actions/compliance/)         | Shortcut ticket reference check, automated PR skip                   |
 | [container](actions/container/)           | Build, scan, push, retag. Full container lifecycle                   |
 | [deployment](actions/deployment/)         | Cloud Run deploy via pctl (deploy, promote, rollback)                |
