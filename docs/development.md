@@ -16,8 +16,8 @@ platform-workflows/
 ├── actions/                    # Composite actions (building blocks)
 │   ├── auth-gcp/               # INTERNAL - WIF login + docker config
 │   ├── auth-release-token/     # GitHub App token for private repo releases
-│   ├── cloudflare-purge/       # Cloudflare cache purge (prefixes, files, tags)
 │   ├── auth-npm-token/         # GitHub App token for npm publishing
+│   ├── cloudflare-purge/       # Cloudflare cache purge (prefixes, files, tags)
 │   ├── compliance/             # Shortcut ticket check + policy gates
 │   ├── container/              # Build, scan, push, retag (standard + WarpBuild)
 │   ├── deployment/             # Cloud Run deploy via pctl
@@ -32,8 +32,8 @@ platform-workflows/
 │   └── setup-language/         # Runtime setup + WarpBuild dep caching
 ├── scripts/                    # Shell scripts (called by actions)
 │   ├── check-shortcut-ticket.sh  # Shortcut ticket pattern matching
-│   ├── deploy.sh                 # pctl deploy (deploy/promote/abort/set-weight/status/rollback)
 │   ├── cloudflare-purge.sh       # Cloudflare cache purge API call
+│   ├── deploy.sh                 # pctl deploy (deploy/promote/abort/set-weight/status/rollback)
 │   ├── docker-build.sh           # Docker buildx build wrapper
 │   ├── docker-push.sh            # Docker push + extra tags
 │   ├── grant-scan.sh             # grant license compliance scan

@@ -51,6 +51,11 @@ sent_body() {
   cat "${WORK_DIR}/body" 2>/dev/null || true
 }
 
+# The --url value from the recorded arguments.
+sent_url() {
+  grep -A1 '^--url$' "${WORK_DIR}/args" 2>/dev/null | tail -n1 || true
+}
+
 fail() {
   echo "  FAIL: $1"
   echo "        body: $(sent_body)"
@@ -101,6 +106,27 @@ elif [ "$(sent_body | jq -c '.files[0] | type')" != '"object"' ]; then
   fail "json line: expected an object, got '$(sent_body)'"
 else
   pass "keeps a JSON line as an object"
+fi
+
+# `tags` is the third supported mode, and the mode name has to become the JSON key verbatim.
+stub_curl "${OK_RESPONSE}" 200
+run_under_test tags "checkout-js"
+status=$?
+if [ "${status}" -ne 0 ]; then
+  fail "tags: expected exit 0, got ${status}"
+elif [ "$(sent_body | jq -c .)" != '{"tags":["checkout-js"]}' ]; then
+  fail "tags: unexpected body '$(sent_body)'"
+else
+  pass "sends a tag name in the tags array"
+fi
+
+# A wrong zone purges nothing and still reports success, so the URL must carry the configured zone.
+stub_curl "${OK_RESPONSE}" 200
+run_under_test files "https://example.com/app.js"
+if [ "$(sent_url)" != "https://api.cloudflare.com/client/v4/zones/${ZONE_ID}/purge_cache" ]; then
+  fail "zone id: unexpected --url '$(sent_url)'"
+else
+  pass "sends the zone id in the request URL"
 fi
 
 # The purge id is what a caller threads into later steps.
@@ -161,8 +187,8 @@ fi
 
 # Each required input is checked before any request goes out.
 stub_curl "${OK_RESPONSE}" 200
-PATH="${WORK_DIR}:${PATH}" MODE=files VALUE="https://example.com/app.js" \
-  CLOUDFLARE_ZONE_ID="${ZONE_ID}" \
+env -u CLOUDFLARE_API_TOKEN PATH="${WORK_DIR}:${PATH}" MODE=files \
+  VALUE="https://example.com/app.js" CLOUDFLARE_ZONE_ID="${ZONE_ID}" \
   bash "${UNDER_TEST}" > "${WORK_DIR}/output" 2>&1
 status=$?
 if [ "${status}" -eq 0 ]; then
