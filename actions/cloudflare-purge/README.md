@@ -27,13 +27,13 @@ Use this after a deploy that changes an asset served from a long-lived cache. Cl
 
 ## Credentials
 
-`CLOUDFLARE_API_TOKEN` is a GitHub organisation secret. `square_root` and `platform-iac` already use it, and every repo in the org can read it. No per-repo setup is needed — pass it straight through:
+Pass `CLOUDFLARE_CACHE_TOKEN`, a token scoped to the `Zone.Cache Purge` permission:
 
 ```yaml
-api-token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+api-token: ${{ secrets.CLOUDFLARE_CACHE_TOKEN }}
 ```
 
-The same name is what `pctl cloudflare` reads from the environment, so one token covers both.
+This is not `CLOUDFLARE_API_TOKEN`. That token is much broader — `square_root` and `platform-iac` use it to apply terraform — and a purge does not need it.
 
 A zone ID is not a secret. `square_root` keeps zone IDs in committed terraform. Pass it as a plain value, or hold it in a repo or org variable if you prefer one place to change it.
 
@@ -54,7 +54,7 @@ Purge one file after a deploy:
     mode: files
     value: https://plugin.payments.stg.credova.com/bigcommerce/payments/abc123/checkout.js
     zone-id: 0123456789abcdef0123456789abcdef # the zone the hostname belongs to
-    api-token: ${{ secrets.CLOUDFLARE_API_TOKEN }} # org secret, nothing to set up
+    api-token: ${{ secrets.CLOUDFLARE_CACHE_TOKEN }}
 ```
 
 Purge several values — one per line:
@@ -68,7 +68,7 @@ Purge several values — one per line:
       example.com/static/
       example.com/assets/
     zone-id: ${{ vars.CLOUDFLARE_ZONE_ID }}
-    api-token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+    api-token: ${{ secrets.CLOUDFLARE_CACHE_TOKEN }}
 ```
 
 Purge a file and send the headers that identify the cached variant:
@@ -81,7 +81,7 @@ Purge a file and send the headers that identify the cached variant:
     value: |
       {"url": "https://example.com/app.js", "headers": {"Accept-Encoding": "br"}}
     zone-id: ${{ vars.CLOUDFLARE_ZONE_ID }}
-    api-token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+    api-token: ${{ secrets.CLOUDFLARE_CACHE_TOKEN }}
 ```
 
 ## Behaviour
