@@ -23,7 +23,7 @@ Use this after a deploy that changes an asset served from a long-lived cache. Cl
 | `files`    | A full URL, or a JSON object as defined by the API                        |
 | `tags`     | A `Cache-Tag` value set by the origin                                     |
 
-`prefixes` and `tags` need an Enterprise plan. `files` works on every plan.
+All three modes work on every plan.
 
 ## Credentials
 
@@ -92,4 +92,6 @@ Purge a file and send the headers that identify the cached variant:
 
 ## Limits
 
-Cloudflare caps each request: 30 files on Free, Pro, and Business plans, and 500 on Enterprise. Prefixes and tags are capped at 30 per request. Split larger lists across steps.
+Cloudflare caps each request at 100 values. `files` is the one exception: an Enterprise plan raises that cap to 500. Split larger lists across steps.
+
+Cloudflare also rate-limits purge requests per account, and the rate depends on the plan. See [Availability and limits](https://developers.cloudflare.com/cache/how-to/purge-cache/#availability-and-limits).
