@@ -34,5 +34,5 @@ runs:
         MODE: ${{ inputs.mode }}
         VALUE: ${{ inputs.value }}
         CLOUDFLARE_ZONE_ID: ${{ inputs.zone-id }}
-        CLOUDFLARE_API_TOKEN: ${{ inputs.api-token }}
+        CLOUDFLARE_CACHE_TOKEN: ${{ inputs.api-token }}
       run: ${{ github.action_path }}/../../scripts/cloudflare-purge.sh

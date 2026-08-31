@@ -42,7 +42,7 @@ EOF
 run_under_test() {
   PATH="${WORK_DIR}:${PATH}" \
     MODE="$1" VALUE="$2" \
-    CLOUDFLARE_ZONE_ID="${ZONE_ID}" CLOUDFLARE_API_TOKEN="${API_TOKEN}" \
+    CLOUDFLARE_ZONE_ID="${ZONE_ID}" CLOUDFLARE_CACHE_TOKEN="${API_TOKEN}" \
     GITHUB_OUTPUT="${WORK_DIR}/github_output" \
     bash "${UNDER_TEST}" > "${WORK_DIR}/output" 2>&1
 }
@@ -187,14 +187,14 @@ fi
 
 # Each required input is checked before any request goes out.
 stub_curl "${OK_RESPONSE}" 200
-env -u CLOUDFLARE_API_TOKEN PATH="${WORK_DIR}:${PATH}" MODE=files \
+env -u CLOUDFLARE_CACHE_TOKEN PATH="${WORK_DIR}:${PATH}" MODE=files \
   VALUE="https://example.com/app.js" CLOUDFLARE_ZONE_ID="${ZONE_ID}" \
   bash "${UNDER_TEST}" > "${WORK_DIR}/output" 2>&1
 status=$?
 if [ "${status}" -eq 0 ]; then
   fail "missing token: expected a non-zero exit"
 else
-  pass "fails when CLOUDFLARE_API_TOKEN is not set"
+  pass "fails when CLOUDFLARE_CACHE_TOKEN is not set"
 fi
 
 if [ "${FAILURES}" -gt 0 ]; then

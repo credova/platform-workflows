@@ -2,13 +2,13 @@
 set -euo pipefail
 
 # Purge entries from the Cloudflare cache.
-# Required env vars: MODE, VALUE, CLOUDFLARE_ZONE_ID, CLOUDFLARE_API_TOKEN
+# Required env vars: MODE, VALUE, CLOUDFLARE_ZONE_ID, CLOUDFLARE_CACHE_TOKEN
 # API reference: https://developers.cloudflare.com/api/resources/cache/methods/purge/
 
 : "${MODE:?MODE is required}"
 : "${VALUE:?VALUE is required}"
 : "${CLOUDFLARE_ZONE_ID:?CLOUDFLARE_ZONE_ID is required}"
-: "${CLOUDFLARE_API_TOKEN:?CLOUDFLARE_API_TOKEN is required}"
+: "${CLOUDFLARE_CACHE_TOKEN:?CLOUDFLARE_CACHE_TOKEN is required}"
 
 case "${MODE}" in
   prefixes | files | tags) ;;
@@ -44,7 +44,7 @@ RESPONSE=$(curl --silent --show-error \
   --request POST \
   --url "https://api.cloudflare.com/client/v4/zones/${CLOUDFLARE_ZONE_ID}/purge_cache" \
   --header 'Content-Type: application/json' \
-  --header "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+  --header "Authorization: Bearer ${CLOUDFLARE_CACHE_TOKEN}" \
   --data "${BODY}" \
   --retry 3 --retry-connrefused \
   --write-out '\n%{http_code}')
