@@ -1,0 +1,38 @@
+name: cloudflare-purge
+description: >
+  Purge entries from the Cloudflare cache by prefix, file URL, or cache tag.
+  Wraps the Cloudflare cache purge API.
+
+inputs:
+  mode:
+    description: "What the values are: prefixes, files, or tags"
+    required: true
+  value:
+    description: >
+      Newline-delimited values to purge. For `files`, each line is a URL or a
+      JSON object as defined by the Cloudflare API.
+    required: true
+  zone-id:
+    description: Cloudflare zone ID to purge from
+    required: true
+  api-token:
+    description: Cloudflare API token with the Zone.Cache Purge permission
+    required: true
+
+outputs:
+  purge-id:
+    description: Cloudflare purge request ID
+    value: ${{ steps.purge.outputs.purge-id }}
+
+runs:
+  using: composite
+  steps:
+    - name: Purge Cloudflare cache
+      id: purge
+      shell: bash
+      env:
+        MODE: ${{ inputs.mode }}
+        VALUE: ${{ inputs.value }}
+        CLOUDFLARE_ZONE_ID: ${{ inputs.zone-id }}
+        CLOUDFLARE_CACHE_TOKEN: ${{ inputs.api-token }}
+      run: ${{ github.action_path }}/../../scripts/cloudflare-purge.sh

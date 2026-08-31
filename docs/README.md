@@ -32,6 +32,7 @@
 
 ## Actions
 
+- **[cloudflare-purge](../actions/cloudflare-purge/)**: purge the Cloudflare cache after a deploy that changes a cached asset
 - **[run-job](../actions/run-job/)**: deploy and execute Cloud Run Jobs (migrations, memorystore patterns)
 
 ## Patterns
