@@ -107,7 +107,8 @@ Comma- and newline-separated lists both work:
 
 Stage names are Dockerfile-specific, so there is no safe default. buildx ignores a name that
 matches no stage and prints no warning, so a typo looks like success. Check the name against the
-`AS <name>` clauses in the Dockerfile. Name the narrowest stage that holds the upgrade, because
+`AS <name>` clauses in the Dockerfile. A value that is set but names no stage at all, such as
+`,,,`, fails the build rather than going green having busted nothing. Name the narrowest stage that holds the upgrade, because
 busting an early stage discards the cache for everything after it.
 
 This only bites where the layer cache survives between runs, meaning WarpBuild Docker Builders

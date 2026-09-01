@@ -35,15 +35,21 @@ fi
 # Fail rather than drop: buildx ignores an unknown stage name without warning,
 # so a dropped entry would look like a busted cache and not be one.
 if [ -n "${NO_CACHE_FILTERS}" ]; then
+  FILTER_COUNT=0
   while IFS= read -r entry; do
     [[ "${entry}" =~ [^[:space:]] ]] || continue
     if [[ "${entry}" =~ ^[[:space:]]*([A-Za-z][A-Za-z0-9._-]*)[[:space:]]*$ ]]; then
       BUILD_CMD="${BUILD_CMD} --no-cache-filter ${BASH_REMATCH[1]}"
+      FILTER_COUNT=$((FILTER_COUNT + 1))
     else
       echo "::error::no-cache-filters entry is not a valid Dockerfile stage name: '${entry}'"
       exit 1
     fi
   done <<< "${NO_CACHE_FILTERS//,/$'\n'}"
+  if [ "${FILTER_COUNT}" -eq 0 ]; then
+    echo "::error::no-cache-filters was set but named no stage: '${NO_CACHE_FILTERS}'"
+    exit 1
+  fi
 fi
 
 if [ -n "${BUILD_ARGS}" ]; then
