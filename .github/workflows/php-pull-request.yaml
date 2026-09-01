@@ -45,6 +45,16 @@ on:
         type: string
         required: false
         default: fxt-ops-shd
+      container-no-cache-filters:
+        description: "Dockerfile stage names to build without the layer cache (comma- or newline-separated)"
+        type: string
+        required: false
+        default: ""
+      container-pull:
+        description: Re-resolve base images on every container build
+        type: boolean
+        required: false
+        default: false
 
       # Run ordering
       run-order:
@@ -248,6 +258,8 @@ jobs:
           push: "false"
           warpbuild-profile: ${{ inputs.warpbuild-profile }}
           warpbuild-api-key: ${{ secrets.WARPBUILD_API_KEY }}
+          no-cache-filters: ${{ inputs.container-no-cache-filters }}
+          pull: ${{ inputs.container-pull && 'true' || 'false' }}
 
   # ============================================================
   # PARALLEL mode: All jobs at once, cancel on first failure
@@ -360,6 +372,8 @@ jobs:
           push: "false"
           warpbuild-profile: ${{ inputs.warpbuild-profile }}
           warpbuild-api-key: ${{ secrets.WARPBUILD_API_KEY }}
+          no-cache-filters: ${{ inputs.container-no-cache-filters }}
+          pull: ${{ inputs.container-pull && 'true' || 'false' }}
 
   # ============================================================
   # CHECKS-FIRST mode: Security -> Lint+Test parallel -> Container
@@ -474,6 +488,8 @@ jobs:
           push: "false"
           warpbuild-profile: ${{ inputs.warpbuild-profile }}
           warpbuild-api-key: ${{ secrets.WARPBUILD_API_KEY }}
+          no-cache-filters: ${{ inputs.container-no-cache-filters }}
+          pull: ${{ inputs.container-pull && 'true' || 'false' }}
 
   # ============================================================
   # Compliance (runs after all modes complete)
