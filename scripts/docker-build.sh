@@ -3,13 +3,17 @@ set -e
 
 # Build a Docker image using buildx.
 # Expects these environment variables:
-#   IMAGE      - Full image reference (registry/project/name:tag)
-#   DOCKERFILE - Path to Dockerfile
-#   CONTEXT    - Docker build context
-#   TARGET     - (optional) Docker build stage target
-#   PLATFORM   - (optional) Target platform (default: linux/amd64)
-#   BUILD_ARGS - (optional) Newline-separated build arguments
-#   PUSH       - (optional) Push after build ("true" to push, default: "false")
+#   IMAGE            - Full image reference (registry/project/name:tag)
+#   DOCKERFILE       - Path to Dockerfile
+#   CONTEXT          - Docker build context
+#   TARGET           - (optional) Docker build stage target
+#   PLATFORM         - (optional) Target platform (default: linux/amd64)
+#   BUILD_ARGS       - (optional) Newline-separated build arguments
+#   NO_CACHE_FILTERS - (optional) Dockerfile stage names to build without the
+#                      layer cache, comma- or newline-separated
+#   PULL             - (optional) Re-resolve base images ("true" to pull,
+#                      default: "false")
+#   PUSH             - (optional) Push after build ("true" to push, default: "false")
 
 : "${IMAGE:?IMAGE is required}"
 : "${DOCKERFILE:?DOCKERFILE is required}"
@@ -21,6 +25,25 @@ BUILD_CMD="docker buildx build --platform ${PLATFORM} --provenance=false --sbom=
 
 if [ -n "${TARGET}" ]; then
   BUILD_CMD="${BUILD_CMD} --target ${TARGET}"
+fi
+
+if [ "${PULL}" = "true" ]; then
+  BUILD_CMD="${BUILD_CMD} --pull"
+fi
+
+# Only a Dockerfile stage name gets through, because BUILD_CMD is eval'd below.
+# Fail rather than drop: buildx ignores an unknown stage name without warning,
+# so a dropped entry would look like a busted cache and not be one.
+if [ -n "${NO_CACHE_FILTERS}" ]; then
+  while IFS= read -r entry; do
+    [[ "${entry}" =~ [^[:space:]] ]] || continue
+    if [[ "${entry}" =~ ^[[:space:]]*([A-Za-z][A-Za-z0-9._-]*)[[:space:]]*$ ]]; then
+      BUILD_CMD="${BUILD_CMD} --no-cache-filter ${BASH_REMATCH[1]}"
+    else
+      echo "::error::no-cache-filters entry is not a valid Dockerfile stage name: '${entry}'"
+      exit 1
+    fi
+  done <<< "${NO_CACHE_FILTERS//,/$'\n'}"
 fi
 
 if [ -n "${BUILD_ARGS}" ]; then
