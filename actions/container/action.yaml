@@ -58,6 +58,24 @@ inputs:
     description: "Target platform (e.g. linux/amd64, linux/arm64)"
     required: false
     default: linux/amd64
+  # Cache control
+  no-cache-filters:
+    description: >
+      Dockerfile stage names to build without the layer cache, comma- or
+      newline-separated. Use it on a stage that runs `apk upgrade` or
+      `apt-get upgrade`: that layer caches forever, so an image keeps shipping
+      CVEs the distro has already fixed. buildx ignores a name that matches no
+      stage in the Dockerfile, and it prints no warning, so check the name.
+    required: false
+    default: ""
+  pull:
+    description: >
+      Re-resolve every base image the Dockerfile references (--pull). Off by
+      default, the same as docker buildx build. It refreshes the digest a
+      floating base tag points at. It does not re-run a cached RUN layer, use
+      no-cache-filters for that.
+    required: false
+    default: "false"
   # Auth inputs (passed through to auth-gcp)
   project-id:
     description: GCP project ID
@@ -222,6 +240,8 @@ runs:
         push: ${{ inputs.push }}
         load: ${{ inputs.push != 'true' }}
         build-args: ${{ inputs.build-args }}
+        no-cache-filters: ${{ inputs.no-cache-filters }}
+        pull: ${{ inputs.pull == 'true' }}
 
     # --- Blacksmith builder (opt-in via blacksmith) ---
     # Sticky-disk-backed buildx builder: BuildKit state (base images, layer
@@ -270,6 +290,8 @@ runs:
         TARGET: ${{ inputs.target }}
         PLATFORM: ${{ inputs.platform }}
         BUILD_ARGS: ${{ inputs.build-args }}
+        NO_CACHE_FILTERS: ${{ inputs.no-cache-filters }}
+        PULL: ${{ inputs.pull }}
         PUSH: ${{ inputs.push }}
       run: ${{ github.action_path }}/../../scripts/docker-build.sh
 

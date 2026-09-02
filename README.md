@@ -110,6 +110,7 @@ Confirm latest images: https://www.warpbuild.com/docs/ci/cloud-runners
 - **WarpBuild runners** by default. Override with `runner` input.
 - **WarpBuild Docker Builders** (opt-in): remote builds with native arm64 and built-in layer caching via `warpbuild-profile`.
 - **WarpBuild dependency caching** (opt-in): `cache: true` enables `WarpBuilds/cache@v1` and auto-disables conflicting built-in caches.
+- **Layer-cache busting** (opt-in): `container-no-cache-filters` rebuilds named Dockerfile stages so `apk upgrade` re-runs instead of caching forever; `container-pull` re-resolves base image digests.
 - **Multi-image builds**: parallel matrix builds via `images` YAML list.
 - **Cross-platform**: `platform` input for arm64 builds (QEMU or native via WarpBuild).
 - **Shortcut ticket enforcement**: compliance checks PRs for `sc-NNNNN` references.

@@ -718,34 +718,68 @@ Cached paths per language:
 
 When `cache: true`, built-in caches from `actions/setup-go` and `actions/setup-node` are disabled to avoid double-caching.
 
+### Busting the container layer cache
+
+`apk update && apk upgrade` in a Dockerfile caches like any other `RUN`. Where the BuildKit
+layer cache persists between runs, meaning WarpBuild Docker Builders and Blacksmith sticky
+disks, that layer can be months old while the distro has already patched the CVEs it contains.
+Name the stage that runs the upgrade:
+
+```yaml
+jobs:
+  deploy:
+    uses: credova/platform-workflows/.github/workflows/kotlin-deploy.yaml@v1
+    secrets: inherit
+    with:
+      container-no-cache-filters: runtime
+      container-pull: true
+```
+
+- `container-no-cache-filters` (default `""`) takes Dockerfile stage names, comma- or
+  newline-separated. Names are Dockerfile-specific, so there is no safe default and this is
+  opt-in per repo. buildx ignores a name that matches no stage and prints no warning, so check
+  it against the `AS <name>` clauses.
+- `container-pull` (default `false`) re-resolves the digest each base image tag points at. On
+  its own it does not re-run a cached `RUN`, so set both.
+
+Name the narrowest stage that contains the upgrade. Busting an early stage discards the cache
+for every stage after it. On a plain buildx builder there is nothing to bust, because
+`docker/setup-buildx-action` starts a fresh builder each job and `apk upgrade` already re-runs.
+
+`container-reuse` still wins. It defaults to `true` and images are tagged by SHA, so
+redeploying an unchanged master skips the build entirely and only re-scans. These inputs take
+effect on the next commit, or on a hotfix deploy, which forces a rebuild.
+
 ---
 
 ## Input Reference
 
 ### pull-request.yaml
 
-| Input               | Type    | Default               | Description                        |
-| ------------------- | ------- | --------------------- | ---------------------------------- |
-| `language`          | string  | `""`                  | Language runtime (see table above) |
-| `language-version`  | string  | `""`                  | Runtime version (required w/ lang) |
-| `test-command`      | string  | `""`                  | Custom test command                |
-| `container`         | boolean | `true`                | Build and scan a container image   |
-| `image`             | string  | `""`                  | Single image `name:dockerfile`     |
-| `images`            | string  | `""`                  | Multi-image YAML list              |
-| `platform`          | string  | `linux/amd64`         | Target platform for builds         |
-| `project-id`        | string  | `fxt-ops-shd`         | GCP project ID for the image path  |
-| `warpbuild-profile` | string  | `""`                  | WarpBuild Docker Builder profile   |
-| `cache`             | boolean | `false`               | WarpBuild dependency caching       |
-| `runner`            | string  | see WarpBuild section | GitHub Actions runner label        |
-| `security-packages` | boolean | `true`                | Package vulnerability scan         |
-| `security-licenses` | boolean | `true`                | License compliance scan            |
-| `security-code`     | boolean | `true`                | Code static analysis               |
-| `security-severity` | string  | `HIGH`                | Minimum severity to fail on        |
-| `compliance-ticket` | boolean | `true`                | Require ticket reference           |
+| Input                        | Type    | Default               | Description                              |
+| ---------------------------- | ------- | --------------------- | ---------------------------------------- |
+| `language`                   | string  | `""`                  | Language runtime (see table above)       |
+| `language-version`           | string  | `""`                  | Runtime version (required w/ lang)       |
+| `test-command`               | string  | `""`                  | Custom test command                      |
+| `container`                  | boolean | `true`                | Build and scan a container image         |
+| `image`                      | string  | `""`                  | Single image `name:dockerfile`           |
+| `images`                     | string  | `""`                  | Multi-image YAML list                    |
+| `platform`                   | string  | `linux/amd64`         | Target platform for builds               |
+| `project-id`                 | string  | `fxt-ops-shd`         | GCP project ID for the image path        |
+| `container-no-cache-filters` | string  | `""`                  | Dockerfile stages to build with no cache |
+| `container-pull`             | boolean | `false`               | Re-resolve base images on every build    |
+| `warpbuild-profile`          | string  | `""`                  | WarpBuild Docker Builder profile         |
+| `cache`                      | boolean | `false`               | WarpBuild dependency caching             |
+| `runner`                     | string  | see WarpBuild section | GitHub Actions runner label              |
+| `security-packages`          | boolean | `true`                | Package vulnerability scan               |
+| `security-licenses`          | boolean | `true`                | License compliance scan                  |
+| `security-code`              | boolean | `true`                | Code static analysis                     |
+| `security-severity`          | string  | `HIGH`                | Minimum severity to fail on              |
+| `compliance-ticket`          | boolean | `true`                | Require ticket reference                 |
 
 ### deploy.yaml
 
-Shares the build/runtime inputs from pull-request.yaml (`language`, `language-version`, `test-command`, `container`, `image`, `images`, `platform`, `project-id`, `warpbuild-profile`, `cache`, `runner`, `security-severity`) plus:
+Shares the build/runtime inputs from pull-request.yaml (`language`, `language-version`, `test-command`, `container`, `image`, `images`, `platform`, `project-id`, `container-no-cache-filters`, `container-pull`, `warpbuild-profile`, `cache`, `runner`, `security-severity`) plus:
 
 | Input                                   | Type    | Default        | Description                                                      |
 |-----------------------------------------| ------- | -------------- | ---------------------------------------------------------------- |
@@ -1151,6 +1185,12 @@ flowchart TD
 A reuse hit skips the build and the push. It does not skip the scan. Known
 vulnerabilities change even when the image does not, so the action pulls the existing
 image and scans it. The `scan: false` input turns the scan off.
+
+Both build paths take `no-cache-filters` and `pull`. The WarpBuild step passes them straight to
+`Warpbuilds/build-push-action`. The standard step passes them to `scripts/docker-build.sh` as
+`NO_CACHE_FILTERS` and `PULL`. That script accepts only names a Dockerfile can give a stage and
+fails the step on anything else, because it assembles the command as a string and runs it
+through `eval`.
 
 ### security action
 

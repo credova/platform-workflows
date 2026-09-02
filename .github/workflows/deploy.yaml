@@ -68,6 +68,16 @@ on:
         type: boolean
         required: false
         default: true
+      container-no-cache-filters:
+        description: "Dockerfile stage names to build without the layer cache (comma- or newline-separated)"
+        type: string
+        required: false
+        default: ""
+      container-pull:
+        description: Re-resolve base images on every container build
+        type: boolean
+        required: false
+        default: false
 
       # Deployment (on by default - disable for release-only repos)
       deploy:
@@ -272,6 +282,8 @@ jobs:
           severity: ${{ inputs.security-severity }}
           warpbuild-profile: ${{ inputs.warpbuild-profile }}
           warpbuild-api-key: ${{ secrets.WARPBUILD_API_KEY }}
+          no-cache-filters: ${{ inputs.container-no-cache-filters }}
+          pull: ${{ inputs.container-pull && 'true' || 'false' }}
 
   # --- Deploy staging (skipped for hotfix) ---
   deploy-staging:
