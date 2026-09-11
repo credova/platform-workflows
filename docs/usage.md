@@ -1198,7 +1198,10 @@ nothing to do, exit green — this is what a re-run of an already-tagged job hit
 absent: `gcloud artifacts docker tags add`. Target tag on some other digest: `docker buildx
 imagetools create`, which re-pushes the source manifest under the target tag. Overwriting a tag
 is an upload rather than a delete, so it stays inside `writer`, and imagetools copies manifests
-registry-side, so nothing is pulled and a multi-arch index survives.
+registry-side, so nothing is pulled and a multi-arch index survives. The copy names the digest
+resolved a moment earlier rather than the tag, so a tag moving underneath the step cannot swap
+the artifact, and `--prefer-index=false` keeps a single-platform manifest as one instead of
+wrapping it in a fresh index that the digest check would never match again.
 
 A reuse hit skips the build and the push. It does not skip the scan. Known
 vulnerabilities change even when the image does not, so the action pulls the existing

@@ -220,9 +220,14 @@ runs:
           # tag instead: overwriting a tag is an upload
           # (artifactregistry.repositories.uploadArtifacts), which CI does have.
           # imagetools copies the manifest registry-side, so nothing is pulled and
-          # a multi-arch index stays intact.
+          # a multi-arch index stays intact. Copy the digest resolved above rather
+          # than the tag, so a tag that moves underneath this step cannot swap the
+          # artifact. --prefer-index=false (buildx 0.15+) keeps a single-platform
+          # manifest as one, instead of wrapping it in a new index under a digest
+          # the check above would never match again.
           echo "${TARGET} currently points at ${TARGET_DIGEST}; overwriting it."
-          docker buildx imagetools create --tag "${TARGET}" "${SOURCE}"
+          docker buildx imagetools create --prefer-index=false --tag "${TARGET}" \
+            "${REGISTRY}/${PROJECT_ID}/${IMAGE_NAME}@${SOURCE_DIGEST}"
         else
           gcloud artifacts docker tags add "${SOURCE}" "${TARGET}"
         fi

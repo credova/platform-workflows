@@ -51,7 +51,16 @@ if [ -n "${EXTRA_TAGS}" ]; then
         echo "Extra tag already current: ${EXTRA_IMAGE}"
         continue
       elif [ -n "${EXTRA_DIGEST}" ]; then
-        docker buildx imagetools create --tag "${EXTRA_IMAGE}" "${IMAGE}"
+        if [ -z "${SOURCE_DIGEST}" ]; then
+          echo "Could not resolve a digest for ${IMAGE}; refusing to overwrite ${EXTRA_IMAGE}." >&2
+          exit 1
+        fi
+        # Copy the resolved digest, not the tag, so a tag that moves underneath
+        # this loop cannot swap the artifact. --prefer-index=false (buildx 0.15+)
+        # keeps a single-platform manifest as one instead of wrapping it in a new
+        # index, which would land on a digest the check above never matches again.
+        docker buildx imagetools create --prefer-index=false --tag "${EXTRA_IMAGE}" \
+          "${REGISTRY}/${PROJECT_ID}/${IMAGE_NAME}@${SOURCE_DIGEST}"
       else
         gcloud artifacts docker tags add "${IMAGE}" "${EXTRA_IMAGE}"
       fi
