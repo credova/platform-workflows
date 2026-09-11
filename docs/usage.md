@@ -1134,7 +1134,10 @@ flowchart TD
     GCP["Authenticate to GCP\n<i>via auth-gcp</i>"]
 
     RETAG_CHECK{"retag mode?"}
-    RETAG["Retag existing image\n<i>gcloud artifacts docker tags add</i>"]
+    RETAG_SAME{"target tag already\nat source digest?"}
+    RETAG_MOVE{"target tag on\nanother digest?"}
+    RETAG_OVER["Overwrite tag\n<i>docker buildx imagetools create</i>"]
+    RETAG["Tag existing image\n<i>gcloud artifacts docker tags add</i>"]
 
     REUSE_CHECK{"reuse enabled?"}
     REUSE["Check for existing image\n<i>docker manifest inspect</i>"]
@@ -1160,7 +1163,11 @@ flowchart TD
 
     IN --> VAL --> GCP --> RETAG_CHECK
 
-    RETAG_CHECK -->|yes| RETAG --> OUT
+    RETAG_CHECK -->|yes| RETAG_SAME
+    RETAG_SAME -->|yes| OUT
+    RETAG_SAME -->|no| RETAG_MOVE
+    RETAG_MOVE -->|yes| RETAG_OVER --> OUT
+    RETAG_MOVE -->|no| RETAG --> OUT
     RETAG_CHECK -->|no| REUSE_CHECK
 
     REUSE_CHECK -->|yes| REUSE --> EXISTS
@@ -1181,6 +1188,17 @@ flowchart TD
     PUSH_CHECK -->|yes| PUSH --> OUT
     PUSH_CHECK -->|no| OUT
 ```
+
+Retag mode compares digests before it touches anything, because `gcloud artifacts docker tags
+add` over an existing tag is a move, and a move deletes the old tag first: it needs
+`artifactregistry.tags.delete`, which CI does not have
+(`roles/artifactregistry.writer` stops at `tags.create`/`tags.update`). So the step resolves
+both digests first and takes one of three paths. Target tag already on the source digest:
+nothing to do, exit green — this is what a re-run of an already-tagged job hits. Target tag
+absent: `gcloud artifacts docker tags add`. Target tag on some other digest: `docker buildx
+imagetools create`, which re-pushes the source manifest under the target tag. Overwriting a tag
+is an upload rather than a delete, so it stays inside `writer`, and imagetools copies manifests
+registry-side, so nothing is pulled and a multi-arch index survives.
 
 A reuse hit skips the build and the push. It does not skip the scan. Known
 vulnerabilities change even when the image does not, so the action pulls the existing

@@ -193,8 +193,39 @@ runs:
       run: |
         SOURCE="${REGISTRY}/${PROJECT_ID}/${IMAGE_NAME}:${SOURCE_TAG}"
         TARGET="${REGISTRY}/${PROJECT_ID}/${IMAGE_NAME}:${TARGET_TAG}"
-        echo "Retagging ${SOURCE} -> ${TARGET}"
-        gcloud artifacts docker tags add "${SOURCE}" "${TARGET}"
+
+        # `tags add` over an existing tag is a move, and a move deletes the old
+        # tag first: it needs artifactregistry.tags.delete, which CI does not
+        # have (roles/artifactregistry.writer stops at tags.create/update). A
+        # re-run of a job that already tagged would therefore fail on work it
+        # had already done, so compare digests and skip when there is nothing
+        # to move.
+        SOURCE_DIGEST="$(gcloud artifacts docker images describe "${SOURCE}" --format='value(image_summary.digest)')"
+        TARGET_DIGEST="$(gcloud artifacts docker images describe "${TARGET}" --format='value(image_summary.digest)' 2>/dev/null || true)"
+
+        if [ -z "${SOURCE_DIGEST}" ]; then
+          echo "::error::Could not resolve a digest for ${SOURCE}."
+          exit 1
+        fi
+
+        if [ "${TARGET_DIGEST}" = "${SOURCE_DIGEST}" ]; then
+          echo "${TARGET} already points at ${SOURCE_DIGEST}; nothing to do."
+          exit 0
+        fi
+
+        echo "Retagging ${SOURCE} (${SOURCE_DIGEST}) -> ${TARGET}"
+        if [ -n "${TARGET_DIGEST}" ]; then
+          # The tag exists on another digest, so this is a move and gcloud would
+          # have to delete it first. Re-push the source manifest under the target
+          # tag instead: overwriting a tag is an upload
+          # (artifactregistry.repositories.uploadArtifacts), which CI does have.
+          # imagetools copies the manifest registry-side, so nothing is pulled and
+          # a multi-arch index stays intact.
+          echo "${TARGET} currently points at ${TARGET_DIGEST}; overwriting it."
+          docker buildx imagetools create --tag "${TARGET}" "${SOURCE}"
+        else
+          gcloud artifacts docker tags add "${SOURCE}" "${TARGET}"
+        fi
 
     # --- Build flow ---
     - name: Check for existing image (reuse)

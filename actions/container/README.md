@@ -178,3 +178,14 @@ exclusive with `warpbuild-profile`.
 5. Pull image for scan: `scripts/docker-pull-for-scan.sh` puts the image in the local Docker daemon when the build did not. A reuse hit, a multi-arch build, and a WarpBuild build that pushes all leave nothing there.
 6. **Image scan:** delegates to the `security` action (syft SBOM + grype vuln scan), which posts results to the PR comment. Blocks on `severity` threshold. A reused image is scanned like a new one, because known vulnerabilities change even when the image does not. Skipped on `retag` or `scan: false`; `scan` is the only input that turns the scan off.
 7. Tag and push: only if `push: true`, and only for an image the run built.
+
+`extra-tags` follows the same rule on the buildx-push path, where the tags are applied in the
+registry rather than by `docker push`: a tag that already exists and points elsewhere — a moving
+tag such as `pr-<number>` — is overwritten with imagetools rather than moved.
+
+In `retag` mode the step resolves both digests before it acts. It is a no-op when the target tag
+already points at the source digest, which is what a re-run of an already-tagged job hits. It
+calls `gcloud artifacts docker tags add` when the target tag does not exist yet. When the target
+tag exists on a different digest it re-pushes the source manifest with `docker buildx imagetools
+create` instead, because `tags add` would delete the old tag first and
+`artifactregistry.tags.delete` is outside `roles/artifactregistry.writer`.
