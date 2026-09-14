@@ -97,6 +97,18 @@ on:
         required: false
         default: info
 
+      run-on-approval:
+        description: >-
+          Dispatch reeve when a pull_request_review is submitted as approved.
+          reeve's own default is false: approvals change no code and the apply
+          gate re-checks them anyway, so the run is pure cost. Callers that
+          configure Slack notifications want it true, because the approved-state
+          message is only posted on that dispatch. Callers subscribed to
+          pull_request_review already pay for the run either way.
+        type: boolean
+        required: false
+        default: false
+
       compliance-ticket:
         description: Require Shortcut ticket reference
         type: boolean
@@ -379,7 +391,7 @@ jobs:
           repositories: ${{ github.event.repository.name }}
 
       - name: Reeve
-        uses: reeveops/reeve@v0.6.0
+        uses: reeveops/reeve@v0.7.0
         with:
           # When pre-warmed we already installed pulumi; leave blank so reeve
           # doesn't reinstall. Same for terraform engines, which never need
@@ -392,6 +404,8 @@ jobs:
           gcp-service-account: ${{ inputs.gcp-service-account }}
           slack-token: ${{ secrets.PCTL_SLACK_BOT_TOKEN }}
           log-level: ${{ inputs.reeve-log-level }}
+          # Action input is a string; the workflow input is a boolean.
+          run-on-approval: ${{ inputs.run-on-approval && 'true' || 'false' }}
         env:
           DASH0_TOKEN: ${{ secrets.DASH0_TOKEN }}
           # Private-module git rewrite for the engine subprocess, forwarded by
