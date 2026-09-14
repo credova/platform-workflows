@@ -109,8 +109,7 @@ on:
         description: "GitHub Actions runner label"
         type: string
         required: false
-        # Baseline for gate jobs and any class without an override below.
-        # Gate jobs finish in seconds; billing rounds up to 60s.
+        # Baseline (default runner)
         default: warp-ubuntu-2404-x64-2x
       lint-runner:
         description: Runner for the lint jobs. Empty inherits `runner`.

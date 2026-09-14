@@ -669,7 +669,7 @@ Use any GitHub-hosted runner instead (for repos not on WarpBuild):
 
 ### Per-class overrides
 
-`runner` is the baseline: gate jobs (`validate`, `compliance`, approvals, retag, release) run there, and they finish in seconds. WarpBuild bills a 60-second minimum per job, so a larger `runner` buys nothing for them. Size only the heavy classes:
+`runner` is the baseline: gate jobs (`validate`, `compliance`, approvals, retag, release) run there and they tend to finish more quickly. WarpBuild bills a 60-second minimum per job so a larger `runner` buys nothing for them. Size only the heavy classes:
 
 ```yaml
     with:
