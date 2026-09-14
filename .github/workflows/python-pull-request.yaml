@@ -104,12 +104,34 @@ on:
         required: false
         default: false
 
-      # Runner
+      # Runners
       runner:
         description: "GitHub Actions runner label"
         type: string
         required: false
+        # Baseline for gate jobs and any class without an override below.
+        # Gate jobs finish in seconds; billing rounds up to 60s.
         default: warp-ubuntu-2404-x64-2x
+      lint-runner:
+        description: Runner for the lint jobs. Empty inherits `runner`.
+        type: string
+        required: false
+        default: ""
+      security-runner:
+        description: Runner for the security jobs (scans are CPU-heavy). Empty inherits `runner`.
+        type: string
+        required: false
+        default: ""
+      test-runner:
+        description: Runner for the test jobs. Empty inherits `runner`.
+        type: string
+        required: false
+        default: ""
+      build-runner:
+        description: Runner for the container build jobs (builds are CPU-heavy). Empty inherits `runner`.
+        type: string
+        required: false
+        default: ""
 
     secrets:
       WARPBUILD_API_KEY:
@@ -151,7 +173,7 @@ jobs:
 
   lint-linear:
     if: inputs.run-order == 'linear'
-    runs-on: ${{ inputs.runner }}
+    runs-on: ${{ inputs.lint-runner || inputs.runner }}
     steps:
       - uses: actions/checkout@v7
       - uses: credova/platform-workflows/actions/setup-language@master
@@ -180,7 +202,7 @@ jobs:
   security-linear:
     if: inputs.run-order == 'linear' && always() && !failure() && !cancelled()
     needs: [lint-linear]
-    runs-on: ${{ inputs.runner }}
+    runs-on: ${{ inputs.security-runner || inputs.runner }}
     steps:
       - uses: actions/checkout@v7
       - uses: credova/platform-workflows/actions/setup-language@master
@@ -209,7 +231,7 @@ jobs:
   test-linear:
     if: inputs.run-order == 'linear'
     needs: [security-linear]
-    runs-on: ${{ inputs.runner }}
+    runs-on: ${{ inputs.test-runner || inputs.runner }}
     steps:
       - uses: actions/checkout@v7
       - uses: credova/platform-workflows/actions/setup-language@master
@@ -238,7 +260,7 @@ jobs:
   build-linear:
     if: inputs.run-order == 'linear' && inputs.container
     needs: [validate, test-linear]
-    runs-on: ${{ inputs.runner }}
+    runs-on: ${{ inputs.build-runner || inputs.runner }}
     strategy:
       fail-fast: true
       matrix:
@@ -267,7 +289,7 @@ jobs:
 
   lint-parallel:
     if: inputs.run-order == 'parallel'
-    runs-on: ${{ inputs.runner }}
+    runs-on: ${{ inputs.lint-runner || inputs.runner }}
     steps:
       - uses: actions/checkout@v7
       - uses: credova/platform-workflows/actions/setup-language@master
@@ -295,7 +317,7 @@ jobs:
 
   security-parallel:
     if: inputs.run-order == 'parallel'
-    runs-on: ${{ inputs.runner }}
+    runs-on: ${{ inputs.security-runner || inputs.runner }}
     steps:
       - uses: actions/checkout@v7
       - uses: credova/platform-workflows/actions/setup-language@master
@@ -323,7 +345,7 @@ jobs:
 
   test-parallel:
     if: inputs.run-order == 'parallel'
-    runs-on: ${{ inputs.runner }}
+    runs-on: ${{ inputs.test-runner || inputs.runner }}
     steps:
       - uses: actions/checkout@v7
       - uses: credova/platform-workflows/actions/setup-language@master
@@ -352,7 +374,7 @@ jobs:
   build-parallel:
     if: inputs.run-order == 'parallel' && inputs.container
     needs: [validate]
-    runs-on: ${{ inputs.runner }}
+    runs-on: ${{ inputs.build-runner || inputs.runner }}
     strategy:
       fail-fast: true
       matrix:
@@ -381,7 +403,7 @@ jobs:
 
   security-checks-first:
     if: inputs.run-order == 'checks-first'
-    runs-on: ${{ inputs.runner }}
+    runs-on: ${{ inputs.security-runner || inputs.runner }}
     steps:
       - uses: actions/checkout@v7
       - uses: credova/platform-workflows/actions/setup-language@master
@@ -410,7 +432,7 @@ jobs:
   lint-checks-first:
     if: inputs.run-order == 'checks-first'
     needs: [security-checks-first]
-    runs-on: ${{ inputs.runner }}
+    runs-on: ${{ inputs.lint-runner || inputs.runner }}
     steps:
       - uses: actions/checkout@v7
       - uses: credova/platform-workflows/actions/setup-language@master
@@ -439,7 +461,7 @@ jobs:
   test-checks-first:
     if: inputs.run-order == 'checks-first'
     needs: [security-checks-first]
-    runs-on: ${{ inputs.runner }}
+    runs-on: ${{ inputs.test-runner || inputs.runner }}
     steps:
       - uses: actions/checkout@v7
       - uses: credova/platform-workflows/actions/setup-language@master
@@ -468,7 +490,7 @@ jobs:
   build-checks-first:
     if: inputs.run-order == 'checks-first' && inputs.container && always() && !failure() && !cancelled()
     needs: [validate, lint-checks-first, test-checks-first]
-    runs-on: ${{ inputs.runner }}
+    runs-on: ${{ inputs.build-runner || inputs.runner }}
     strategy:
       fail-fast: true
       matrix:

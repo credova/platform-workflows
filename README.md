@@ -75,6 +75,7 @@ See the [usage guide](docs/usage.md) for customization.
 
 - Default: `warp-ubuntu-2404-x64-2x` ([WarpBuild](https://warpbuild.com)).
 - Override per workflow with the `runner` input.
+- Size heavy classes independently with `lint-runner`, `security-runner`, `test-runner`, `build-runner` (language PR workflows) and `test-runner`, `build-runner` (deploy). Empty inherits `runner`. See [docs/usage.md](docs/usage.md#per-class-overrides).
 
 Naming pattern:
 
