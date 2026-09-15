@@ -28,7 +28,7 @@ runs:
 
     - name: Cache Go modules
       if: inputs.language == 'go' && inputs.cache == 'true'
-      uses: WarpBuilds/cache@v1
+      uses: WarpBuilds/cache@v2
       with:
         path: ~/go/pkg/mod
         key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
@@ -44,7 +44,7 @@ runs:
 
     - name: Cache npm
       if: inputs.language == 'node' && inputs.cache == 'true'
-      uses: WarpBuilds/cache@v1
+      uses: WarpBuilds/cache@v2
       with:
         path: ~/.npm
         key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json', '**/yarn.lock') }}
@@ -66,7 +66,7 @@ runs:
 
     - name: Cache Gradle (WarpBuild)
       if: inputs.language == 'kotlin' && inputs.cache == 'true'
-      uses: WarpBuilds/cache@v1
+      uses: WarpBuilds/cache@v2
       with:
         path: |
           ~/.gradle/caches
@@ -83,7 +83,7 @@ runs:
 
     - name: Cache pip
       if: inputs.language == 'python' && inputs.cache == 'true'
-      uses: WarpBuilds/cache@v1
+      uses: WarpBuilds/cache@v2
       with:
         path: ~/.cache/pip
         key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements*.txt', '**/pyproject.toml', '**/setup.py') }}
@@ -98,7 +98,7 @@ runs:
 
     - name: Cache Bundler
       if: inputs.language == 'ruby' && inputs.cache == 'true'
-      uses: WarpBuilds/cache@v1
+      uses: WarpBuilds/cache@v2
       with:
         path: vendor/bundle
         key: ${{ runner.os }}-bundler-${{ hashFiles('**/Gemfile.lock') }}
@@ -113,7 +113,7 @@ runs:
 
     - name: Cache NuGet
       if: inputs.language == 'dotnet' && inputs.cache == 'true'
-      uses: WarpBuilds/cache@v1
+      uses: WarpBuilds/cache@v2
       with:
         path: ~/.nuget/packages
         key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', '**/packages.lock.json') }}
@@ -128,7 +128,7 @@ runs:
 
     - name: Cache Composer
       if: inputs.language == 'php' && inputs.cache == 'true'
-      uses: WarpBuilds/cache@v1
+      uses: WarpBuilds/cache@v2
       with:
         path: ~/.composer/cache
         key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}

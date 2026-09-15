@@ -26,9 +26,11 @@ Cache browser binaries to speed up subsequent runs:
   shell: bash
   run: echo "version=$(jq -r '.devDependencies["@playwright/test"]' package.json | sed 's/^[^0-9]*//')" >> "$GITHUB_OUTPUT"
 
+# WarpBuilds/cache is a drop-in for actions/cache and only works on WarpBuild
+# runners; use actions/cache for jobs on GitHub-hosted runners.
 - name: Cache Playwright browsers
   id: pw-cache
-  uses: actions/cache@v5
+  uses: WarpBuilds/cache@v2
   with:
     path: ~/.cache/ms-playwright
     key: playwright-${{ steps.pw-version.outputs.version }}

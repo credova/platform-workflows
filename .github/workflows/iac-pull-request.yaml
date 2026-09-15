@@ -254,7 +254,7 @@ jobs:
       # cache:false still points GOMODCACHE/GOCACHE at these standard paths.
       - name: Cache Go modules
         if: inputs.prewarm
-        uses: WarpBuilds/cache@v1
+        uses: WarpBuilds/cache@v2
         with:
           path: ~/go/pkg/mod
           key: ${{ runner.os }}-go-mod-${{ hashFiles('go.sum') }}
@@ -265,7 +265,7 @@ jobs:
       # and always saves a fresh entry.
       - name: Cache Go build
         if: inputs.prewarm
-        uses: WarpBuilds/cache@v1
+        uses: WarpBuilds/cache@v2
         with:
           path: ~/.cache/go-build
           key: ${{ runner.os }}-go-build-${{ hashFiles('go.sum') }}-${{ github.sha }}
