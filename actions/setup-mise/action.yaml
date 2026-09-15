@@ -1,0 +1,116 @@
+name: setup-mise
+description: >
+  Install mise and its tools. Wraps jdx/mise-action and swaps the tool cache
+  to WarpCache when the job runs on a WarpBuild runner. Elsewhere it behaves
+  exactly like jdx/mise-action.
+
+inputs:
+  version:
+    description: mise version to install (default latest release)
+    required: false
+    default: ""
+  install:
+    description: Run `mise install` after setup
+    required: false
+    default: "true"
+  install_args:
+    description: Arguments passed to `mise install`, e.g. `jq@1.7.1`
+    required: false
+    default: ""
+  cache:
+    description: Read and write the mise tool cache
+    required: false
+    default: "true"
+  cache_save:
+    description: Write the cache after install (no effect when cache is false)
+    required: false
+    default: "true"
+  cache_key_prefix:
+    description: Cache key prefix. Change it to invalidate the cache
+    required: false
+    default: mise-v1
+  github_token:
+    description: GitHub token used by mise to install GitHub-hosted tools
+    required: false
+    default: ${{ github.token }}
+  working_directory:
+    description: Directory mise runs in (default repository root)
+    required: false
+    default: ""
+
+outputs:
+  cache-hit:
+    description: "`true` when the tool cache was restored from the primary key"
+    value: ${{ steps.result.outputs.cache-hit }}
+
+runs:
+  using: composite
+  steps:
+    - name: Detect runner and compute cache key
+      id: detect
+      shell: bash
+      env:
+        CACHE_KEY_PREFIX: ${{ inputs.cache_key_prefix }}
+        RUNNER_OS: ${{ runner.os }}
+        RUNNER_ARCH: ${{ runner.arch }}
+        MISE_VERSION: ${{ inputs.version || 'latest' }}
+        INSTALL_ARGS: ${{ inputs.install_args }}
+        CONFIG_HASH: ${{ hashFiles('**/mise.toml', '**/.mise.toml', '**/.mise/config.toml', '**/.config/mise.toml', '**/.tool-versions', '**/mise.lock', '**/.mise.*.toml') || 'no-config' }}
+      run: |
+        warp="${WARPBUILD_RUNNER_VERIFICATION_TOKEN:+true}"
+        mise_dir="${MISE_DATA_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/mise}"
+        args_hash="$(printf '%s' "${INSTALL_ARGS}" | sha256sum | cut -c1-16)"
+        key="${CACHE_KEY_PREFIX}-${RUNNER_OS}-${RUNNER_ARCH}-${MISE_VERSION}-${args_hash}-${CONFIG_HASH}"
+
+        {
+          echo "warp=${warp:-false}"
+          echo "mise_dir=${mise_dir}"
+          echo "key=${key}"
+        } >> "$GITHUB_OUTPUT"
+
+        echo "runner=$([ -n "${warp}" ] && echo warpbuild || echo github)"
+        echo "mise_dir=${mise_dir}"
+        echo "key=${key}"
+
+    - name: Restore mise cache (WarpCache)
+      id: restore
+      if: steps.detect.outputs.warp == 'true' && inputs.cache == 'true'
+      uses: WarpBuilds/cache/restore@dad44e2487e9dc889ad6e6bd198e77bb2d828eee # v2.0.0
+      with:
+        path: ${{ steps.detect.outputs.mise_dir }}
+        key: ${{ steps.detect.outputs.key }}
+
+    - name: Setup mise
+      id: mise
+      uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
+      with:
+        version: ${{ inputs.version }}
+        install: ${{ inputs.install }}
+        install_args: ${{ inputs.install_args }}
+        cache: ${{ steps.detect.outputs.warp != 'true' && inputs.cache == 'true' }}
+        cache_save: ${{ inputs.cache_save }}
+        cache_key_prefix: ${{ inputs.cache_key_prefix }}
+        github_token: ${{ inputs.github_token }}
+        working_directory: ${{ inputs.working_directory }}
+
+    - name: Save mise cache (WarpCache)
+      if: >-
+        steps.detect.outputs.warp == 'true' &&
+        inputs.cache == 'true' &&
+        inputs.cache_save == 'true' &&
+        steps.restore.outputs.cache-hit != 'true'
+      uses: WarpBuilds/cache/save@dad44e2487e9dc889ad6e6bd198e77bb2d828eee # v2.0.0
+      with:
+        path: ${{ steps.detect.outputs.mise_dir }}
+        key: ${{ steps.detect.outputs.key }}
+
+    - name: Report cache result
+      id: result
+      shell: bash
+      env:
+        WARP_HIT: ${{ steps.restore.outputs.cache-hit }}
+        MISE_HIT: ${{ steps.mise.outputs.cache-hit }}
+      run: |
+        hit="${WARP_HIT:-${MISE_HIT:-false}}"
+        echo "cache-hit=${hit}" >> "$GITHUB_OUTPUT"
+        echo "cache-hit=${hit}"

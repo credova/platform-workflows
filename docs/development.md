@@ -32,7 +32,8 @@ platform-workflows/
 │   ├── run-job/                # Deploy and execute a Cloud Run Job
 │   ├── secrets-setup/          # GCP Secret Manager via fnox
 │   ├── security/               # syft + grype + grant + opengrep scanning
-│   └── setup-language/         # Runtime setup + WarpBuild dep caching
+│   ├── setup-language/         # Runtime setup + WarpBuild dep caching
+│   └── setup-mise/             # mise install + WarpCache tool cache
 ├── scripts/                    # Shell scripts (called by actions)
 │   ├── check-shortcut-ticket.sh  # Shortcut ticket pattern matching
 │   ├── cloudflare-purge.sh       # Cloudflare cache purge API call
