@@ -253,7 +253,7 @@ runs:
         inputs.build == 'true' &&
         inputs.retag != 'true' &&
         steps.reuse-check.outputs.exists != 'true'
-      uses: WarpBuilds/build-push-action@v6
+      uses: WarpBuilds/build-push-action@v7
       with:
         context: ${{ inputs.context }}
         file: ${{ inputs.dockerfile }}
