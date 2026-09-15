@@ -15,6 +15,7 @@ Set up a language runtime for the current job. Handles Go, Node.js, Kotlin, Pyth
 When `cache: true`:
 
 - Go's `actions/setup-go` cache and Node's `actions/setup-node` cache are disabled to avoid double-caching.
+- Node caches `~/.npm` when `package-lock.json`/`yarn.lock` exists and `~/.bun/install/cache` when `bun.lock` exists (pinned via `BUN_INSTALL_CACHE_DIR`). pnpm is not cached.
 - For Kotlin, Gradle's built-in cache is disabled in favor of WarpBuild cache.
 
 ## Internal Mapping
