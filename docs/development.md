@@ -33,7 +33,7 @@ platform-workflows/
 │   ├── secrets-setup/          # GCP Secret Manager via fnox
 │   ├── security/               # syft + grype + grant + opengrep scanning
 │   ├── setup-language/         # Runtime setup + WarpBuild dep caching
-│   └── setup-mise/             # mise install + WarpCache tool cache
+│   └── setup-mise/             # mise install + WarpCache tool cache (snake_case inputs, mirrors jdx/mise-action)
 ├── scripts/                    # Shell scripts (called by actions)
 │   ├── check-shortcut-ticket.sh  # Shortcut ticket pattern matching
 │   ├── cloudflare-purge.sh       # Cloudflare cache purge API call
