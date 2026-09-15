@@ -165,12 +165,23 @@ on:
         required: false
         default: ""
 
-      # Runner
+      # Runners
       runner:
         description: "GitHub Actions runner label"
         type: string
         required: false
+        # Baseline (default runner)
         default: warp-ubuntu-2404-x64-2x
+      test-runner:
+        description: Runner for the test jobs. Empty inherits `runner`.
+        type: string
+        required: false
+        default: ""
+      build-runner:
+        description: Runner for the container build jobs. Empty inherits `runner`.
+        type: string
+        required: false
+        default: ""
 
     secrets:
       RELEASE_DOWNLOADER_APP_ID:
@@ -237,7 +248,7 @@ jobs:
   # --- Tests (skipped for hotfix) ---
   test:
     if: ${{ !inputs.hotfix }}
-    runs-on: ${{ inputs.runner }}
+    runs-on: ${{ inputs.test-runner || inputs.runner }}
     steps:
       - uses: actions/checkout@v7
       - uses: credova/platform-workflows/actions/setup-language@master
@@ -267,7 +278,7 @@ jobs:
   build-scan-push:
     if: inputs.container && always() && !failure() && !cancelled()
     needs: [validate, test]
-    runs-on: ${{ inputs.runner }}
+    runs-on: ${{ inputs.build-runner || inputs.runner }}
     strategy:
       fail-fast: true
       matrix:

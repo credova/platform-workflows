@@ -667,6 +667,19 @@ Use any GitHub-hosted runner instead (for repos not on WarpBuild):
       runner: ubuntu-latest
 ```
 
+### Per-class overrides
+
+`runner` is the baseline: gate jobs (`validate`, `compliance`, approvals, retag, release) run there and they tend to finish more quickly. WarpBuild bills a 60-second minimum per job so a larger `runner` buys nothing for them. Size only the heavy classes:
+
+```yaml
+    with:
+      runner: warp-ubuntu-2404-x64-2x        # gates and any class not overridden
+      test-runner: warp-ubuntu-2404-x64-4x
+      build-runner: warp-ubuntu-2404-x64-4x
+```
+
+Language pull-request workflows accept `lint-runner`, `security-runner`, `test-runner`, and `build-runner`. Deploy workflows accept `test-runner` and `build-runner`. An empty value (the default) inherits `runner`. Go and iac workflows expose their own per-job inputs (`security-runner`, `build-runner`, `goreleaser-runner`, `reeve-runner`) with fixed defaults.
+
 ### Naming pattern
 
 ```
@@ -771,6 +784,10 @@ effect on the next commit, or on a hotfix deploy, which forces a rebuild.
 | `warpbuild-profile`          | string  | `""`                  | WarpBuild Docker Builder profile         |
 | `cache`                      | boolean | `false`               | WarpBuild dependency caching             |
 | `runner`                     | string  | see WarpBuild section | GitHub Actions runner label              |
+| `lint-runner`                | string  | `""`                  | Runner for lint jobs; empty inherits `runner`     |
+| `security-runner`            | string  | `""`                  | Runner for security jobs; empty inherits `runner` |
+| `test-runner`                | string  | `""`                  | Runner for test jobs; empty inherits `runner`     |
+| `build-runner`               | string  | `""`                  | Runner for build jobs; empty inherits `runner`    |
 | `security-packages`          | boolean | `true`                | Package vulnerability scan               |
 | `security-licenses`          | boolean | `true`                | License compliance scan                  |
 | `security-code`              | boolean | `true`                | Code static analysis                     |
@@ -779,7 +796,7 @@ effect on the next commit, or on a hotfix deploy, which forces a rebuild.
 
 ### deploy.yaml
 
-Shares the build/runtime inputs from pull-request.yaml (`language`, `language-version`, `test-command`, `container`, `image`, `images`, `platform`, `project-id`, `container-no-cache-filters`, `container-pull`, `warpbuild-profile`, `cache`, `runner`, `security-severity`) plus:
+Shares the build/runtime inputs from pull-request.yaml (`language`, `language-version`, `test-command`, `container`, `image`, `images`, `platform`, `project-id`, `container-no-cache-filters`, `container-pull`, `warpbuild-profile`, `cache`, `runner`, `test-runner`, `build-runner`, `security-severity`) plus:
 
 | Input                                   | Type    | Default        | Description                                                      |
 |-----------------------------------------| ------- | -------------- | ---------------------------------------------------------------- |
