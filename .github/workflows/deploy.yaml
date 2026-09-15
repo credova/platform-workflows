@@ -178,7 +178,7 @@ jobs:
 
       - name: Parse image inputs
         id: parse
-        uses: credova/platform-workflows/actions/parse-images@master
+        uses: credova/platform-workflows/actions/parse-images@v1.5.0
         with:
           image: ${{ inputs.image }}
           images: ${{ inputs.images }}
@@ -211,7 +211,7 @@ jobs:
 
       - name: Generate release download token
         id: token
-        uses: credova/platform-workflows/actions/auth-release-token@master
+        uses: credova/platform-workflows/actions/auth-release-token@v1.5.0
         with:
           client-id: ${{ secrets.RELEASE_DOWNLOADER_APP_ID }}
           private-key: ${{ secrets.RELEASE_DOWNLOADER_APP_PRIVATE_KEY }}
@@ -225,7 +225,7 @@ jobs:
       - uses: actions/checkout@v7
 
       - name: Setup language
-        uses: credova/platform-workflows/actions/setup-language@master
+        uses: credova/platform-workflows/actions/setup-language@v1.5.0
         with:
           language: ${{ inputs.language }}
           version: ${{ inputs.language-version }}
@@ -265,7 +265,7 @@ jobs:
       - uses: actions/checkout@v7
 
       - name: Build, scan, and push image (${{ matrix.name }})
-        uses: credova/platform-workflows/actions/container@master
+        uses: credova/platform-workflows/actions/container@v1.5.0
         with:
           name: ${{ matrix.name }}
           dockerfile: ${{ matrix.dockerfile }}
@@ -295,7 +295,7 @@ jobs:
       - uses: actions/checkout@v7
 
       - name: Deploy to staging
-        uses: credova/platform-workflows/actions/deployment@master
+        uses: credova/platform-workflows/actions/deployment@v1.5.0
         with:
           target: ${{ inputs.config-path }}
           tag: ${{ needs.validate-inputs.outputs.deploy-tag }}
@@ -322,7 +322,7 @@ jobs:
       - uses: actions/checkout@v7
       - name: Deploy canary
         id: canary
-        uses: credova/platform-workflows/actions/deployment@master
+        uses: credova/platform-workflows/actions/deployment@v1.5.0
         with:
           target: ${{ inputs.config-path }}
           tag: ${{ needs.validate-inputs.outputs.deploy-tag }}
@@ -355,7 +355,7 @@ jobs:
       - uses: actions/checkout@v7
 
       - name: Retag image for production (${{ matrix.name }})
-        uses: credova/platform-workflows/actions/container@master
+        uses: credova/platform-workflows/actions/container@v1.5.0
         with:
           name: ${{ matrix.name }}
           retag: "true"
@@ -386,7 +386,7 @@ jobs:
 
       - name: Promote canary to production
         if: inputs.canary > 0
-        uses: credova/platform-workflows/actions/deployment@master
+        uses: credova/platform-workflows/actions/deployment@v1.5.0
         with:
           target: ${{ inputs.config-path }}
           action: promote
@@ -398,7 +398,7 @@ jobs:
 
       - name: Deploy to production (full)
         if: inputs.canary == 0
-        uses: credova/platform-workflows/actions/deployment@master
+        uses: credova/platform-workflows/actions/deployment@v1.5.0
         with:
           target: ${{ inputs.config-path }}
           tag: ${{ needs.validate-inputs.outputs.deploy-tag }}-prd
@@ -422,7 +422,7 @@ jobs:
       - name: Create release tag
         if: ${{ !inputs.hotfix }}
         id: tag
-        uses: credova/platform-workflows/actions/increment-tag@master
+        uses: credova/platform-workflows/actions/increment-tag@v1.5.0
 
       - name: Create GitHub Release
         if: ${{ !inputs.hotfix }}
