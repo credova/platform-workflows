@@ -10,7 +10,7 @@ Use this in place of `uses: jdx/mise-action@v4`. The action exposes a supported 
 | ------------------- | -------- | -------------------- | ------------------------------------------------------------------ |
 | `version`           | No       | latest release       | mise version to install                                            |
 | `install`           | No       | `true`               | Run `mise install` after setup                                     |
-| `install_args`      | No       | -                    | Arguments passed to `mise install`, e.g. `jq@1.7.1`                |
+| `install_args`      | No       | -                    | Arguments passed to `mise install`, e.g. `bun`                     |
 | `cache`             | No       | `true`               | Read and write the mise tool cache                                 |
 | `cache_save`        | No       | `true`               | Write the cache after install                                      |
 | `cache_key_prefix`  | No       | `mise-v1`            | Cache key prefix. Change it to invalidate the cache                |
@@ -44,10 +44,10 @@ Install one tool only:
 ```yaml
 - uses: credova/platform-workflows/actions/setup-mise@v1
   with:
-    install_args: jq@1.7.1
+    install_args: bun
 ```
 
-Read the cache without writing it, for example on a hotfix branch:
+Read the cache without writing it:
 
 ```yaml
 - uses: credova/platform-workflows/actions/setup-mise@v1

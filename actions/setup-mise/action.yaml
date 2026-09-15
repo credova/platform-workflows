@@ -16,7 +16,7 @@ inputs:
     required: false
     default: "true"
   install_args:
-    description: Arguments passed to `mise install`, e.g. `jq@1.7.1`
+    description: Arguments passed to `mise install`, e.g. `bun`
     required: false
     default: ""
   cache:
