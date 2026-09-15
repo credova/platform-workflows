@@ -1,0 +1,127 @@
+name: setup-mise
+description: >
+  Install mise and its tools. Wraps jdx/mise-action and swaps the tool cache
+  to WarpCache when the job runs on a WarpBuild runner. Elsewhere it behaves
+  exactly like jdx/mise-action.
+
+# Inputs are snake_case to match jdx/mise-action so call sites migrate by
+# changing only the `uses:` line. Other actions in this repo use kebab-case.
+inputs:
+  version:
+    description: mise version to install (default latest release)
+    required: false
+    default: ""
+  install:
+    description: Run `mise install` after setup
+    required: false
+    default: "true"
+  install_args:
+    description: Arguments passed to `mise install`, e.g. `bun`
+    required: false
+    default: ""
+  cache:
+    description: Read and write the mise tool cache
+    required: false
+    default: "true"
+  cache_save:
+    description: Write the cache after install (no effect when cache is false)
+    required: false
+    default: "true"
+  cache_key_prefix:
+    description: Cache key prefix. Change it to invalidate the cache
+    required: false
+    default: mise-v1
+  github_token:
+    description: GitHub token used by mise to install GitHub-hosted tools
+    required: false
+    default: ${{ github.token }}
+  working_directory:
+    description: Directory mise runs in (default repository root)
+    required: false
+    default: ""
+
+outputs:
+  cache-hit:
+    description: "`true` when the tool cache was restored from the primary key"
+    value: ${{ steps.restore.outputs.cache-hit || steps.mise.outputs.cache-hit }}
+
+runs:
+  using: composite
+  steps:
+    - name: Detect runner and compute cache key
+      id: detect
+      shell: bash
+      env:
+        CACHE_KEY_PREFIX: ${{ inputs.cache_key_prefix }}
+        RUNNER_OS: ${{ runner.os }}
+        RUNNER_ARCH: ${{ runner.arch }}
+        MISE_VERSION: ${{ inputs.version || 'latest' }}
+        INSTALL_ARGS: ${{ inputs.install_args }}
+        # Same file list jdx/mise-action hashes (src/index.ts MISE_CONFIG_FILE_PATTERNS).
+        CONFIG_HASH: >-
+          ${{ hashFiles(
+            '**/.config/mise/config.toml', '**/.config/mise/config.lock',
+            '**/.config/mise/config.*.toml', '**/.config/mise/config.*.lock',
+            '**/.config/mise.toml', '**/.config/mise.lock',
+            '**/.config/mise.*.toml', '**/.config/mise.*.lock',
+            '**/.mise/config.toml', '**/.mise/config.lock',
+            '**/.mise/config.*.toml', '**/.mise/config.*.lock',
+            '**/mise/config.toml', '**/mise/config.lock',
+            '**/mise/config.*.toml', '**/mise/config.*.lock',
+            '**/.mise.toml', '**/.mise.lock', '**/.mise.*.toml', '**/.mise.*.lock',
+            '**/mise.toml', '**/mise.lock', '**/mise.*.toml', '**/mise.*.lock',
+            '**/.tool-versions'
+          ) || 'no-config' }}
+      run: |
+        warp="${WARPBUILD_RUNNER_VERIFICATION_TOKEN:+true}"
+        mise_dir="${MISE_DATA_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/mise}"
+
+        if command -v sha256sum >/dev/null 2>&1; then
+          args_hash="$(printf '%s' "${INSTALL_ARGS}" | sha256sum | cut -c1-16)"
+        else
+          args_hash="$(printf '%s' "${INSTALL_ARGS}" | shasum -a 256 | cut -c1-16)"
+        fi
+
+        # ImageOS (e.g. ubuntu24) is set by GitHub-hosted and WarpBuild images.
+        # MISE_ENV selects mise config profiles, so it must be part of the key.
+        key="${CACHE_KEY_PREFIX}-${RUNNER_OS}-${RUNNER_ARCH}-${ImageOS:-self-hosted}-${MISE_VERSION}${MISE_ENV:+-${MISE_ENV}}-${args_hash}-${CONFIG_HASH}"
+
+        {
+          echo "warp=${warp:-false}"
+          echo "mise_dir=${mise_dir}"
+          echo "key=${key}"
+        } | tee -a "$GITHUB_OUTPUT"
+
+    - name: Restore mise cache (WarpCache)
+      id: restore
+      if: steps.detect.outputs.warp == 'true' && inputs.cache == 'true'
+      uses: WarpBuilds/cache/restore@dad44e2487e9dc889ad6e6bd198e77bb2d828eee # v2.0.0
+      with:
+        path: ${{ steps.detect.outputs.mise_dir }}
+        key: ${{ steps.detect.outputs.key }}
+
+    - name: Setup mise
+      id: mise
+      uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
+      with:
+        version: ${{ inputs.version }}
+        install: ${{ inputs.install }}
+        install_args: ${{ inputs.install_args }}
+        cache: ${{ steps.detect.outputs.warp != 'true' && inputs.cache == 'true' }}
+        cache_save: ${{ inputs.cache_save }}
+        cache_key_prefix: ${{ inputs.cache_key_prefix }}
+        github_token: ${{ inputs.github_token }}
+        working_directory: ${{ inputs.working_directory }}
+
+    # Same rule as jdx/mise-action: save only after a real install on a miss.
+    - name: Save mise cache (WarpCache)
+      if: >-
+        steps.detect.outputs.warp == 'true' &&
+        inputs.cache == 'true' &&
+        inputs.cache_save == 'true' &&
+        inputs.install == 'true' &&
+        steps.restore.outputs.cache-hit != 'true'
+      uses: WarpBuilds/cache/save@dad44e2487e9dc889ad6e6bd198e77bb2d828eee # v2.0.0
+      with:
+        path: ${{ steps.detect.outputs.mise_dir }}
+        key: ${{ steps.detect.outputs.key }}

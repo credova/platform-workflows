@@ -17,7 +17,7 @@ reusable workflow (deploy.yaml)
 
 - **Fail early, fail fast**: security and compliance checks run first.
 - **Opt-out, not opt-in**: security scanning and compliance gates are on by default.
-- **On rails**: defaults handle conflicts automatically. Enabling WarpBuild cache auto-disables built-in Go/Node caches.
+- **On rails**: defaults handle conflicts automatically. Enabling WarpBuild cache auto-disables built-in Go/Node caches. `setup-mise` detects WarpBuild runners and turns off `jdx/mise-action`'s built-in cache in favour of WarpCache, so nothing double-caches.
 - **Feature flags, not separate workflows**: one `pull-request.yaml`, one `deploy.yaml` with boolean toggles (`container`, `deploy`, `hotfix`, `cache`).
 - **Self-contained modules**: each composite handles its own auth, dependencies, and setup.
 - **One interface, hidden internals**: swap grype for something else by updating one composite.

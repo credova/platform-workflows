@@ -130,6 +130,7 @@ Confirm latest images: https://www.warpbuild.com/docs/ci/cloud-runners
 | [security](actions/security/)             | Syft + Grype vuln scan, Grant license scan, OpenGrep static analysis |
 | [run-job](actions/run-job/)               | Deploy and execute a Cloud Run Job                                   |
 | [setup-language](actions/setup-language/) | Multi-language runtime setup (Go, Node, Kotlin, Python, Ruby, .NET)  |
+| [setup-mise](actions/setup-mise/)         | mise + tools install, WarpCache tool cache on WarpBuild runners      |
 
 Internal actions (called by workflows, not directly by teams):
 
