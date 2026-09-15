@@ -724,13 +724,13 @@ Cached paths per language:
 | ------------- | ---------------------- | ---------------------------------------- |
 | Go            | `~/go/pkg/mod`         | `go.sum`                                 |
 | Node.js (npm) | `~/.npm`               | `package-lock.json`, `yarn.lock`         |
-| Node.js (bun) | `~/.bun/install/cache` | `bun.lock`, `bun.lockb`                  |
+| Node.js (bun) | `~/.bun/install/cache` | `bun.lock`                               |
 | Kotlin        | `~/.gradle/caches`     | `*.gradle*`, `gradle-wrapper.properties` |
 | Python        | `~/.cache/pip`         | `requirements*.txt`, `pyproject.toml`    |
 | Ruby          | `vendor/bundle`        | `Gemfile.lock`                           |
 | .NET          | `~/.nuget/packages`    | `*.csproj`, `packages.lock.json`         |
 
-When `cache: true`, built-in caches from `actions/setup-go` and `actions/setup-node` are disabled to avoid double-caching. For Node.js, each cache step runs only when its lockfile exists, so a bun repo caches bun's global cache and skips `~/.npm`.
+When `cache: true`, built-in caches from `actions/setup-go` and `actions/setup-node` are disabled to avoid double-caching. For Node.js, each WarpBuild cache step runs only when its lockfile exists, so a bun repo caches bun's global cache and skips `~/.npm`. pnpm is not cached.
 
 ### Busting the container layer cache
 
