@@ -29,7 +29,6 @@ Container lifecycle: build, scan, push, tag, reuse, retag. Calls `auth-gcp` inte
 | `severity`                   | No       | `HIGH`              | Minimum severity to fail image scan on                   |
 | `warpbuild-profile`          | No       | `""`                | WarpBuild Docker Builder profile name                    |
 | `warpbuild-api-key`          | No       | `""`                | WarpBuild API key (only needed on non-WarpBuild runners) |
-| `blacksmith`                 | No       | `false`             | Use Blacksmith's sticky-disk Docker builder (persistent layer cache; requires Blacksmith runners) |
 
 ## Outputs
 
@@ -111,9 +110,8 @@ matches no stage and prints no warning, so a typo looks like success. Check the 
 `,,,`, fails the build rather than going green having busted nothing. Name the narrowest stage that holds the upgrade, because
 busting an early stage discards the cache for everything after it.
 
-This only bites where the layer cache survives between runs, meaning WarpBuild Docker Builders
-and Blacksmith sticky disks. A plain buildx builder starts cold every job, so `apk upgrade`
-already re-runs there.
+This only bites where the layer cache survives between runs, meaning WarpBuild Docker Builders.
+A plain buildx builder starts cold every job, so `apk upgrade` already re-runs there.
 
 ### Retag for production (no build, no scan: already scanned at staging)
 
@@ -151,30 +149,12 @@ already re-runs there.
     workload-identity-provider: projects/<project-number>/locations/global/...
 ```
 
-### Blacksmith runners: persistent layer cache
-
-On `blacksmith-*` runners, opt in to Blacksmith's sticky-disk-backed builder so
-the BuildKit layer cache (base images, dependency-install layers, cache mounts)
-persists across runs instead of starting cold on every build. Mutually
-exclusive with `warpbuild-profile`.
-
-```yaml
-- uses: credova/platform-workflows/actions/container@master
-  with:
-    name: merchant-portal
-    build: true
-    push: true
-    blacksmith: true
-    project-id: <gcp-project-id>
-    workload-identity-provider: projects/<project-number>/locations/global/...
-```
-
 ## Internal Flow (`build: true`)
 
 1. Compute image metadata.
 2. `auth-gcp`: authenticate to GCP and configure Docker for Artifact Registry.
 3. Reuse check: skip the build and the push if the image already exists for this SHA (when `reuse: true`).
-4. Build image via buildx (optionally on a Blacksmith sticky-disk builder) or WarpBuild `no-cache-filters` forces the named stages to rebuild; `pull` re-resolves base image digests.
+4. Build image via buildx or WarpBuild. `no-cache-filters` forces the named stages to rebuild; `pull` re-resolves base image digests.
 5. Pull image for scan: `scripts/docker-pull-for-scan.sh` puts the image in the local Docker daemon when the build did not. A reuse hit, a multi-arch build, and a WarpBuild build that pushes all leave nothing there.
 6. **Image scan:** delegates to the `security` action (syft SBOM + grype vuln scan), which posts results to the PR comment. Blocks on `severity` threshold. A reused image is scanned like a new one, because known vulnerabilities change even when the image does not. Skipped on `retag` or `scan: false`; `scan` is the only input that turns the scan off.
 7. Tag and push: only if `push: true`, and only for an image the run built.
