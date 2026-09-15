@@ -706,7 +706,7 @@ Confirm latest images and specs: https://www.warpbuild.com/docs/ci/cloud-runners
 
 ### Dependency caching (WarpCache)
 
-Enable `WarpBuilds/cache@v1` for dependency caching. It is a drop-in replacement for `actions/cache` with unlimited storage on WarpBuild runners.
+Enable `WarpBuilds/cache@v2` for dependency caching. It is a drop-in replacement for `actions/cache` with unlimited storage on WarpBuild runners.
 
 ```yaml
 jobs:
