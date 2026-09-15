@@ -42,13 +42,24 @@ runs:
         node-version: ${{ inputs.version }}
         package-manager-cache: ${{ inputs.cache != 'true' }}
 
+    # Each step is gated on its own lockfile so a repo never saves an empty-hash key
+    # for a package manager it does not use.
     - name: Cache npm
-      if: inputs.language == 'node' && inputs.cache == 'true'
+      if: inputs.language == 'node' && inputs.cache == 'true' && hashFiles('**/package-lock.json', '**/yarn.lock') != ''
       uses: WarpBuilds/cache@v2
       with:
         path: ~/.npm
         key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json', '**/yarn.lock') }}
         restore-keys: ${{ runner.os }}-node-
+
+    # bun's global cache; callers install bun themselves (mise), this only caches its downloads.
+    - name: Cache bun
+      if: inputs.language == 'node' && inputs.cache == 'true' && hashFiles('**/bun.lock', '**/bun.lockb') != ''
+      uses: WarpBuilds/cache@v2
+      with:
+        path: ~/.bun/install/cache
+        key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lock', '**/bun.lockb') }}
+        restore-keys: ${{ runner.os }}-bun-
 
     # Kotlin / JDK + Gradle
     - name: Setup JDK (Kotlin)
