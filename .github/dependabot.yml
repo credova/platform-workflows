@@ -1,12 +1,3 @@
-# Dependabot: keep third-party GitHub Actions current.
-#
-# Two update blocks because Dependabot only scans `.github/workflows` under
-# `/`. The composite actions in `actions/*` need their own entry.
-#
-# Monthly. Minor and patch updates land as one grouped PR per block; majors
-# open as separate PRs so input and output changes get read individually.
-# Every merged bump reaches consumers pinned to `@master` on their next run
-# and consumers on `@v1` at the next release, so nothing auto-merges here.
 version: 2
 
 updates:
