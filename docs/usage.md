@@ -734,8 +734,8 @@ When `cache: true`, built-in caches from `actions/setup-go` and `actions/setup-n
 ### Busting the container layer cache
 
 `apk update && apk upgrade` in a Dockerfile caches like any other `RUN`. Where the BuildKit
-layer cache persists between runs, meaning WarpBuild Docker Builders and Blacksmith sticky
-disks, that layer can be months old while the distro has already patched the CVEs it contains.
+layer cache persists between runs, meaning WarpBuild Docker Builders, that layer can be
+months old while the distro has already patched the CVEs it contains.
 Name the stage that runs the upgrade:
 
 ```yaml

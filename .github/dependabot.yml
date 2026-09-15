@@ -1,0 +1,46 @@
+version: 2
+
+updates:
+  # Reusable workflows: .github/workflows/*.yaml
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+      time: "04:00"
+      timezone: America/Los_Angeles
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(actions)"
+    labels:
+      - dependencies
+      - github-actions
+    groups:
+      workflows-minor-patch:
+        update-types:
+          - minor
+          - patch
+    ignore:
+      # Exact 0.x pin. Every minor can break; bumped by hand with a story.
+      - dependency-name: reeveops/reeve
+
+  # Composite actions: actions/*/action.yaml
+  - package-ecosystem: github-actions
+    directories:
+      - /actions/*
+    schedule:
+      interval: monthly
+      time: "04:00"
+      timezone: America/Los_Angeles
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(actions)"
+    labels:
+      - dependencies
+      - github-actions
+    groups:
+      composite-actions-minor-patch:
+        update-types:
+          - minor
+          - patch
+    ignore:
+      - dependency-name: reeveops/reeve
