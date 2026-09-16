@@ -181,10 +181,7 @@ jobs:
           version: ${{ inputs.java-version }}
           cache: ${{ inputs.cache && 'true' || 'false' }}
       - name: Setup mise
-        uses: jdx/mise-action@v4
-        with:
-          install: true
-          cache: true
+        uses: credova/platform-workflows/actions/setup-mise@master
       - name: Lint
         shell: bash
         env:
@@ -210,10 +207,7 @@ jobs:
           version: ${{ inputs.java-version }}
           cache: ${{ inputs.cache && 'true' || 'false' }}
       - name: Setup mise
-        uses: jdx/mise-action@v4
-        with:
-          install: true
-          cache: true
+        uses: credova/platform-workflows/actions/setup-mise@master
       - name: Security (mise)
         shell: bash
         run: |
@@ -239,10 +233,7 @@ jobs:
           version: ${{ inputs.java-version }}
           cache: ${{ inputs.cache && 'true' || 'false' }}
       - name: Setup mise
-        uses: jdx/mise-action@v4
-        with:
-          install: true
-          cache: true
+        uses: credova/platform-workflows/actions/setup-mise@master
       - name: Test
         shell: bash
         env:
@@ -297,10 +288,7 @@ jobs:
           version: ${{ inputs.java-version }}
           cache: ${{ inputs.cache && 'true' || 'false' }}
       - name: Setup mise
-        uses: jdx/mise-action@v4
-        with:
-          install: true
-          cache: true
+        uses: credova/platform-workflows/actions/setup-mise@master
       - name: Lint
         shell: bash
         env:
@@ -325,10 +313,7 @@ jobs:
           version: ${{ inputs.java-version }}
           cache: ${{ inputs.cache && 'true' || 'false' }}
       - name: Setup mise
-        uses: jdx/mise-action@v4
-        with:
-          install: true
-          cache: true
+        uses: credova/platform-workflows/actions/setup-mise@master
       - name: Security (mise)
         shell: bash
         run: |
@@ -353,10 +338,7 @@ jobs:
           version: ${{ inputs.java-version }}
           cache: ${{ inputs.cache && 'true' || 'false' }}
       - name: Setup mise
-        uses: jdx/mise-action@v4
-        with:
-          install: true
-          cache: true
+        uses: credova/platform-workflows/actions/setup-mise@master
       - name: Test
         shell: bash
         env:
@@ -411,10 +393,7 @@ jobs:
           version: ${{ inputs.java-version }}
           cache: ${{ inputs.cache && 'true' || 'false' }}
       - name: Setup mise
-        uses: jdx/mise-action@v4
-        with:
-          install: true
-          cache: true
+        uses: credova/platform-workflows/actions/setup-mise@master
       - name: Security (mise)
         shell: bash
         run: |
@@ -440,10 +419,7 @@ jobs:
           version: ${{ inputs.java-version }}
           cache: ${{ inputs.cache && 'true' || 'false' }}
       - name: Setup mise
-        uses: jdx/mise-action@v4
-        with:
-          install: true
-          cache: true
+        uses: credova/platform-workflows/actions/setup-mise@master
       - name: Lint
         shell: bash
         env:
@@ -469,10 +445,7 @@ jobs:
           version: ${{ inputs.java-version }}
           cache: ${{ inputs.cache && 'true' || 'false' }}
       - name: Setup mise
-        uses: jdx/mise-action@v4
-        with:
-          install: true
-          cache: true
+        uses: credova/platform-workflows/actions/setup-mise@master
       - name: Test
         shell: bash
         env:
