@@ -190,6 +190,10 @@ runs:
     # so repos that have not been onboarded see no change.
     - name: Install pctl
       if: always() && inputs.siem == 'true' && inputs.wazuh-scan-url != '' && inputs.wazuh-token != ''
+      # Install failures must honour siem-block too, or an unreachable release
+      # API would fail a job that opted out of SIEM gating — and the push step
+      # would then fail again for a missing binary.
+      continue-on-error: ${{ inputs.siem-block != 'true' }}
       uses: credova/platform-workflows/actions/install-pctl@master
       with:
         version: ${{ inputs.pctl-version }}
@@ -197,6 +201,7 @@ runs:
 
     - name: Push scan results to Wazuh
       if: always() && inputs.siem == 'true' && inputs.wazuh-scan-url != '' && inputs.wazuh-token != ''
+      continue-on-error: ${{ inputs.siem-block != 'true' }}
       shell: bash
       env:
         PCTL_WAZUH_SCAN_URL: ${{ inputs.wazuh-scan-url }}
