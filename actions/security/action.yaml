@@ -59,11 +59,13 @@ inputs:
     default: ""
   siem:
     description: >
-      Push scan results to the Wazuh SIEM via the pctl server. Requires both
-      wazuh-scan-url and wazuh-token; either absent means the push is skipped,
-      so repos that have not been onboarded are unaffected.
+      Push scan results to the Wazuh SIEM via the pctl server. Off by default:
+      findings currently accumulate in Wazuh with no way to close them once
+      they are fixed, so pushing at volume would build a backlog nobody can
+      clear. See sc-89393. Opt in per repo once that is solved. Also requires
+      wazuh-scan-url and wazuh-token; either absent skips the push regardless.
     required: false
-    default: "true"
+    default: "false"
   wazuh-token:
     description: >
       Bearer token for the ingestion endpoint. Callers pass the
