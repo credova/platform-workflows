@@ -359,7 +359,7 @@ jobs:
       # TEMPORARY — pinned to this branch so the new wazuh-token input resolves
       # while testing end to end. A @master ref would silently ignore it as an
       # unknown input. REVERT TO @master BEFORE MERGE.
-      - uses: credova/platform-workflows/actions/security@feature/sc-85229/push-scans-to-wazuh
+      - uses: credova/platform-workflows/actions/security@0b35f3dcae24d3d402fab73be5f595b4d8704f99
         with:
           packages: ${{ inputs.security-packages && 'true' || 'false' }}
           licenses: ${{ inputs.security-licenses && 'true' || 'false' }}
