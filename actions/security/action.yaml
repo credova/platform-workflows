@@ -66,8 +66,10 @@ inputs:
     default: "true"
   wazuh-token:
     description: >
-      Bearer token for the ingestion endpoint. Pass
-      ${{ secrets.PIPELINE_WEBHOOK_TOKEN }}. Empty disables the push.
+      Bearer token for the ingestion endpoint. Callers pass the
+      PIPELINE_WEBHOOK_TOKEN secret. Empty disables the push.
+      Written without an expression on purpose: GitHub evaluates ${{ }} inside
+      descriptions too, and a composite action has no secrets context.
     required: false
     default: ""
   wazuh-scan-url:
