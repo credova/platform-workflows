@@ -68,8 +68,9 @@ inputs:
     description: >
       Bearer token for the ingestion endpoint. Callers pass the
       PIPELINE_WEBHOOK_TOKEN secret. Empty disables the push.
-      Written without an expression on purpose: GitHub evaluates ${{ }} inside
-      descriptions too, and a composite action has no secrets context.
+      Deliberately written without an expression: GitHub evaluates
+      interpolation syntax inside descriptions too, and a composite action has
+      no secrets context, so naming one here makes the action fail to load.
     required: false
     default: ""
   wazuh-scan-url:
