@@ -12,7 +12,13 @@ fi
 
 echo "::group::OpenGrep static analysis"
 
-ARGS="scan --sarif-output=opengrep-results.sarif"
+# Emit SARIF and JSON in one pass. SARIF drives the PR comment and the
+# fail-on-findings check below; the JSON copy is what `pctl wazuh scan push`
+# sends to the SIEM, because the receiver parses OpenGrep's native shape
+# ({"results": [...]}) and SARIF loses the metadata it decodes (cwe, owasp,
+# the raw severity string). --*-output flags are repeatable and independent,
+# so this costs one extra file, not a second scan.
+ARGS="scan --sarif-output=opengrep-results.sarif --json-output=opengrep-results.json"
 
 # Map severity to opengrep --severity flag
 case "${SEVERITY}" in
@@ -28,6 +34,10 @@ OPENGREP_EXIT=0
 opengrep ${ARGS} . || OPENGREP_EXIT=$?
 
 echo "::endgroup::"
+
+if [ -f opengrep-results.json ]; then
+  echo "JSON results written to opengrep-results.json"
+fi
 
 if [ -f opengrep-results.sarif ]; then
   echo "SARIF results written to opengrep-results.sarif"

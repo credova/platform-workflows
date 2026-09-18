@@ -57,6 +57,35 @@ inputs:
       platform (e.g. an amd64-only image scanned on an arm64 runner).
     required: false
     default: ""
+  siem:
+    description: >
+      Push scan results to the Wazuh SIEM via the pctl server. Requires both
+      wazuh-scan-url and wazuh-token; either absent means the push is skipped,
+      so repos that have not been onboarded are unaffected.
+    required: false
+    default: "true"
+  wazuh-token:
+    description: >
+      Bearer token for the ingestion endpoint. Pass
+      ${{ secrets.PIPELINE_WEBHOOK_TOKEN }}. Empty disables the push.
+    required: false
+    default: ""
+  wazuh-scan-url:
+    description: >
+      Ingestion endpoint for scan results. Defaults to the org endpoint, so
+      call sites only need to supply wazuh-token. Empty disables the push.
+    required: false
+    default: "https://platform.credova.com/pipeline/scans"
+  siem-block:
+    description: >
+      Fail the workflow if the SIEM push fails. Default false: a SIEM outage
+      should not gate a merge, and pctl still reports the failure in the log.
+    required: false
+    default: "false"
+  pctl-version:
+    description: pctl version used for the SIEM push
+    required: false
+    default: latest
 
 runs:
   using: composite
@@ -154,6 +183,26 @@ runs:
       env:
         SEVERITY: ${{ inputs.severity }}
       run: ${{ github.action_path }}/../../scripts/opengrep-scan.sh
+
+    # Both scanners have written their result files by this point. Runs even
+    # when a scan failed its severity gate: those findings are exactly the ones
+    # the SIEM needs. The step is skipped entirely when the endpoint is unset,
+    # so repos that have not been onboarded see no change.
+    - name: Install pctl
+      if: always() && inputs.siem == 'true' && inputs.wazuh-scan-url != '' && inputs.wazuh-token != ''
+      uses: credova/platform-workflows/actions/install-pctl@master
+      with:
+        version: ${{ inputs.pctl-version }}
+        token: ${{ github.token }}
+
+    - name: Push scan results to Wazuh
+      if: always() && inputs.siem == 'true' && inputs.wazuh-scan-url != '' && inputs.wazuh-token != ''
+      shell: bash
+      env:
+        PCTL_WAZUH_SCAN_URL: ${{ inputs.wazuh-scan-url }}
+        PIPELINE_WEBHOOK_TOKEN: ${{ inputs.wazuh-token }}
+        NO_FAIL: ${{ inputs.siem-block == 'true' && 'false' || 'true' }}
+      run: ${{ github.action_path }}/../../scripts/wazuh-scan-push.sh
 
     - name: Post security comment
       if: always() && github.event_name == 'pull_request'

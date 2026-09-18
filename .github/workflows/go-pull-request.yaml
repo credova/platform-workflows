@@ -129,6 +129,11 @@ on:
         required: false
       WARPBUILD_API_KEY:
         required: false
+      PIPELINE_WEBHOOK_TOKEN:
+        description: >
+          Bearer token for the Wazuh scan-result push. Absent means scan
+          results are not sent to the SIEM; nothing else changes.
+        required: false
 
 jobs:
   # --- Input validation and image parsing ---
@@ -357,6 +362,7 @@ jobs:
           licenses: ${{ inputs.security-licenses && 'true' || 'false' }}
           code: ${{ inputs.security-code && 'true' || 'false' }}
           severity: ${{ inputs.security-severity }}
+          wazuh-token: ${{ secrets.PIPELINE_WEBHOOK_TOKEN }}
 
   # --- Container build (after checks pass) ---
   build:
