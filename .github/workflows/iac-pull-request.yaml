@@ -309,7 +309,7 @@ jobs:
       # by dropping `tailscale: true` from the caller.
       - name: Connect to Tailscale
         if: inputs.tailscale
-        uses: tailscale/github-action@v2
+        uses: tailscale/github-action@v4
         with:
           oauth-client-id: ${{ secrets.TAILSCALE_OAUTH_CLIENT_ID }}
           oauth-secret: ${{ secrets.TAILSCALE_OAUTH_CLIENT_SECRET }}
