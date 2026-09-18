@@ -356,10 +356,7 @@ jobs:
           GIT_CONFIG_VALUE_0: "ssh://git@github.com/"
         run: go mod download
 
-      # TEMPORARY — pinned to this branch so the new wazuh-token input resolves
-      # while testing end to end. A @master ref would silently ignore it as an
-      # unknown input. REVERT TO @master BEFORE MERGE.
-      - uses: credova/platform-workflows/actions/security@a0bc0fd7c5f37f1ba59ac7440cfa28df0bc4ef88
+      - uses: credova/platform-workflows/actions/security@master
         with:
           packages: ${{ inputs.security-packages && 'true' || 'false' }}
           licenses: ${{ inputs.security-licenses && 'true' || 'false' }}
