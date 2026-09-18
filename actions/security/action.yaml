@@ -86,7 +86,7 @@ inputs:
     required: false
     default: "false"
   pctl-version:
-    description: pctl version used for the SIEM push
+    description: pctl version to install
     required: false
     default: latest
 
