@@ -37,6 +37,28 @@ jobs:
         shell: bash
         run: ./scripts/tests/run.sh
 
+      - name: Compute scanner tool list
+        id: tools
+        shell: bash
+        env:
+          ACTION_PATH: actions/security
+          TARGET: "dir:."
+          PACKAGES: "true"
+          LICENSES: "true"
+          CODE: "true"
+        run: ./scripts/select-security-tools.sh
+
+      - name: Install scanner tools
+        uses: ./actions/setup-mise
+        with:
+          working_directory: actions/security
+          install_args: ${{ steps.tools.outputs.install_args }}
+          cache_key_prefix: ${{ steps.tools.outputs.cache_key_prefix }}
+
+      - name: Check scanners are on PATH
+        shell: bash
+        run: for tool in syft grype grant opengrep; do command -v "$tool"; done
+
       - name: Validate action.yaml files
         shell: bash
         run: |

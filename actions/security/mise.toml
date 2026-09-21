@@ -1,0 +1,15 @@
+# Scanner toolchain for actions/security. Versions are pinned deliberately -
+# re-run `mise lock` after any bump, and commit both files. See README.md.
+
+[tools]
+"aqua:anchore/syft" = "1.42.3"
+"aqua:anchore/grype" = "0.110.0"
+"aqua:opengrep/opengrep" = "1.25.0"
+
+# grant has no aqua package, and ubi picks its asset at install time so
+# `mise lock` cannot record a checksum for it. http reads anchore's checksums.txt.
+[tools."http:grant"]
+version = "0.6.4"
+url = 'https://github.com/anchore/grant/releases/download/v{{ version }}/grant_{{ version }}_{{ os(macos="darwin") }}_{{ arch(x64="amd64") }}.tar.gz'
+checksum_url = 'https://github.com/anchore/grant/releases/download/v{{ version }}/grant_{{ version }}_checksums.txt'
+bin_path = "."

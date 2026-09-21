@@ -1244,7 +1244,7 @@ config:
 flowchart TD
     IN(["security action called"])
 
-    INSTALL["Install Anchore tools\n<i>syft + grype + grant</i>"]
+    INSTALL["Install scanner tools\n<i>mise: syft + grype + grant + opengrep</i>"]
     SBOM["Generate SBOM\n<i>syft scan</i>"]
 
     PKG{"packages\nenabled?"}
@@ -1254,7 +1254,6 @@ flowchart TD
     GRANT["License compliance scan\n<i>grant</i>"]
 
     CODE{"code enabled\n& source scan?"}
-    OG_INSTALL["Install opengrep"]
     OG_SCAN["Code static analysis\n<i>opengrep</i>"]
 
     COMMENT["Post security PR comment\n<i>single comment, both phases</i>"]
@@ -1275,7 +1274,7 @@ flowchart TD
     LIC -->|yes| GRANT --> CODE
     LIC -->|no| CODE
 
-    CODE -->|yes| OG_INSTALL --> OG_SCAN --> COMMENT
+    CODE -->|yes| OG_SCAN --> COMMENT
     CODE -->|no| COMMENT
 
     COMMENT --> FAIL_PKG

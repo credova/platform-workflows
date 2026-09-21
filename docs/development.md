@@ -42,8 +42,6 @@ platform-workflows/
 │   ├── docker-push.sh            # Docker push + extra tags
 │   ├── grant-scan.sh             # grant license compliance scan
 │   ├── grype-scan.sh             # grype vulnerability scan
-│   ├── install-anchore.sh        # syft/grype/grant installer
-│   ├── install-opengrep.sh       # opengrep installer
 │   ├── install-pctl.sh           # pctl download + SHA256 verify
 │   ├── notify-slack.sh           # Slack notification via pctl
 │   ├── opengrep-scan.sh          # OpenGrep static analysis
@@ -51,6 +49,7 @@ platform-workflows/
 │   ├── post-compliance-comment.sh  # Upsert compliance PR comment
 │   ├── post-go-comment.sh        # Upsert Go lint/security/test PR comment
 │   ├── post-security-comment.sh  # Upsert security scan PR comment
+│   ├── select-security-tools.sh  # Scanner tools for a scan -> setup-mise inputs
 │   └── semver.sh                 # Semver tag computation
 └── docs/                       # Documentation
     ├── README.md               # Doc index
@@ -94,6 +93,11 @@ composite actions need a patch release before consumers on `@v1` see them (see R
 
 `reeveops/reeve` is excluded. It is pinned to an exact 0.x tag where every minor can break, so
 bump it by hand with its own story.
+
+The security action's scanners (syft, grype, grant, opengrep) are not third-party actions, so
+Dependabot does not see them. They are pinned in `actions/security/mise.toml` with a committed
+`actions/security/mise.lock`; bump them by hand and re-run `mise lock`. See
+[`actions/security/README.md`](../actions/security/README.md#bumping-a-version).
 
 ## Versioning
 
