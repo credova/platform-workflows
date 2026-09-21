@@ -136,7 +136,9 @@ its cosign check through aqua's registry entry.
 
 ### Bumping a version
 
-Edit the version in `mise.toml`, then from this directory:
+Pick a release that is at least 3 days old. `mise lock --minimum-release-age`
+only applies to fuzzy versions, not these exact pins, so check the release
+date by hand. Edit the version in `mise.toml`, then from this directory:
 
 ```bash
 mise lock --platform linux-x64,linux-arm64,macos-x64,macos-arm64
