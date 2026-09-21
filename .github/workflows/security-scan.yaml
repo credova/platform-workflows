@@ -1,0 +1,112 @@
+name: Scheduled security scan
+
+# Scans the default branch and pushes findings to the Wazuh SIEM.
+#
+# Separate from the per-pull-request scan in *-pull-request.yaml, which posts a
+# PR comment and gates a merge but does not push. Those two jobs answer
+# different questions: the PR scan asks "does this change introduce a problem",
+# this one asks "what is currently wrong with this repo".
+#
+# Scheduled rather than per-PR because the SIEM needs a stable view of current
+# state. Findings are diffed against the previous scan of the same ref to
+# decide what opened and what was resolved, and a diff only means anything if
+# both sides scanned the same thing. Per-PR pushes would compare one branch
+# against another. See sc-89392.
+#
+# Callers own the cron:
+#
+#   on:
+#     schedule:
+#       - cron: "17 9 * * *"
+#     workflow_dispatch:
+#
+#   jobs:
+#     scan:
+#       uses: credova/platform-workflows/.github/workflows/security-scan.yaml@master
+#       secrets: inherit
+#
+# Stagger the minute across repos rather than using "0 9 * * *" everywhere.
+# GitHub queues scheduled runs org-wide and delays them under load.
+
+on:
+  workflow_call:
+    inputs:
+      runner:
+        description: Runner for the scan job
+        type: string
+        required: false
+        default: ubuntu-latest
+      severity:
+        description: Minimum severity to report (CRITICAL, HIGH, MEDIUM, LOW)
+        type: string
+        required: false
+        default: HIGH
+      packages:
+        description: Run the package vulnerability scan (grype)
+        type: boolean
+        required: false
+        default: true
+      code:
+        description: Run static code analysis (opengrep)
+        type: boolean
+        required: false
+        default: true
+      ref:
+        description: >
+          Ref to scan. Defaults to the repository default branch. Changing this
+          between runs resets the diff, because state is keyed on the ref that
+          produced it.
+        type: string
+        required: false
+        default: ""
+      pctl-version:
+        description: pctl version to install
+        type: string
+        required: false
+        default: latest
+    secrets:
+      PIPELINE_WEBHOOK_TOKEN:
+        description: >
+          Bearer token for the Wazuh scan-result push. Absent means the scan
+          still runs and reports in the log, but nothing reaches the SIEM.
+        required: false
+
+permissions:
+  contents: read
+
+# One scan per repo at a time. A queued run would diff against state the
+# in-flight run is about to replace.
+concurrency:
+  group: scheduled-security-scan-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  scan:
+    runs-on: ${{ inputs.runner }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref }}
+
+      - uses: credova/platform-workflows/actions/security@master
+        with:
+          # dir:. only. A scheduled scan has no built image to point at, and
+          # image scanning belongs with the build that produces the image.
+          target: "dir:."
+          packages: ${{ inputs.packages && 'true' || 'false' }}
+          code: ${{ inputs.code && 'true' || 'false' }}
+          # Licence findings are informational and do not belong in the SIEM.
+          licenses: "false"
+          severity: ${{ inputs.severity }}
+          # Never fail this job on findings. A scheduled scan reports; it does
+          # not gate anything, and a red cron job every morning trains people
+          # to ignore it.
+          block-on-packages: "false"
+          block-on-code: "false"
+          siem: "true"
+          wazuh-token: ${{ secrets.PIPELINE_WEBHOOK_TOKEN }}
+          # A failed push must be visible here. There is no pull request to
+          # carry the result, so a silently dropped scan would leave the SIEM
+          # stale with nothing to indicate it.
+          siem-block: "true"
+          pctl-version: ${{ inputs.pctl-version }}
