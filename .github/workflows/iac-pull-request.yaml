@@ -331,7 +331,7 @@ jobs:
 
       - name: Setup Terraform
         if: inputs.terraform
-        uses: hashicorp/setup-terraform@v3
+        uses: hashicorp/setup-terraform@v4
         with:
           terraform_version: ${{ steps.tf-version.outputs.version }}
           # The wrapper shim breaks programmatic callers that parse stdout.
