@@ -169,7 +169,7 @@ jobs:
 
       - name: Post Go comment
         if: always() && github.event_name == 'pull_request'
-        uses: credova/platform-workflows/actions/go-report@master
+        uses: credova/platform-workflows/actions/go-report@v1.5.2
         with:
           job: lint
           outcome: ${{ steps.lint.outcome }}
@@ -425,6 +425,6 @@ jobs:
     runs-on: ${{ inputs.runner }}
     steps:
       - uses: actions/checkout@v7
-      - uses: credova/platform-workflows/actions/compliance@master
+      - uses: credova/platform-workflows/actions/compliance@v1.5.2
         with:
           ticket: ${{ inputs.compliance-ticket && 'true' || 'false' }}

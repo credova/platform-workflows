@@ -199,7 +199,7 @@ runs:
       # API would fail a job that opted out of SIEM gating — and the push step
       # would then fail again for a missing binary.
       continue-on-error: ${{ inputs.siem-block != 'true' }}
-      uses: credova/platform-workflows/actions/install-pctl@master
+      uses: credova/platform-workflows/actions/install-pctl@v1.5.2
       with:
         version: ${{ inputs.pctl-version }}
         token: ${{ github.token }}
