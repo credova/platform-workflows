@@ -1,0 +1,34 @@
+name: publish-apt
+description: >
+  Internal: publish goreleaser's .deb output to an Artifact Registry APT
+  repository, so hosts can install the package with apt instead of needing a
+  GitHub credential to reach a private repo's release assets.
+
+inputs:
+  repository:
+    description: Artifact Registry APT repository name
+    required: true
+  project:
+    description: GCP project holding the repository
+    required: false
+    default: psq-shd-operations
+  location:
+    description: Artifact Registry location
+    required: false
+    default: us
+  path:
+    description: Directory holding the built packages
+    required: false
+    default: dist
+
+runs:
+  using: composite
+  steps:
+    - name: Publish Debian packages
+      shell: bash
+      env:
+        APT_REPOSITORY: ${{ inputs.repository }}
+        APT_PROJECT: ${{ inputs.project }}
+        APT_LOCATION: ${{ inputs.location }}
+        DIST_PATH: ${{ inputs.path }}
+      run: ${{ github.action_path }}/../../scripts/publish-apt.sh

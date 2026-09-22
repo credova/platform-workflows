@@ -25,6 +25,25 @@ on:
         type: boolean
         required: false
         default: true
+      apt-repository:
+        description: >
+          Artifact Registry APT repository to publish .deb packages to, e.g.
+          psq-utils. Empty skips publishing; the packages are still attached to
+          the GitHub release either way.
+        type: string
+        required: false
+        default: ""
+      apt-project:
+        description: GCP project holding the APT repository
+        type: string
+        required: false
+        default: psq-shd-operations
+      apt-location:
+        description: Artifact Registry location of the APT repository
+        type: string
+        required: false
+        default: us
+
       goreleaser-args:
         description: Additional GoReleaser args
         type: string
@@ -329,6 +348,18 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
           HOMEBREW_GITHUB_API_TOKEN: ${{ steps.homebrew-token.outputs.token }}
+
+      # goreleaser's nfpms block already builds the .deb and attaches it to the
+      # GitHub release. Publishing it to an APT repository as well is what lets
+      # a VM install it with apt, without holding a GitHub credential to reach
+      # a private repo's release assets.
+      - name: Publish Debian packages to Artifact Registry
+        if: startsWith(github.ref, 'refs/tags/v') && inputs.apt-repository != ''
+        uses: credova/platform-workflows/actions/publish-apt@master
+        with:
+          repository: ${{ inputs.apt-repository }}
+          project: ${{ inputs.apt-project }}
+          location: ${{ inputs.apt-location }}
 
   # --- Container build, scan, push ---
   build-scan-push:
