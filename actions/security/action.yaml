@@ -87,6 +87,26 @@ inputs:
       should not gate a merge, and pctl still reports the failure in the log.
     required: false
     default: "false"
+  scan-repo:
+    description: >
+      Repository the findings belong to, as owner/name. Leave empty for a pull
+      request scan, where pctl reads GITHUB_REPOSITORY. A scheduled scan runs in
+      one repository and scans a checked-out copy of another, so it must say
+      which one, and sc-89393 keys previous-scan state on it.
+    required: false
+    default: ""
+  scan-ref:
+    description: >
+      Ref the findings belong to, e.g. refs/heads/master. Empty means
+      GITHUB_REF. State is keyed on repository AND ref, so a scheduled scan
+      reporting the workflow's own ref would diff against the wrong baseline.
+    required: false
+    default: ""
+  scan-commit:
+    description: >
+      Commit SHA that was scanned. Empty means GITHUB_SHA.
+    required: false
+    default: ""
   pctl-version:
     description: pctl version to install
     required: false
@@ -212,6 +232,9 @@ runs:
         PCTL_WAZUH_SCAN_URL: ${{ inputs.wazuh-scan-url }}
         PIPELINE_WEBHOOK_TOKEN: ${{ inputs.wazuh-token }}
         NO_FAIL: ${{ inputs.siem-block == 'true' && 'false' || 'true' }}
+        SCAN_REPO: ${{ inputs.scan-repo }}
+        SCAN_REF: ${{ inputs.scan-ref }}
+        SCAN_COMMIT: ${{ inputs.scan-commit }}
       run: ${{ github.action_path }}/../../scripts/wazuh-scan-push.sh
 
     - name: Post security comment

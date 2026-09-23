@@ -1,0 +1,167 @@
+name: Scheduled Security Scan
+
+# One scan per repository per day, rather than one per pull request.
+#
+# sc-89393 closes a finding by diffing a scan against the previous scan of the
+# same thing. A per-pull-request scan compares one branch against another, so
+# the diff is meaningless and nothing can ever be marked resolved. Scanning the
+# default branch on a fixed cadence gives each repository a stable series to
+# diff, which is what makes resolution work at all.
+#
+# It also stops the repetition: a repository whose base image carries ten
+# Critical CVEs re-reported all ten on every pull request, each as a separate
+# alert with a different commit, while nothing about the finding had changed.
+
+on:
+  schedule:
+    # 07:00 UTC daily, which is outside working hours in every timezone the
+    # team works in, so a first-run spike lands before anyone is paging.
+    - cron: "0 7 * * *"
+  workflow_dispatch:
+    inputs:
+      repos:
+        description: >
+          Comma-separated owner/name list to scan instead of the whole org.
+          Use this to roll out gradually or to re-check one repository; leave
+          empty to scan everything in scope.
+        required: false
+        default: ""
+      org:
+        description: GitHub organization to enumerate
+        required: false
+        default: credova
+
+permissions:
+  contents: read
+
+concurrency:
+  # A run that overlaps the previous one would diff against a baseline the
+  # previous run is still writing, so the later scan could resolve findings the
+  # earlier one just opened. Queueing rather than cancelling, because a
+  # cancelled scan looks identical to a repository with nothing wrong.
+  group: scheduled-security-scan
+  cancel-in-progress: false
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    outputs:
+      targets: ${{ steps.targets.outputs.targets }}
+      count: ${{ steps.targets.outputs.count }}
+    steps:
+      - name: Mint app token
+        id: token
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ secrets.PCTL_APP_ID }}
+          private-key: ${{ secrets.PCTL_APP_PRIVATE_KEY }}
+          owner: credova
+
+      - name: Install pctl
+        uses: credova/platform-workflows/actions/install-pctl@master
+        with:
+          token: ${{ steps.token.outputs.token }}
+
+      - name: Resolve scan targets
+        id: targets
+        env:
+          GITHUB_TOKEN: ${{ steps.token.outputs.token }}
+          ORG: ${{ inputs.org || 'credova' }}
+          REPOS: ${{ inputs.repos }}
+        run: |
+          set -euo pipefail
+
+          # pctl applies the scope rules: archived, forks, empty, and the
+          # no-security-scan topic are all excluded. An explicit list from
+          # workflow_dispatch is intersected with that rather than replacing
+          # it, so a dispatch cannot scan a repository the org has opted out.
+          pctl github repos list --org "$ORG" --format json > all.json
+          echo "In scope for $ORG: $(jq length all.json)"
+
+          if [ -n "$REPOS" ]; then
+            jq -c --arg want "$REPOS" \
+              '($want | split(",") | map(gsub("^\\s+|\\s+$";""))) as $w
+               | map(select(.repo as $r | $w | index($r)))' all.json > targets.json
+
+            # Name anything asked for that is not in scope. Silently scanning
+            # fewer repositories than requested is the failure this whole
+            # workflow exists to avoid.
+            missing=$(jq -r --arg want "$REPOS" \
+              '($want | split(",") | map(gsub("^\\s+|\\s+$";""))) as $w
+               | ($w - (map(.repo))) | join(", ")' all.json)
+            if [ -n "$missing" ]; then
+              echo "::warning::Requested but not in scope (archived, fork, empty, or opted out): $missing"
+            fi
+          else
+            cp all.json targets.json
+          fi
+
+          count=$(jq length targets.json)
+          echo "count=$count" >> "$GITHUB_OUTPUT"
+          echo "targets=$(jq -c . targets.json)" >> "$GITHUB_OUTPUT"
+          echo "Scanning $count repositories"
+          jq -r '.[] | "  \(.repo) @ \(.default_branch)"' targets.json
+
+  scan:
+    needs: discover
+    # fromJson('[]') is a valid empty matrix, but GitHub errors on a matrix
+    # with no entries, so skip the job rather than fail the run.
+    if: needs.discover.outputs.count != '0'
+    runs-on: ubuntu-latest
+    strategy:
+      # One repository's scan failing must not cancel the other 61. A partial
+      # sweep that reports itself as complete is the dangerous outcome here.
+      fail-fast: false
+      # Caps concurrent runners. 62 at once saturates the pool and starves
+      # ordinary CI, and this job has no deadline.
+      max-parallel: 8
+      matrix:
+        target: ${{ fromJson(needs.discover.outputs.targets) }}
+    name: scan ${{ matrix.target.repo }}
+    steps:
+      - name: Mint app token
+        id: token
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ secrets.PCTL_APP_ID }}
+          private-key: ${{ secrets.PCTL_APP_PRIVATE_KEY }}
+          owner: credova
+
+      # Before the checkout, so install-pctl sees no local source. Otherwise
+      # scanning credova/pctl itself would build the scanner's own tooling from
+      # the revision under test.
+      - name: Install pctl
+        uses: credova/platform-workflows/actions/install-pctl@master
+        with:
+          token: ${{ steps.token.outputs.token }}
+
+      - name: Checkout ${{ matrix.target.repo }}
+        uses: actions/checkout@v5
+        with:
+          repository: ${{ matrix.target.repo }}
+          ref: ${{ matrix.target.default_branch }}
+          token: ${{ steps.token.outputs.token }}
+          persist-credentials: false
+
+      - name: Resolve scanned commit
+        id: commit
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - uses: credova/platform-workflows/actions/security@master
+        with:
+          # Findings never fail this run. A cron that goes red every morning
+          # trains people to ignore it, and the per-pull-request scan already
+          # gates merges on severity.
+          block-on-packages: "false"
+          block-on-code: "false"
+          block-on-licenses: "false"
+          siem: "true"
+          wazuh-token: ${{ secrets.PIPELINE_WEBHOOK_TOKEN }}
+          # A push failure does fail the job. There is no pull request to carry
+          # the result, so a dropped scan would leave the SIEM stale with
+          # nothing to show for it, and a repository with stale state looks
+          # exactly like one with nothing wrong.
+          siem-block: "true"
+          scan-repo: ${{ matrix.target.repo }}
+          scan-ref: refs/heads/${{ matrix.target.default_branch }}
+          scan-commit: ${{ steps.commit.outputs.sha }}
