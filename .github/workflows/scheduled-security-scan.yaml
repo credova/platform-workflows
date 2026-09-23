@@ -49,6 +49,9 @@ jobs:
       targets: ${{ steps.targets.outputs.targets }}
       count: ${{ steps.targets.outputs.count }}
     steps:
+      # Org-wide by necessity: this job exists to enumerate every repository.
+      # Permissions are still narrowed to what that needs -- metadata to list
+      # them, contents to resolve each default branch.
       - name: Mint app token
         id: token
         uses: actions/create-github-app-token@v3
@@ -56,6 +59,8 @@ jobs:
           client-id: ${{ secrets.PCTL_APP_ID }}
           private-key: ${{ secrets.PCTL_APP_PRIVATE_KEY }}
           owner: credova
+          permission-contents: read
+          permission-metadata: read
 
       - name: Install pctl
         uses: credova/platform-workflows/actions/install-pctl@master
@@ -119,6 +124,10 @@ jobs:
         target: ${{ fromJson(needs.discover.outputs.targets) }}
     name: scan ${{ matrix.target.repo }}
     steps:
+      # Scoped to the two repositories this job touches, rather than every
+      # repository the app is installed on: pctl, whose releases install-pctl
+      # downloads, and the one being scanned. A matrix job holding read access
+      # to all 62 would make one compromised scan a whole-org read.
       - name: Mint app token
         id: token
         uses: actions/create-github-app-token@v3
@@ -126,6 +135,11 @@ jobs:
           client-id: ${{ secrets.PCTL_APP_ID }}
           private-key: ${{ secrets.PCTL_APP_PRIVATE_KEY }}
           owner: credova
+          repositories: |
+            pctl
+            ${{ matrix.target.name }}
+          permission-contents: read
+          permission-metadata: read
 
       # Before the checkout, so install-pctl sees no local source. Otherwise
       # scanning credova/pctl itself would build the scanner's own tooling from
