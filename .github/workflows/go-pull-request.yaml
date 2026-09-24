@@ -129,11 +129,6 @@ on:
         required: false
       WARPBUILD_API_KEY:
         required: false
-      PIPELINE_WEBHOOK_TOKEN:
-        description: >
-          Bearer token for the Wazuh scan-result push. Absent means scan
-          results are not sent to the SIEM; nothing else changes.
-        required: false
 
 jobs:
   # --- Input validation and image parsing ---
@@ -356,13 +351,18 @@ jobs:
           GIT_CONFIG_VALUE_0: "ssh://git@github.com/"
         run: go mod download
 
+      # No SIEM push here. Scanning moved to a daily per-repository run in
+      # scheduled-security-scan.yaml: a pull request scan compares one branch
+      # against another, so its diff cannot mark anything resolved, and it
+      # re-reported every existing finding on every push to an open PR. This
+      # scan still gates the merge on severity, which the scheduled one does
+      # not.
       - uses: credova/platform-workflows/actions/security@master
         with:
           packages: ${{ inputs.security-packages && 'true' || 'false' }}
           licenses: ${{ inputs.security-licenses && 'true' || 'false' }}
           code: ${{ inputs.security-code && 'true' || 'false' }}
           severity: ${{ inputs.security-severity }}
-          wazuh-token: ${{ secrets.PIPELINE_WEBHOOK_TOKEN }}
 
   # --- Container build (after checks pass) ---
   build:
