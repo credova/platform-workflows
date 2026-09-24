@@ -67,6 +67,22 @@ jobs:
         with:
           token: ${{ steps.token.outputs.token }}
 
+      # actions/security skips the push when the token is empty, so a missing
+      # secret would produce 62 green jobs that shipped nothing. That is the
+      # exact failure this scan has to avoid: a run that reports success and
+      # sends no findings is indistinguishable from an org with none. Checked
+      # here so it fails once, before the matrix fans out.
+      - name: Verify the ingestion token is present
+        env:
+          PIPELINE_WEBHOOK_TOKEN: ${{ secrets.PIPELINE_WEBHOOK_TOKEN }}
+        run: |
+          if [ -z "${PIPELINE_WEBHOOK_TOKEN}" ]; then
+            echo "::error::PIPELINE_WEBHOOK_TOKEN is empty. The scan would run and push nothing."
+            echo "Set it as an organization secret visible to this repository."
+            exit 1
+          fi
+          echo "Ingestion token present."
+
       - name: Resolve scan targets
         id: targets
         env:
