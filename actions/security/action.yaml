@@ -125,10 +125,29 @@ runs:
         echo "  code:     ${{ inputs.code }}"
         echo "  severity: ${{ inputs.severity }}"
 
-    - name: Install Anchore tools
-      if: inputs.packages == 'true' || inputs.licenses == 'true'
+    # Tools come from actions/security/mise.toml with a committed mise.lock.
+    # mise fails on the HTTP status before it hashes anything and retries only
+    # transient errors, so a CDN 500 no longer reads as a checksum mismatch.
+    - name: Compute scanner tool list
+      id: tools
       shell: bash
-      run: ${{ github.action_path }}/../../scripts/install-anchore.sh
+      env:
+        ACTION_PATH: ${{ github.action_path }}
+        TARGET: ${{ inputs.target }}
+        PACKAGES: ${{ inputs.packages }}
+        LICENSES: ${{ inputs.licenses }}
+        CODE: ${{ inputs.code }}
+      run: ${{ github.action_path }}/../../scripts/select-security-tools.sh
+
+    - name: Install scanner tools
+      if: steps.tools.outputs.install_args != ''
+      uses: credova/platform-workflows/actions/setup-mise@master
+      with:
+        # mise reads the config from the action's own directory, so a consuming
+        # repo's mise config cannot shadow these pins.
+        working_directory: ${{ github.action_path }}
+        install_args: ${{ steps.tools.outputs.install_args }}
+        cache_key_prefix: ${{ steps.tools.outputs.cache_key_prefix }}
 
     # Hour-keyed cache for the grype vulnerability DB. grype-scan.sh still runs
     # `grype db update` on every scan, so CVE data is never stale — the cache
@@ -183,22 +202,6 @@ runs:
       if: inputs.licenses == 'true' && inputs.target == 'dir:.'
       shell: bash
       run: ${{ github.action_path }}/../../scripts/grant-scan.sh
-
-    # cosign is not preinstalled on GitHub-hosted runners; install-opengrep.sh
-    # uses it to verify the downloaded binary's signature (blocking).
-    - name: Install cosign
-      if: inputs.code == 'true' && inputs.target == 'dir:.'
-      uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
-
-    - name: Install opengrep
-      if: inputs.code == 'true' && inputs.target == 'dir:.'
-      shell: bash
-      # gh authenticates with the runner token, so the install is immune to the
-      # unauthenticated 60 req/hr API limit that made opengrep's own install.sh
-      # flake with "Failed to fetch available versions from GitHub".
-      env:
-        GH_TOKEN: ${{ github.token }}
-      run: ${{ github.action_path }}/../../scripts/install-opengrep.sh
 
     - name: Code static analysis
       if: inputs.code == 'true' && inputs.target == 'dir:.'

@@ -120,14 +120,43 @@ ignore:
 
 ## Tool Versions
 
-Pinned in the install scripts below. Bump deliberately. Do not use `latest`.
+mise installs all four scanners, pinned in [`mise.toml`](mise.toml) with a
+committed [`mise.lock`](mise.lock). Bump deliberately. Do not use `latest`.
 
-| Tool     | Purpose                                         | Pinned in                                                          |
-| -------- | ----------------------------------------------- | ------------------------------------------------------------------ |
-| syft     | SBOM generation                                 | [`scripts/install-anchore.sh`](../../scripts/install-anchore.sh)   |
-| grype    | Vulnerability scanning (offline after first DB) | [`scripts/install-anchore.sh`](../../scripts/install-anchore.sh)   |
-| grant    | License compliance                              | [`scripts/install-anchore.sh`](../../scripts/install-anchore.sh)   |
-| opengrep | Static analysis / SAST                          | [`scripts/install-opengrep.sh`](../../scripts/install-opengrep.sh) |
+| Tool     | Purpose                                         | Backend                  |
+| -------- | ----------------------------------------------- | ------------------------ |
+| syft     | SBOM generation                                 | `aqua:anchore/syft`      |
+| grype    | Vulnerability scanning (offline after first DB) | `aqua:anchore/grype`     |
+| grant    | License compliance                              | `http:grant`             |
+| opengrep | Static analysis / SAST                          | `aqua:opengrep/opengrep` |
+
+Only the tools a scan needs are installed. An image scan skips opengrep.
+`setup-mise` caches the set, keyed on a hash of `mise.lock`. opengrep keeps
+its cosign check through aqua's registry entry.
+
+### Bumping a version
+
+Pick a release that is at least 3 days old. `mise lock --minimum-release-age`
+only applies to fuzzy versions, not these exact pins, so check the release
+date by hand. Edit the version in `mise.toml`, then from this directory:
+
+```bash
+mise lock --platform linux-x64,linux-arm64,macos-x64,macos-arm64
+```
+
+Commit both files. CI installs the tools with `--locked`, so a version bumped
+without `mise lock` fails the PR.
+
+### Why mise
+
+The old installers were `curl -sSfL https://get.anchore.io/grype | sudo sh`,
+which writes whatever the CDN returns and checks the hash afterwards. A GitHub
+500 therefore failed as "checksum did not verify" with two hashes, which reads
+as tampering and blocked every open PR until someone re-ran the job.
+
+mise fails on the HTTP status before hashing and retries only transient errors
+(5xx, 408, 429, network) three times. A checksum mismatch after a clean 200 is
+never retried.
 
 ## Output Files
 
