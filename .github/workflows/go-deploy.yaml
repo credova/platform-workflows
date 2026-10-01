@@ -256,10 +256,7 @@ jobs:
           repositories: shared-configs
 
       - name: Setup mise
-        uses: jdx/mise-action@v4
-        with:
-          install: true
-          cache: true
+        uses: credova/platform-workflows/actions/setup-mise@master
         env:
           MISE_GITHUB_TOKEN: ${{ steps.cross-repo-token.outputs.token || github.token }}
           GIT_CONFIG_COUNT: 1
@@ -300,10 +297,7 @@ jobs:
           repositories: shared-configs
 
       - name: Setup mise
-        uses: jdx/mise-action@v4
-        with:
-          install: true
-          cache: true
+        uses: credova/platform-workflows/actions/setup-mise@master
         env:
           MISE_GITHUB_TOKEN: ${{ steps.cross-repo-token.outputs.token || github.token }}
           GIT_CONFIG_COUNT: 1
