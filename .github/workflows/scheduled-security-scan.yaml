@@ -166,7 +166,7 @@ jobs:
           token: ${{ steps.token.outputs.token }}
 
       - name: Checkout ${{ matrix.target.repo }}
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           repository: ${{ matrix.target.repo }}
           ref: ${{ matrix.target.default_branch }}
