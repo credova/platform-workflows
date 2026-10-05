@@ -141,7 +141,7 @@ runs:
 
     - name: Install scanner tools
       if: steps.tools.outputs.install_args != ''
-      uses: credova/platform-workflows/actions/setup-mise@master
+      uses: credova/platform-workflows/actions/setup-mise@v1.7.0
       with:
         # mise reads the config from the action's own directory, so a consuming
         # repo's mise config cannot shadow these pins.
@@ -222,7 +222,7 @@ runs:
       # API would fail a job that opted out of SIEM gating — and the push step
       # would then fail again for a missing binary.
       continue-on-error: ${{ inputs.siem-block != 'true' }}
-      uses: credova/platform-workflows/actions/install-pctl@master
+      uses: credova/platform-workflows/actions/install-pctl@v1.7.0
       with:
         version: ${{ inputs.pctl-version }}
         token: ${{ github.token }}

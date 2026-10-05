@@ -18,13 +18,13 @@ runs:
   using: composite
   steps:
     - name: Authenticate to GCP
-      uses: credova/platform-workflows/actions/auth-gcp@master
+      uses: credova/platform-workflows/actions/auth-gcp@v1.7.0
       with:
         project-id: ${{ inputs.project-id }}
         workload-identity-provider: ${{ inputs.workload-identity-provider }}
 
     - name: Setup mise
-      uses: credova/platform-workflows/actions/setup-mise@master
+      uses: credova/platform-workflows/actions/setup-mise@v1.7.0
 
     - name: Load secrets via fnox
       shell: bash

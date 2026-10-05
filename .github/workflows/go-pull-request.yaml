@@ -152,7 +152,7 @@ jobs:
 
       - name: Parse image inputs
         id: parse
-        uses: credova/platform-workflows/actions/parse-images@master
+        uses: credova/platform-workflows/actions/parse-images@v1.7.0
         with:
           image: ${{ inputs.image }}
           images: ${{ inputs.images }}
@@ -181,7 +181,7 @@ jobs:
           repositories: shared-configs
 
       - name: Setup mise
-        uses: credova/platform-workflows/actions/setup-mise@master
+        uses: credova/platform-workflows/actions/setup-mise@v1.7.0
         env:
           MISE_GITHUB_TOKEN: ${{ steps.cross-repo-token.outputs.token || github.token }}
           GIT_CONFIG_COUNT: 1
@@ -199,7 +199,7 @@ jobs:
 
       - name: Post Go comment
         if: always() && github.event_name == 'pull_request'
-        uses: credova/platform-workflows/actions/go-report@master
+        uses: credova/platform-workflows/actions/go-report@v1.7.0
         with:
           job: lint
           outcome: ${{ steps.lint.outcome }}
@@ -226,7 +226,7 @@ jobs:
           repositories: shared-configs
 
       - name: Setup mise
-        uses: credova/platform-workflows/actions/setup-mise@master
+        uses: credova/platform-workflows/actions/setup-mise@v1.7.0
         env:
           MISE_GITHUB_TOKEN: ${{ steps.cross-repo-token.outputs.token || github.token }}
           GIT_CONFIG_COUNT: 1
@@ -244,7 +244,7 @@ jobs:
 
       - name: Post Go comment
         if: always() && github.event_name == 'pull_request'
-        uses: credova/platform-workflows/actions/go-report@master
+        uses: credova/platform-workflows/actions/go-report@v1.7.0
         with:
           job: security
           outcome: ${{ steps.security.outcome }}
@@ -271,7 +271,7 @@ jobs:
           repositories: shared-configs
 
       - name: Setup mise
-        uses: credova/platform-workflows/actions/setup-mise@master
+        uses: credova/platform-workflows/actions/setup-mise@v1.7.0
         env:
           MISE_GITHUB_TOKEN: ${{ steps.cross-repo-token.outputs.token || github.token }}
           GIT_CONFIG_COUNT: 1
@@ -297,7 +297,7 @@ jobs:
 
       - name: Post Go comment
         if: always() && github.event_name == 'pull_request'
-        uses: credova/platform-workflows/actions/go-report@master
+        uses: credova/platform-workflows/actions/go-report@v1.7.0
         with:
           job: test
           outcome: ${{ steps.test.outcome }}
@@ -324,7 +324,7 @@ jobs:
           repositories: shared-configs
 
       - name: Setup mise
-        uses: credova/platform-workflows/actions/setup-mise@master
+        uses: credova/platform-workflows/actions/setup-mise@v1.7.0
         env:
           MISE_GITHUB_TOKEN: ${{ steps.cross-repo-token.outputs.token || github.token }}
           GIT_CONFIG_COUNT: 1
@@ -345,7 +345,7 @@ jobs:
       # re-reported every existing finding on every push to an open PR. This
       # scan still gates the merge on severity, which the scheduled one does
       # not.
-      - uses: credova/platform-workflows/actions/security@master
+      - uses: credova/platform-workflows/actions/security@v1.7.0
         with:
           packages: ${{ inputs.security-packages && 'true' || 'false' }}
           licenses: ${{ inputs.security-licenses && 'true' || 'false' }}
@@ -364,7 +364,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: Build container (${{ matrix.name }})
-        uses: credova/platform-workflows/actions/container@master
+        uses: credova/platform-workflows/actions/container@v1.7.0
         with:
           name: ${{ matrix.name }}
           dockerfile: ${{ matrix.dockerfile }}
@@ -384,6 +384,6 @@ jobs:
     runs-on: ${{ inputs.runner }}
     steps:
       - uses: actions/checkout@v7
-      - uses: credova/platform-workflows/actions/compliance@master
+      - uses: credova/platform-workflows/actions/compliance@v1.7.0
         with:
           ticket: ${{ inputs.compliance-ticket && 'true' || 'false' }}
