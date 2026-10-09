@@ -6,7 +6,8 @@
 platform-workflows/
 ├── .github/
 │   ├── CODEOWNERS
-│   └── dependabot.yml          # Monthly third-party action bumps (see Dependencies)
+│   ├── dependabot.yml          # Monthly third-party action bumps (see Dependencies)
+│   └── jactionlint.yaml        # WarpBuild runner labels for jactionlint
 ├── .github/workflows/          # Reusable workflows (public interface; selected below)
 │   ├── ci.yaml                 # Self-test: validate actions
 │   ├── release.yaml            # Version + tag platform-workflows itself
@@ -34,6 +35,8 @@ platform-workflows/
 │   ├── security/               # syft + grype + grant + opengrep scanning
 │   ├── setup-language/         # Runtime setup + WarpBuild dep caching
 │   └── setup-mise/             # mise install + WarpCache tool cache (snake_case inputs, mirrors jdx/mise-action)
+├── hk.pkl                      # Git hooks (pre-push jactionlint)
+├── mise.toml                   # Dev tools (jactionlint, hk)
 ├── scripts/                    # Shell scripts (called by actions)
 │   ├── check-shortcut-ticket.sh  # Shortcut ticket pattern matching
 │   ├── cloudflare-purge.sh       # Cloudflare cache purge API call
@@ -63,9 +66,20 @@ platform-workflows/
 
 1. Create a feature branch.
 2. Modify the composite action or reusable workflow.
-3. CI runs automatically to validate YAML syntax and structure.
+3. CI runs automatically to validate YAML syntax and structure, and lints workflows with
+   [jactionlint](https://jactionlint.jdx.dev/).
 4. Get Platform team approval (required via CODEOWNERS).
 5. Merge to master.
+
+### Local setup
+
+```bash
+mise install
+```
+
+`mise install` also installs an [hk](https://hk.jdx.dev/) pre-push hook that runs `jactionlint`
+when a push touches `.github/workflows/` or `.github/jactionlint.yaml`. Run it by hand with
+`mise x -- jactionlint`. New WarpBuild runner labels go in `.github/jactionlint.yaml`.
 
 ## Releasing
 

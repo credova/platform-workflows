@@ -1,0 +1,7 @@
+[tools]
+"github:jdx/jactionlint" = "1.8.2"
+hk = "2.5.0"
+
+[hooks]
+# CI also reads this file (actions/security runs mise below it) without hk installed.
+postinstall = 'test -n "$CI" || hk install --mise'

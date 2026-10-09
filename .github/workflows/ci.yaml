@@ -33,6 +33,15 @@ jobs:
 
           echo "All YAML files pass lint."
 
+      - name: Install jactionlint
+        uses: ./actions/setup-mise
+        with:
+          install_args: github:jdx/jactionlint
+
+      - name: Lint workflows
+        shell: bash
+        run: jactionlint
+
       - name: Run script tests
         shell: bash
         run: ./scripts/tests/run.sh

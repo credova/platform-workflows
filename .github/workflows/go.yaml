@@ -119,10 +119,7 @@ jobs:
           repositories: shared-configs
 
       - name: Setup mise
-        uses: jdx/mise-action@v4
-        with:
-          install: true
-          cache: true
+        uses: credova/platform-workflows/actions/setup-mise@master
         env:
           MISE_GITHUB_TOKEN: ${{ steps.cross-repo-token.outputs.token || github.token }}
           GIT_CONFIG_COUNT: 1
@@ -168,10 +165,7 @@ jobs:
           repositories: shared-configs
 
       - name: Setup mise
-        uses: jdx/mise-action@v4
-        with:
-          install: true
-          cache: true
+        uses: credova/platform-workflows/actions/setup-mise@master
         env:
           MISE_GITHUB_TOKEN: ${{ steps.cross-repo-token.outputs.token || github.token }}
           GIT_CONFIG_COUNT: 1
@@ -217,10 +211,7 @@ jobs:
           repositories: shared-configs
 
       - name: Setup mise
-        uses: jdx/mise-action@v4
-        with:
-          install: true
-          cache: true
+        uses: credova/platform-workflows/actions/setup-mise@master
         env:
           MISE_GITHUB_TOKEN: ${{ steps.cross-repo-token.outputs.token || github.token }}
           GIT_CONFIG_COUNT: 1
@@ -277,10 +268,7 @@ jobs:
           repositories: shared-configs
 
       - name: Setup mise
-        uses: jdx/mise-action@v4
-        with:
-          install: true
-          cache: true
+        uses: credova/platform-workflows/actions/setup-mise@master
         env:
           MISE_GITHUB_TOKEN: ${{ steps.cross-repo-token.outputs.token || github.token }}
           GIT_CONFIG_COUNT: 1
@@ -292,11 +280,11 @@ jobs:
           TOKEN: ${{ steps.cross-repo-token.outputs.token || github.token }}
         run: |
           git config --global url."https://x-access-token:${TOKEN}@github.com/".insteadOf "https://github.com/"
-          echo "GOPRIVATE=github.com/credova/*" >> $GITHUB_ENV
+          echo "GOPRIVATE=github.com/credova/*" >> "$GITHUB_ENV"
 
       - name: Set snapshot flag for non-tag builds
         if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
-        run: echo "GORELEASER_FLAGS=--snapshot" >> $GITHUB_ENV
+        run: echo "GORELEASER_FLAGS=--snapshot" >> "$GITHUB_ENV"
 
       - name: Authenticate to GCP
         if: startsWith(github.ref, 'refs/tags/v') && inputs.workload-identity-provider != ''
