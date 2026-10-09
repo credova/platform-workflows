@@ -103,8 +103,8 @@ jobs:
           # literal being replaced, so the sweep would corrupt the tag snapshot.
           find . -not -path './.git/*' -not -path './.github/workflows/release.yaml' \
             \( -name '*.yaml' -o -name '*.yml' \) \
-            -exec grep -lF 'credova/platform-workflows/' {} \; \
-            | xargs -r sed -i "s|credova/platform-workflows/\(.\+\)@master|credova/platform-workflows/\1@${TAG}|g"
+            -exec grep -lZF 'credova/platform-workflows/' {} \; \
+            | xargs -0 -r sed -i "s|credova/platform-workflows/\(.\+\)@master|credova/platform-workflows/\1@${TAG}|g"
           git commit -am "chore: pin internal action refs to ${TAG}"
           RELEASE_SHA=$(git rev-parse HEAD)
           echo "RELEASE_SHA=${RELEASE_SHA}" >> "${GITHUB_ENV}"
