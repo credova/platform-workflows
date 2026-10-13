@@ -65,6 +65,10 @@ runs:
 
     - name: Setup gcloud
       uses: google-github-actions/setup-gcloud@v3
+      with:
+        # Use the runner image's gcloud; downloading it every job is slow and
+        # setup-gcloud's `cache` input only persists to the ephemeral runner disk.
+        skip_install: true
 
     - name: Execute Cloud Run Job
       shell: bash

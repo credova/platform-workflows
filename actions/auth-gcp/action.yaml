@@ -30,6 +30,10 @@ runs:
 
     - name: Setup gcloud CLI
       uses: google-github-actions/setup-gcloud@v3
+      with:
+        # Use the runner image's gcloud; downloading it every job is slow and
+        # setup-gcloud's `cache` input only persists to the ephemeral runner disk.
+        skip_install: true
 
     - name: Configure Docker for Artifact Registry
       shell: bash
