@@ -70,7 +70,7 @@ runs:
     # Kotlin / JDK + Gradle
     - name: Setup JDK (Kotlin)
       if: inputs.language == 'kotlin'
-      uses: actions/setup-java@v5
+      uses: actions/setup-java@v6
       with:
         distribution: temurin
         java-version: ${{ inputs.version }}
