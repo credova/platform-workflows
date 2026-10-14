@@ -7,7 +7,7 @@ Authenticate to Google Cloud via Workload Identity Federation and configure Dock
 ## What it does
 
 1. Authenticates to GCP via Workload Identity Federation (no service account keys, no PATs).
-2. Sets up the `gcloud` CLI.
+2. Sets up the runner image's built-in `gcloud` CLI (no download).
 3. Configures Docker for `us-docker.pkg.dev`.
 
 ## Inputs

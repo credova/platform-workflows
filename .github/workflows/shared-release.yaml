@@ -126,7 +126,7 @@ jobs:
           fi
 
           # Strip prefix to get version
-          BASE_VERSION="${LATEST_STABLE#${PREFIX}}"
+          BASE_VERSION="${LATEST_STABLE#"${PREFIX}"}"
 
           # Increment patch for edge base
           IFS='.' read -r MAJOR MINOR PATCH <<< "${BASE_VERSION}"
@@ -273,7 +273,7 @@ jobs:
           PREFIX: ${{ inputs.tag-prefix }}
           REF_NAME: ${{ github.ref_name }}
         run: |
-          VERSION="${REF_NAME#${PREFIX}}"
+          VERSION="${REF_NAME#"${PREFIX}"}"
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           echo "tag=${REF_NAME}" >> "$GITHUB_OUTPUT"
           echo "Full release version: ${VERSION}"
@@ -448,12 +448,23 @@ jobs:
           bump: ${{ steps.bump.outputs.bump }}
           prefix: ${{ inputs.tag-prefix }}
 
+      - name: Set final tag
+        if: steps.bump.outputs.has-changes == 'true'
+        id: final
+        shell: bash
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+          PREFIX: ${{ inputs.tag-prefix }}
+        run: |
+          echo "tag=${TAG}" >> "${GITHUB_OUTPUT}"
+          echo "version=${TAG#"${PREFIX}"}" >> "${GITHUB_OUTPUT}"
+
       - name: Create tag and GitHub Release
         if: steps.bump.outputs.has-changes == 'true'
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ steps.version.outputs.tag }}
+          TAG: ${{ steps.final.outputs.tag }}
         run: |
           git tag "${TAG}"
           git push origin "${TAG}"
@@ -466,7 +477,7 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ steps.version.outputs.tag }}
+          TAG: ${{ steps.final.outputs.tag }}
           PATTERN: ${{ inputs.release-assets }}
         run: |
           for file in ${PATTERN}; do
@@ -494,10 +505,8 @@ jobs:
           PKG_MGR: ${{ inputs.package-manager }}
           NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_DIRS: ${{ inputs.npm-package-dir }}
-          VERSION: ${{ steps.version.outputs.tag }}
-          PREFIX: ${{ inputs.tag-prefix }}
+          VERSION: ${{ steps.final.outputs.version }}
         run: |
-          VERSION="${VERSION#${PREFIX}}"
           if [[ "${PKG_MGR}" == "npm" ]]; then
             # OIDC trusted publishing needs Node >= 22.14.0 and npm >= 11.5.1
             # (https://docs.npmjs.com/trusted-publishers). Reject incompatible
@@ -537,10 +546,8 @@ jobs:
         shell: bash
         env:
           NUGET_AUTH_TOKEN: ${{ github.token }}
-          VERSION: ${{ steps.version.outputs.tag }}
-          PREFIX: ${{ inputs.tag-prefix }}
+          VERSION: ${{ steps.final.outputs.version }}
         run: |
-          VERSION="${VERSION#${PREFIX}}"
           dotnet pack "${{ inputs.nuget-project }}" \
             -c Release \
             -p:PackageVersion="${VERSION}" \
@@ -602,9 +609,12 @@ jobs:
       - name: Set final tag
         id: final
         shell: bash
+        env:
+          TAG: ${{ steps.tag.outputs.tag || steps.version.outputs.tag }}
+          PREFIX: ${{ inputs.tag-prefix }}
         run: |
-          TAG="${{ steps.tag.outputs.tag || steps.version.outputs.tag }}"
           echo "tag=${TAG}" >> "${GITHUB_OUTPUT}"
+          echo "version=${TAG#"${PREFIX}"}" >> "${GITHUB_OUTPUT}"
 
       - name: Create tag and GitHub Release
         shell: bash
@@ -654,10 +664,8 @@ jobs:
           PKG_MGR: ${{ inputs.package-manager }}
           NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_DIRS: ${{ inputs.npm-package-dir }}
-          VERSION: ${{ steps.final.outputs.tag }}
-          PREFIX: ${{ inputs.tag-prefix }}
+          VERSION: ${{ steps.final.outputs.version }}
         run: |
-          VERSION="${VERSION#${PREFIX}}"
           if [[ "${PKG_MGR}" == "npm" ]]; then
             # OIDC trusted publishing needs Node >= 22.14.0 and npm >= 11.5.1
             # (https://docs.npmjs.com/trusted-publishers). Reject incompatible
@@ -697,10 +705,8 @@ jobs:
         shell: bash
         env:
           NUGET_AUTH_TOKEN: ${{ github.token }}
-          VERSION: ${{ steps.final.outputs.tag }}
-          PREFIX: ${{ inputs.tag-prefix }}
+          VERSION: ${{ steps.final.outputs.version }}
         run: |
-          VERSION="${VERSION#${PREFIX}}"
           dotnet pack "${{ inputs.nuget-project }}" \
             -c Release \
             -p:PackageVersion="${VERSION}" \
