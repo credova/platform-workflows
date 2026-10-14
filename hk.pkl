@@ -1,0 +1,13 @@
+amends "package://github.com/jdx/hk/releases/download/v2.5.0/hk@2.5.0#/Config.pkl"
+
+hooks {
+  ["pre-push"] {
+    steps {
+      // Lints every workflow when any workflow or the runner-label config changes.
+      ["jactionlint"] {
+        glob = List(".github/workflows/*.{yml,yaml}", ".github/jactionlint.yaml")
+        check = "jactionlint"
+      }
+    }
+  }
+}
