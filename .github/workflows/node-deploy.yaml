@@ -7,7 +7,7 @@ on:
         description: Node.js version
         type: string
         required: false
-        default: "20"
+        default: "24"
       test-command:
         description: "Override test command (default: mise run test)"
         type: string

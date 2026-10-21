@@ -57,7 +57,7 @@ jobs:
     uses: credova/platform-workflows/.github/workflows/pull-request.yaml@master
     with:
       language: node
-      language-version: "20"
+      language-version: "24"
       test-command: "npm ci && npm test"
 ```
 
@@ -73,7 +73,7 @@ jobs:
     uses: credova/platform-workflows/.github/workflows/deploy.yaml@master
     with:
       language: node
-      language-version: "20"
+      language-version: "24"
       config-path: deployments/
     secrets:
       RELEASE_DOWNLOADER_APP_ID: ${{ secrets.RELEASE_DOWNLOADER_APP_ID }}
