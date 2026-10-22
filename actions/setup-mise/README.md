@@ -2,19 +2,20 @@
 
 Install mise and the tools in the repository's mise config. Wraps [`jdx/mise-action`](https://github.com/jdx/mise-action) and puts the tool cache on WarpCache when the job runs on a WarpBuild runner. On any other runner it behaves exactly like `jdx/mise-action`.
 
-Use this in place of `uses: jdx/mise-action@v4`. The action exposes a supported subset of `jdx/mise-action`'s inputs, with the same names and defaults. Inputs not listed below are not forwarded; a caller that passes one gets an "Unexpected input" warning and the value is dropped. Step-level `env` (for example `MISE_GITHUB_TOKEN`) is inherited by every step and needs no input.
+Use this in place of `uses: jdx/mise-action@v5`. The action exposes a supported subset of `jdx/mise-action`'s inputs, with the same names and defaults. Inputs not listed below are not forwarded; a caller that passes one gets an "Unexpected input" warning and the value is dropped. Step-level `env` (for example `MISE_GITHUB_TOKEN`) is inherited by every step and needs no input.
 
 ## Inputs
 
 | Input               | Required | Default              | Description                                                        |
 | ------------------- | -------- | -------------------- | ------------------------------------------------------------------ |
-| `version`           | No       | latest release       | mise version to install                                            |
+| `version`           | No       | latest release       | mise version to install (unset: newest release at least 24h old)   |
 | `install`           | No       | `true`               | Run `mise install` after setup                                     |
 | `install_args`      | No       | -                    | Arguments passed to `mise install`, e.g. `bun`                     |
 | `cache`             | No       | `true`               | Read and write the mise tool cache                                 |
 | `cache_save`        | No       | `true`               | Write the cache after install                                      |
 | `cache_key_prefix`  | No       | `mise-v1`            | Cache key prefix. Change it to invalidate the cache                |
 | `github_token`      | No       | `${{ github.token }}` | Token mise uses to install GitHub-hosted tools                   |
+| `persist_github_token` | No    | `false`              | Export `MISE_GITHUB_TOKEN` to later steps: `true` or a token value |
 | `working_directory` | No       | repository root      | Directory mise runs in                                             |
 
 ## Outputs
@@ -53,4 +54,14 @@ Read the cache without writing it:
 - uses: credova/platform-workflows/actions/setup-mise@v1
   with:
     cache_save: false
+```
+
+Keep `MISE_GITHUB_TOKEN` for later steps. Since v5, `jdx/mise-action` keeps the token inside its own step, so later `mise run` steps no longer see it. The Go and IaC workflows set `persist_github_token: true`, because their later `mise run` steps need the cross-repo app token they pass in. Any later step in the job can read an exported token, so opt in only when a later step needs it:
+
+```yaml
+- uses: credova/platform-workflows/actions/setup-mise@v1
+  with:
+    persist_github_token: true
+  env:
+    MISE_GITHUB_TOKEN: ${{ steps.cross-repo-token.outputs.token }}
 ```
