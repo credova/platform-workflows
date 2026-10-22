@@ -1,4 +1,4 @@
-amends "package://github.com/jdx/hk/releases/download/v2.5.0/hk@2.5.0#/Config.pkl"
+amends "package://github.com/jdx/hk/releases/download/v2.8.0/hk@2.8.0#/Config.pkl"
 
 hooks {
   ["pre-push"] {
@@ -6,7 +6,7 @@ hooks {
       // Lints every workflow when any workflow or the runner-label config changes.
       ["jactionlint"] {
         glob = List(".github/workflows/*.{yml,yaml}", ".github/jactionlint.yaml")
-        check = "jactionlint"
+        check = "jactionlint --profile correctness" // 2.x defaults to a stricter profile; keep the actionlint-equivalent checks
       }
     }
   }
