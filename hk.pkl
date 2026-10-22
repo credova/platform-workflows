@@ -1,6 +1,12 @@
 amends "package://github.com/jdx/hk/releases/download/v2.5.0/hk@2.5.0#/Config.pkl"
+import "package://github.com/jdx/hk/releases/download/v2.5.0/hk@2.5.0#/Builtins.pkl"
 
 hooks {
+  ["pre-commit"] {
+    steps {
+      ["shellcheck"] = Builtins.shellcheck
+    }
+  }
   ["pre-push"] {
     steps {
       // Lints every workflow when any workflow or the runner-label config changes.

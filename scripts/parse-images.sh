@@ -64,6 +64,7 @@ if [ -n "${IMAGES}" ]; then
     if echo "$line" | grep -qE '^\s*-\s'; then
       flush_entry
       # Extract key: value from the "- key: value" line
+      # shellcheck disable=SC2001 # ${var//} has no \s or anchors.
       kv=$(echo "$line" | sed 's/^\s*-\s*//')
       key=$(echo "$kv" | cut -d: -f1 | tr -d '[:space:]')
       val=$(echo "$kv" | cut -d: -f2- | sed 's/^\s*//')
