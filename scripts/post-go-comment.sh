@@ -181,15 +181,17 @@ ${TEST_END}"
 if [ -n "$EXISTING_ID" ]; then
   ENDPOINT="repos/${GITHUB_REPOSITORY}/issues/comments/${EXISTING_ID}"
   METHOD=PATCH
+  DONE_MESSAGE="Updated Go comment #${EXISTING_ID} on PR #${PR_NUMBER}"
 else
   ENDPOINT="repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments"
   METHOD=POST
+  DONE_MESSAGE="Posted new Go comment on PR #${PR_NUMBER}"
 fi
 
 # Pipe the body to jq: as an --arg, a large body fails with "Argument list too long".
 if printf '%s' "$COMMENT_BODY" | jq -Rs '{body: .}' \
     | gh api "$ENDPOINT" --method "$METHOD" --input - > /dev/null; then
-  echo "Go comment posted (${METHOD})"
+  echo "$DONE_MESSAGE"
 else
-  warn "could not post the Go comment"
+  warn "could not ${METHOD} the Go comment on PR #${PR_NUMBER}"
 fi
