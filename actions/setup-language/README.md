@@ -47,7 +47,7 @@ When `cache: true`:
 - uses: credova/platform-workflows/actions/setup-language@master
   with:
     language: node
-    version: "20"
+    version: "24"
 ```
 
 ### Kotlin (JDK + Gradle)
