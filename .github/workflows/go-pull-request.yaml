@@ -182,6 +182,8 @@ jobs:
 
       - name: Setup mise
         uses: credova/platform-workflows/actions/setup-mise@master
+        with:
+          persist_github_token: true
         env:
           MISE_GITHUB_TOKEN: ${{ steps.cross-repo-token.outputs.token || github.token }}
           GIT_CONFIG_COUNT: 1
@@ -227,6 +229,8 @@ jobs:
 
       - name: Setup mise
         uses: credova/platform-workflows/actions/setup-mise@master
+        with:
+          persist_github_token: true
         env:
           MISE_GITHUB_TOKEN: ${{ steps.cross-repo-token.outputs.token || github.token }}
           GIT_CONFIG_COUNT: 1
@@ -272,6 +276,8 @@ jobs:
 
       - name: Setup mise
         uses: credova/platform-workflows/actions/setup-mise@master
+        with:
+          persist_github_token: true
         env:
           MISE_GITHUB_TOKEN: ${{ steps.cross-repo-token.outputs.token || github.token }}
           GIT_CONFIG_COUNT: 1
@@ -325,6 +331,8 @@ jobs:
 
       - name: Setup mise
         uses: credova/platform-workflows/actions/setup-mise@master
+        with:
+          persist_github_token: true
         env:
           MISE_GITHUB_TOKEN: ${{ steps.cross-repo-token.outputs.token || github.token }}
           GIT_CONFIG_COUNT: 1

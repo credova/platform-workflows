@@ -35,6 +35,13 @@ inputs:
     description: GitHub token used by mise to install GitHub-hosted tools
     required: false
     default: ${{ github.token }}
+  persist_github_token:
+    description: >
+      Export MISE_GITHUB_TOKEN to later steps. `true` exports the token mise
+      used (env.MISE_GITHUB_TOKEN wins over github_token); a token value
+      exports that token instead
+    required: false
+    default: "false"
   working_directory:
     description: Directory mise runs in (default repository root)
     required: false
@@ -102,7 +109,7 @@ runs:
 
     - name: Setup mise
       id: mise
-      uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
+      uses: jdx/mise-action@8418fedb1110381a0d3ba51a7a415d7c1b884550 # v5.2.2
       with:
         version: ${{ inputs.version }}
         install: ${{ inputs.install }}
@@ -111,6 +118,7 @@ runs:
         cache_save: ${{ inputs.cache_save }}
         cache_key_prefix: ${{ inputs.cache_key_prefix }}
         github_token: ${{ inputs.github_token }}
+        persist_github_token: ${{ inputs.persist_github_token }}
         working_directory: ${{ inputs.working_directory }}
 
     # Same rule as jdx/mise-action: save only after a real install on a miss.
