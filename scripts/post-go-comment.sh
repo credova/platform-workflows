@@ -13,6 +13,9 @@ set -euo pipefail
 #               default "true"). A disabled section renders "_Not enabled._"
 #               instead of "_Pending..._" so workflows that only run some jobs
 #               (e.g. IaC lint-only) don't show perpetual Pending.
+#
+# The comment is a report only: if it cannot be posted, the script prints a
+# warning and exits 0, so it never fails a job whose check passed.
 
 MAIN_MARKER="<!-- go-report -->"
 LINT_START="<!-- go-lint-start -->"
@@ -21,6 +24,13 @@ SECURITY_START="<!-- go-security-start -->"
 SECURITY_END="<!-- go-security-end -->"
 TEST_START="<!-- go-test-start -->"
 TEST_END="<!-- go-test-end -->"
+
+# GitHub rejects a comment longer than 65,536 characters. The three sections
+# share that limit, so each block of command output is cut to this many bytes.
+MAX_OUTPUT_BYTES=18000
+
+WORK_DIR=$(mktemp -d)
+trap 'rm -rf "$WORK_DIR"' EXIT
 
 PR_NUMBER=$(jq -r '.pull_request.number // empty' "$GITHUB_EVENT_PATH")
 if [ -z "$PR_NUMBER" ]; then
@@ -33,6 +43,20 @@ extract_section() {
   printf '%s' "$body" | awk \
     "found && index(\$0, \"${end}\"){found=0; next} found{print} index(\$0, \"${start}\"){found=1}" \
     || true
+}
+
+# Print stdin, cut at a line boundary to MAX_OUTPUT_BYTES, with a note if cut.
+truncate_output() {
+  local full="${WORK_DIR}/truncate-input"
+  cat > "$full"
+  local size
+  size=$(wc -c < "$full" | tr -d ' ')
+  if [ "$size" -le "$MAX_OUTPUT_BYTES" ]; then
+    cat "$full"
+    return
+  fi
+  head -c "$MAX_OUTPUT_BYTES" "$full" | sed '$d'
+  echo "... (truncated: ${size} bytes in total, see the job log for the full output)"
 }
 
 build_job_section() {
@@ -59,7 +83,7 @@ build_job_section() {
       echo "<summary>Output (${lines} lines)</summary>"
       echo ""
       echo '```'
-      cat "$output_file"
+      truncate_output < "$output_file"
       echo '```'
       echo ""
       echo "</details>"
@@ -104,12 +128,16 @@ build_test_section() {
       echo "<summary>Failed tests (${failures})</summary>"
       echo ""
       echo '```'
-      grep -A 30 "^--- FAIL" "$output_file" || true
+      { grep -A 30 "^--- FAIL" "$output_file" || true; } | truncate_output
       echo '```'
       echo ""
       echo "</details>"
     fi
   fi
+}
+
+warn() {
+  echo "::warning::Go PR comment: $1"
 }
 
 # Fetch existing comment if present
@@ -118,7 +146,10 @@ EXISTING_ID=$(gh api "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" \
 
 EXISTING_BODY=""
 if [ -n "$EXISTING_ID" ]; then
-  EXISTING_BODY=$(gh api "repos/${GITHUB_REPOSITORY}/issues/comments/${EXISTING_ID}" --jq '.body')
+  if ! EXISTING_BODY=$(gh api "repos/${GITHUB_REPOSITORY}/issues/comments/${EXISTING_ID}" --jq '.body'); then
+    warn "could not read comment #${EXISTING_ID}; skipping the update"
+    exit 0
+  fi
 fi
 
 # Preserve sections for other jobs; update current job's section
@@ -160,14 +191,26 @@ ${TEST_START}
 ${TEST_CONTENT}
 ${TEST_END}"
 
+# Pass the body to jq through a file: as a command-line argument, a large body
+# fails with "Argument list too long".
+printf '%s' "$COMMENT_BODY" > "${WORK_DIR}/body.md"
+if ! jq -n --rawfile body "${WORK_DIR}/body.md" '{body: $body}' > "${WORK_DIR}/request.json"; then
+  warn "could not build the request body"
+  exit 0
+fi
+
 if [ -n "$EXISTING_ID" ]; then
-  jq -n --arg body "$COMMENT_BODY" '{body: $body}' \
-    | gh api "repos/${GITHUB_REPOSITORY}/issues/comments/${EXISTING_ID}" \
-        --method PATCH --input - > /dev/null
-  echo "Updated Go comment #${EXISTING_ID}"
+  if gh api "repos/${GITHUB_REPOSITORY}/issues/comments/${EXISTING_ID}" \
+      --method PATCH --input "${WORK_DIR}/request.json" > /dev/null; then
+    echo "Updated Go comment #${EXISTING_ID}"
+  else
+    warn "could not update comment #${EXISTING_ID}"
+  fi
 else
-  jq -n --arg body "$COMMENT_BODY" '{body: $body}' \
-    | gh api "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" \
-        --method POST --input - > /dev/null
-  echo "Posted new Go comment on PR #${PR_NUMBER}"
+  if gh api "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" \
+      --method POST --input "${WORK_DIR}/request.json" > /dev/null; then
+    echo "Posted new Go comment on PR #${PR_NUMBER}"
+  else
+    warn "could not post a comment on PR #${PR_NUMBER}"
+  fi
 fi
