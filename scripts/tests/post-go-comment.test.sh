@@ -1,10 +1,7 @@
 #!/bin/bash
 set -uo pipefail
 
-# Tests for scripts/post-go-comment.sh. A stub `gh` on PATH reports no existing
-# comment, saves the JSON the script sends, and exits with a chosen status, so
-# each case asserts on the comment body and on the script's exit status.
-# Run directly, or through `scripts/tests/run.sh` with the other test files.
+# Tests for scripts/post-go-comment.sh: comment size, truncation, and exit status.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 UNDER_TEST="${SCRIPT_DIR}/../post-go-comment.sh"
@@ -18,29 +15,21 @@ trap 'rm -rf "${WORK_DIR}"' EXIT
 
 printf '{"pull_request":{"number":42}}' > "${WORK_DIR}/event.json"
 
-# Write a stub `gh`. A call without --input is the lookup of existing comments
-# and prints nothing. A call with --input saves the request JSON it names
-# ("-" for stdin).
-#   $1 - exit status for the request that posts the comment
+# Stub `gh`: the comment lookup prints nothing; the post saves stdin and exits $1.
 stub_gh() {
   local post_status="$1"
   cat > "${WORK_DIR}/gh" <<EOF
 #!/bin/bash
-prev=""
-for arg in "\$@"; do
-  if [ "\${prev}" = "--input" ]; then
-    if [ "\${arg}" = "-" ]; then cat; else cat "\${arg}"; fi > "${WORK_DIR}/request.json"
-    exit ${post_status}
-  fi
-  prev="\${arg}"
-done
+if [[ " \$* " == *" --input "* ]]; then
+  cat > "${WORK_DIR}/request.json"
+  exit ${post_status}
+fi
 EOF
   chmod +x "${WORK_DIR}/gh"
   rm -f "${WORK_DIR}/request.json"
 }
 
-# Run the script under test for the security job with the stub in front of PATH.
-#   $1 - job outcome, $2 - path to the job output
+# Run the security job with outcome $1 and output file $2.
 run_under_test() {
   PATH="${WORK_DIR}:${PATH}" \
     GH_TOKEN="test-token" GITHUB_REPOSITORY="credova/example" \
