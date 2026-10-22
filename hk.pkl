@@ -1,5 +1,5 @@
-amends "package://github.com/jdx/hk/releases/download/v2.5.0/hk@2.5.0#/Config.pkl"
-import "package://github.com/jdx/hk/releases/download/v2.5.0/hk@2.5.0#/Builtins.pkl"
+amends "package://github.com/jdx/hk/releases/download/v2.8.0/hk@2.8.0#/Config.pkl"
+import "package://github.com/jdx/hk/releases/download/v2.8.0/hk@2.8.0#/Builtins.pkl"
 
 hooks {
   ["pre-commit"] {
@@ -12,7 +12,7 @@ hooks {
       // Lints every workflow when any workflow or the runner-label config changes.
       ["jactionlint"] {
         glob = List(".github/workflows/*.{yml,yaml}", ".github/jactionlint.yaml")
-        check = "jactionlint"
+        check = "jactionlint" // profile comes from .github/jactionlint.yaml, same as CI
       }
     }
   }

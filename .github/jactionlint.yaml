@@ -1,3 +1,5 @@
+profile: correctness
+
 # WarpBuild runner labels used by these workflows.
 self-hosted-runner:
   labels:
