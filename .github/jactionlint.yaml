@@ -1,4 +1,3 @@
-# jactionlint 2.x adds zizmor-style rules; keep the actionlint-equivalent checks we had on 1.x.
 profile: correctness
 
 # WarpBuild runner labels used by these workflows.

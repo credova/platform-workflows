@@ -25,5 +25,4 @@ updates:
         applies-to: security-updates
         patterns: ["*"]
     ignore:
-      # Exact 0.x pin. Every minor can break; bumped by hand with a story.
       - dependency-name: reeveops/reeve
