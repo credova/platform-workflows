@@ -22,6 +22,9 @@ SECURITY_END="<!-- go-security-end -->"
 TEST_START="<!-- go-test-start -->"
 TEST_END="<!-- go-test-end -->"
 
+# GitHub rejects comments longer than 65,536 characters.
+MAX_OUTPUT_CHARS=18000
+
 PR_NUMBER=$(jq -r '.pull_request.number // empty' "$GITHUB_EVENT_PATH")
 if [ -z "$PR_NUMBER" ]; then
   echo "Not a pull request - skipping comment"
@@ -33,6 +36,14 @@ extract_section() {
   printf '%s' "$body" | awk \
     "found && index(\$0, \"${end}\"){found=0; next} found{print} index(\$0, \"${start}\"){found=1}" \
     || true
+}
+
+truncate_output() {
+  local text="$1"
+  printf '%s\n' "${text:0:MAX_OUTPUT_CHARS}"
+  if [ "${#text}" -gt "$MAX_OUTPUT_CHARS" ]; then
+    echo "... (truncated, see the job log for the full output)"
+  fi
 }
 
 build_job_section() {
@@ -59,7 +70,7 @@ build_job_section() {
       echo "<summary>Output (${lines} lines)</summary>"
       echo ""
       echo '```'
-      cat "$output_file"
+      truncate_output "$(cat "$output_file")"
       echo '```'
       echo ""
       echo "</details>"
@@ -104,12 +115,16 @@ build_test_section() {
       echo "<summary>Failed tests (${failures})</summary>"
       echo ""
       echo '```'
-      grep -A 30 "^--- FAIL" "$output_file" || true
+      truncate_output "$(grep -A 30 "^--- FAIL" "$output_file" || true)"
       echo '```'
       echo ""
       echo "</details>"
     fi
   fi
+}
+
+warn() {
+  echo "::warning::Go PR comment: $1"
 }
 
 # Fetch existing comment if present
@@ -118,7 +133,10 @@ EXISTING_ID=$(gh api "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" \
 
 EXISTING_BODY=""
 if [ -n "$EXISTING_ID" ]; then
-  EXISTING_BODY=$(gh api "repos/${GITHUB_REPOSITORY}/issues/comments/${EXISTING_ID}" --jq '.body')
+  if ! EXISTING_BODY=$(gh api "repos/${GITHUB_REPOSITORY}/issues/comments/${EXISTING_ID}" --jq '.body'); then
+    warn "could not read comment #${EXISTING_ID}; skipping the update"
+    exit 0
+  fi
 fi
 
 # Preserve sections for other jobs; update current job's section
@@ -161,13 +179,19 @@ ${TEST_CONTENT}
 ${TEST_END}"
 
 if [ -n "$EXISTING_ID" ]; then
-  jq -n --arg body "$COMMENT_BODY" '{body: $body}' \
-    | gh api "repos/${GITHUB_REPOSITORY}/issues/comments/${EXISTING_ID}" \
-        --method PATCH --input - > /dev/null
-  echo "Updated Go comment #${EXISTING_ID}"
+  ENDPOINT="repos/${GITHUB_REPOSITORY}/issues/comments/${EXISTING_ID}"
+  METHOD=PATCH
+  DONE_MESSAGE="Updated Go comment #${EXISTING_ID} on PR #${PR_NUMBER}"
 else
-  jq -n --arg body "$COMMENT_BODY" '{body: $body}' \
-    | gh api "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" \
-        --method POST --input - > /dev/null
-  echo "Posted new Go comment on PR #${PR_NUMBER}"
+  ENDPOINT="repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments"
+  METHOD=POST
+  DONE_MESSAGE="Posted new Go comment on PR #${PR_NUMBER}"
+fi
+
+# Pipe the body to jq: as an --arg, a large body fails with "Argument list too long".
+if printf '%s' "$COMMENT_BODY" | jq -Rs '{body: .}' \
+    | gh api "$ENDPOINT" --method "$METHOD" --input - > /dev/null; then
+  echo "$DONE_MESSAGE"
+else
+  warn "could not ${METHOD} the Go comment on PR #${PR_NUMBER}"
 fi

@@ -18,20 +18,20 @@ echo "::group::OpenGrep static analysis"
 # ({"results": [...]}) and SARIF loses the metadata it decodes (cwe, owasp,
 # the raw severity string). --*-output flags are repeatable and independent,
 # so this costs one extra file, not a second scan.
-ARGS="scan --sarif-output=opengrep-results.sarif --json-output=opengrep-results.json"
+ARGS=(scan --sarif-output=opengrep-results.sarif --json-output=opengrep-results.json)
 
 # Map severity to opengrep --severity flag
 case "${SEVERITY}" in
-  CRITICAL) ARGS="${ARGS} --severity ERROR" ;;
-  HIGH)     ARGS="${ARGS} --severity WARNING" ;;
-  *)        ARGS="${ARGS} --severity INFO" ;;
+  CRITICAL) ARGS+=(--severity ERROR) ;;
+  HIGH)     ARGS+=(--severity WARNING) ;;
+  *)        ARGS+=(--severity INFO) ;;
 esac
 
 # Use auto-detected rules (opengrep default rulesets)
-ARGS="${ARGS} --config auto"
+ARGS+=(--config auto)
 
 OPENGREP_EXIT=0
-opengrep ${ARGS} . || OPENGREP_EXIT=$?
+opengrep "${ARGS[@]}" . || OPENGREP_EXIT=$?
 
 echo "::endgroup::"
 
