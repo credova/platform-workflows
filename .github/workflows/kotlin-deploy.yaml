@@ -352,10 +352,17 @@ jobs:
         include: ${{ fromJson(needs.validate.outputs.image-matrix) }}
     steps:
       - uses: actions/checkout@v7
+      - name: Record build time
+        id: build-time
+        shell: bash
+        run: echo "value=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "${GITHUB_OUTPUT}"
       - name: Build, scan, and push (${{ matrix.name }})
         uses: credova/platform-workflows/actions/container@master
         with:
           name: ${{ matrix.name }}
+          build-args: |
+            GIT_SHA=${{ github.sha }}
+            BUILD_TIME=${{ steps.build-time.outputs.value }}
           dockerfile: ${{ matrix.dockerfile }}
           context: ${{ matrix.context }}
           target: ${{ matrix.target }}
